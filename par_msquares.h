@@ -505,5 +505,4 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
 #undef MIN
 #undef MAX
 #undef CLAMP
-
 #endif

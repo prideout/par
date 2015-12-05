@@ -37,7 +37,7 @@ static void test_color()
     mlist = par_msquares_from_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         OCEAN_COLOR, 4, flags);
     mesh = par_msquares_get_mesh(mlist, 0);
-    objfile = fopen("msquares_color_invert_heights.obj", "wt");
+    objfile = fopen("build/msquares_color_invert_heights.obj", "wt");
     pt = mesh->points;
     for (i = 0; i < mesh->npoints; i++) {
         float z = mesh->dim > 2 ? pt[2] : 0;
@@ -77,7 +77,7 @@ static void test_grayscale()
     mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     mesh = par_msquares_get_mesh(mlist, 0);
-    objfile = fopen("msquares_grayscale_heights.obj", "wt");
+    objfile = fopen("build/msquares_grayscale_heights.obj", "wt");
     pt = mesh->points;
     for (i = 0; i < mesh->npoints; i++) {
         float z = mesh->dim > 2 ? pt[2] : 0;

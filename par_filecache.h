@@ -53,6 +53,8 @@ void par_filecache_evict_all();
 // END PUBLIC API
 // -----------------------------------------------------------------------------
 
+#ifdef PAR_FILECACHE_IMPLEMENTATION
+
 #include <limits.h>
 #include <string.h>
 #include <assert.h>
@@ -383,3 +385,4 @@ static uint64_t _hash(const char* name)
 #undef MIN
 #undef MAX
 #undef CLAMP
+#endif
