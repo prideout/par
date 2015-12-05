@@ -1,9 +1,11 @@
 language: c
 script:
-    - which gcc
-    - gcc-5.1 --version
-    - CC=gcc-5.1 CXX=g++-5.1 cmake -Htest -Bbuild
-    - CC=gcc-5.1 CXX=g++-5.1 cmake --build build -- VERBOSE=1
+    - ls -l /usr/bin/gcc
+    - export CC=gcc-5.1
+    - export CXX=g++-5.1
+    - gcc --version
+    - cmake -Htest -Bbuild
+    - cmake --build build -- VERBOSE=1
     - build/test_msquares
 addons:
   apt:
