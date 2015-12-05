@@ -7,5 +7,5 @@ Single-file C libraries under the MIT license.
 library    | description
 ------------------- | ----
 **par_msquares.h** | efficient marching squares implementation
-**par_easycurl.h** | simple HTTP requests; wraps libcurl
+**par_easycurl.h** | simple HTTP requests using libcurl
 **par_filecache.h** | LRU caching on your device's filesystem

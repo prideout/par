@@ -3,36 +3,16 @@
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
 
-#include <strings.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <curl/curl.h>
+// -----------------------------------------------------------------------------
+// BEGIN PUBLIC API
+// -----------------------------------------------------------------------------
 
 typedef unsigned char par_byte;
 
 // Call this before calling any other easycurl function.  The flags are
 // currently unused, so you can just pass 0.
-void par_easycurl_init(uint32_t flags);
+void par_easycurl_init(unsigned int flags);
 
 // Allocates a memory buffer and downloads a data blob into it.
 // Returns 1 for success and 0 otherwise.  The byte count should be
@@ -44,9 +24,19 @@ int par_easycurl_to_memory(const char* url, par_byte** data, int* nbytes);
 // success and 0 otherwise.
 int par_easycurl_to_file(const char* srcurl, const char* dstpath);
 
+// -----------------------------------------------------------------------------
+// END PUBLIC API
+// -----------------------------------------------------------------------------
+
+#include <strings.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <curl/curl.h>
+
 static int _ready = 0;
 
-void par_easycurl_init(uint32_t flags)
+void par_easycurl_init(unsigned int flags)
 {
     if (!_ready) {
         curl_global_init(CURL_GLOBAL_SSL);
@@ -141,7 +131,7 @@ int par_easycurl_to_memory(const char* url, par_byte** data, int* nbytes)
     curl_easy_setopt(handle, CURLOPT_TIMECONDITION, CURL_TIMECOND_IFMODSINCE);
     curl_easy_setopt(handle, CURLOPT_TIMEVALUE, 0);
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, 0);
-    curl_easy_setopt(handle, CURLOPT_TIMEOUT, 15);
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT, 60);
     curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errbuf);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0);
     CURLcode res = curl_easy_perform(handle);
@@ -181,7 +171,7 @@ int par_easycurl_to_file(const char* srcurl, const char* dstpath)
     curl_easy_setopt(handle, CURLOPT_TIMECONDITION, CURL_TIMECOND_IFMODSINCE);
     curl_easy_setopt(handle, CURLOPT_TIMEVALUE, 0);
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, 0);
-    curl_easy_setopt(handle, CURLOPT_TIMEOUT, 15);
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT, 60);
     curl_easy_perform(handle);
     curl_easy_getinfo(handle, CURLINFO_CONDITION_UNMET, &code);
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
