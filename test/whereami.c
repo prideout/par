@@ -43,10 +43,6 @@ extern "C" {
 #endif
 #endif
 
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
-
 static int WAI_PREFIX(getModulePath_)(HMODULE module, char* out, int capacity, int* dirname_length)
 {
   wchar_t buffer1[MAX_PATH];
@@ -148,6 +144,10 @@ int WAI_PREFIX(getModulePath)(char* out, int capacity, int* dirname_length)
 #define __STDC_FORMAT_MACROS
 #endif
 #include <inttypes.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 #if !defined(WAI_PROC_SELF_EXE)
 #define WAI_PROC_SELF_EXE "/proc/self/exe"
