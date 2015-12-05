@@ -1,12 +1,14 @@
+language: c
 script:
-    - gcc --version
-    - CC=gcc-5.0 CXX=g++-5.0 cmake -Htest -Bbuild
-    - CC=gcc-5.0 CXX=g++-5.0 cmake --build build -- VERBOSE=1
+    - which gcc
+    - gcc-5.1 --version
+    - CC=gcc-5.1 CXX=g++-5.1 cmake -Htest -Bbuild
+    - CC=gcc-5.1 CXX=g++-5.1 cmake --build build -- VERBOSE=1
     - build/test_msquares
 addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
     packages:
-    - gcc-5.0
-    - g++-5.0
+    - gcc-5.1
+    - g++-5.1
