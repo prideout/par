@@ -1,5 +1,5 @@
-language: c
 script:
+    - gcc --version
     - CC=gcc-5.0 CXX=g++-5.0 cmake -Htest -Bbuild
     - CC=gcc-5.0 CXX=g++-5.0 cmake --build build -- VERBOSE=1
     - build/test_msquares
