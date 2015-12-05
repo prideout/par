@@ -73,6 +73,19 @@ void par_filecache_evict_all();
 #include "lz4.h"
 #endif
 
+static char * _par_strdup(const char *s)
+{
+    if (s) {
+        size_t l = strlen(s);
+        char *s2 = malloc(l + 1);
+        if (s2) {
+            strcpy(s2, s);
+        }
+        return s2;
+    }
+    return 0;
+}
+
 #define MAX_ENTRIES 64
 #define MIN(a, b) (a < b ? a : b)
 
@@ -252,7 +265,7 @@ static void _append_table(const char* item_name, int item_size)
     filecache_entry_t* entry = &_table->entries[_table->nentries++];
     entry->last_used_timestamp = now;
     entry->hashed_name = hashed_name;
-    entry->name = strdup(item_name);
+    entry->name = _par_strdup(item_name);
     entry->nbytes = item_size;
     _save_tablefile();
 }
@@ -300,7 +313,7 @@ static void _read_or_create_tablefile()
             if (nargs != 3) {
                 break;
             }
-            entry.name = strdup(name);
+            entry.name = _par_strdup(name);
             entry.hashed_name = _hash(entry.name);
             _table->entries[_table->nentries++] = entry;
             _table->totalbytes += entry.nbytes;

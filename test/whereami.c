@@ -43,6 +43,10 @@ extern "C" {
 #endif
 #endif
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 static int WAI_PREFIX(getModulePath_)(HMODULE module, char* out, int capacity, int* dirname_length)
 {
   wchar_t buffer1[MAX_PATH];
