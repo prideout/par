@@ -1,16 +1,17 @@
 language: c
+addons:
+    apt:
+        sources:
+            - llvm-toolchain-precise
+            - ubuntu-toolchain-r-test
+        packages:
+            - clang-3.7
+            - g++-5
+            - gcc-5
 script:
-    - ls -l /usr/bin/gcc
-    - export CC=gcc-5.1
-    - export CXX=g++-5.1
+    - ls -l /usr/bin/gcc*
+    - export CC=gcc-5.1 CXX=g++-5.1
     - gcc --version
     - cmake -Htest -Bbuild
     - cmake --build build -- VERBOSE=1
     - build/test_msquares
-addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    packages:
-    - gcc-5.1
-    - g++-5.1
