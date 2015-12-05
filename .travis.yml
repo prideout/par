@@ -1,7 +1,7 @@
 language: c
 script:
     - cmake -Htest -Bbuild
-    - cmake --build build
+    - cmake --build build -- VERBOSE=1
     - build/test_msquares
 addons:
   apt:

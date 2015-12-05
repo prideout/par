@@ -16,26 +16,10 @@
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
 
-#include <limits.h>
-#include <string.h>
-#include <assert.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <libgen.h>
-#include <time.h>
-#include <sys/stat.h>
-
 // Set this to zero if you wish to avoid LZ4 compression.  I recommend using
 // it though, because it's very fast and it's a two-file library.
 #ifndef ENABLE_LZ4
 #define ENABLE_LZ4 0
-#endif
-
-#if ENABLE_LZ4
-#include "lz4.h"
 #endif
 
 // -----------------------------------------------------------------------------
@@ -68,6 +52,26 @@ void par_filecache_evict_all();
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
+
+#include <limits.h>
+#include <string.h>
+#include <assert.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <libgen.h>
+#include <time.h>
+#include <sys/stat.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+#if ENABLE_LZ4
+#include "lz4.h"
+#endif
 
 #define MAX_ENTRIES 64
 #define MIN(a, b) (a < b ? a : b)
