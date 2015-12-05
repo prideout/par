@@ -30,7 +30,9 @@
 
 // Set this to zero if you wish to avoid LZ4 compression.  I recommend using
 // it though, because it's very fast and it's a two-file library.
-#define ENABLE_LZ4 1
+#ifndef ENABLE_LZ4
+#define ENABLE_LZ4 0
+#endif
 
 #if ENABLE_LZ4
 #include "lz4.h"
@@ -360,3 +362,7 @@ static uint64_t _hash(const char* name)
     }
     return hval;
 }
+
+#undef MIN
+#undef MAX
+#undef CLAMP

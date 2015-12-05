@@ -164,7 +164,6 @@ typedef struct {
 static int color_inside(int location, void* contextptr)
 {
     color_context* context = (color_context*) contextptr;
-    int bpp = context->bpp;
     par_byte const* data = context->data + location * context->bpp;
     for (int i = 0; i < context->bpp; i++) {
         if (data[i] != context->color[i]) {
@@ -263,7 +262,6 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     mesh->dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     int ncols = width / cellsize;
     int nrows = height / cellsize;
-    int ncorners = (ncols + 1) * (nrows + 1);
 
     // Worst case is three triangles and six verts per cell, so allocate that
     // much.
@@ -489,5 +487,9 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     mesh->triangles = tris;
     return mlist;
 }
+
+#undef MIN
+#undef MAX
+#undef CLAMP
 
 #endif
