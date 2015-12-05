@@ -3,7 +3,7 @@ project(par)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(CURL REQUIRED libcurl)
 
-set(CMAKE_C_FLAGS "-std=c99 -O3 -Wall")
+set(CMAKE_C_FLAGS "-std=c11 -O3 -Wall")
 set(CMAKE_CXX_FLAGS "-O3 -Wall")
 
 include_directories(
