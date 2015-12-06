@@ -18,11 +18,11 @@ void par_easycurl_init(unsigned int flags);
 // Returns 1 for success and 0 otherwise.  The byte count should be
 // pre-allocated.  The caller is responsible for freeing the returned data.
 // This does not do any caching!
-int par_easycurl_to_memory(const char* url, par_byte** data, int* nbytes);
+int par_easycurl_to_memory(char const* url, par_byte** data, int* nbytes);
 
 // Downloads a file from the given URL and saves it to disk.  Returns 1 for
 // success and 0 otherwise.
-int par_easycurl_to_file(const char* srcurl, const char* dstpath);
+int par_easycurl_to_file(char const* srcurl, char const* dstpath);
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -58,7 +58,7 @@ static size_t onheader(void* v, size_t size, size_t nmemb)
     size_t n = size * nmemb;
     char* h = v;
     if (n > 14 && !strncasecmp("Last-Modified:", h, 14)) {
-        const char* s = h + 14;
+        char const* s = h + 14;
         time_t r = curl_getdate(s, 0);
         if (r != -1) {
             // TODO handle last-modified
@@ -89,7 +89,7 @@ static size_t onwrite(char* contents, size_t size, size_t nmemb, void* udata)
 }
 
 #if IOS_EXAMPLE
-bool curlToMemory(const char* url, uint8_t** data, int* nbytes)
+bool curlToMemory(char const* url, uint8_t** data, int* nbytes)
 {
     NSString* nsurl =
     [NSString stringWithCString:url encoding:NSASCIIStringEncoding];
@@ -114,7 +114,7 @@ bool curlToMemory(const char* url, uint8_t** data, int* nbytes)
 
 #endif
 
-int par_easycurl_to_memory(const char* url, par_byte** data, int* nbytes)
+int par_easycurl_to_memory(char const* url, par_byte** data, int* nbytes)
 {
     char errbuf[CURL_ERROR_SIZE] = {0};
     par_easycurl_buffer buffer = {malloc(1), 0};
@@ -152,7 +152,7 @@ int par_easycurl_to_memory(const char* url, par_byte** data, int* nbytes)
     return 1;
 }
 
-int par_easycurl_to_file(const char* srcurl, const char* dstpath)
+int par_easycurl_to_file(char const* srcurl, char const* dstpath)
 {
     long code = 0;
     long status = 0;

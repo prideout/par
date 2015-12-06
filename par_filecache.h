@@ -32,18 +32,18 @@ typedef unsigned char par_byte;
 // a trailing slash) and the given maximum byte count.  If items already exist
 // in the cache when this is called, they are not evicted.  Cached items are
 // meant to persist from run to run.
-void par_filecache_init(const char* prefix, int maxsize);
+void par_filecache_init(char const* prefix, int maxsize);
 
 // Save a blob to the cache using the given unique name.  If adding the blob
 // would cause the cache to exceed maxsize, the least-recently-used item is
 // evicted at this time.
-void par_filecache_save(const char* name, par_byte* payload, int payloadsize,
+void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
     par_byte* header, int headersize);
 
 // Check if the given blob is in the cache; if not, return 0.  If so, return 1
 // and allocate new memory for payload.  The caller should free the payload.
 // The header is preallocated so the caller needs to know its size beforehand.
-int par_filecache_load(const char* name, par_byte** payload, int* payloadsize,
+int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     par_byte* header, int headersize);
 
 // Remove all items from the cache.
@@ -75,7 +75,7 @@ void par_filecache_evict_all();
 #include "lz4.h"
 #endif
 
-static char * _par_strdup(const char *s)
+static char * _par_strdup(char const* s)
 {
     if (s) {
         size_t l = strlen(s);
@@ -94,7 +94,7 @@ static char * _par_strdup(const char *s)
 typedef struct {
     time_t last_used_timestamp;
     uint64_t hashed_name;
-    const char* name;
+    char const* name;
     int nbytes;
 } filecache_entry_t;
 
@@ -104,19 +104,19 @@ typedef struct {
     int totalbytes;
 } filecache_table_t;
 
-static void _update_table(const char* item_name, int item_size);
-static void _append_table(const char* item_name, int item_size);
+static void _update_table(char const* item_name, int item_size);
+static void _append_table(char const* item_name, int item_size);
 static void _read_or_create_tablefile();
 static void _save_tablefile();
 static void _evict_lru();
-static uint64_t _hash(const char* name);
+static uint64_t _hash(char const* name);
 
 static char _fileprefix[PATH_MAX] = "./_cache.";
 static char _tablepath[PATH_MAX] = "./_cache.table";
 static int _maxtotalbytes = 1024 * 1024 * 16;
 static filecache_table_t* _table = 0;
 
-void par_filecache_init(const char* prefix, int maxsize)
+void par_filecache_init(char const* prefix, int maxsize)
 {
     size_t len = strlen(prefix);
     assert(len + 1 < PATH_MAX && "Cache prefix is too long");
@@ -144,7 +144,7 @@ NSString* getPrefix()
 
 #endif
 
-int par_filecache_load(const char* name, par_byte** payload, int* payloadsize,
+int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     par_byte* header, int headersize)
 {
     char qualified[PATH_MAX];
@@ -186,7 +186,7 @@ int par_filecache_load(const char* name, par_byte** payload, int* payloadsize,
     return 1;
 }
 
-void par_filecache_save(const char* name, par_byte* payload, int payloadsize,
+void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
     par_byte* header, int headersize)
 {
     char qualified[PATH_MAX];
@@ -209,7 +209,7 @@ void par_filecache_save(const char* name, par_byte* payload, int payloadsize,
 #if ENABLE_LZ4
         int maxsize = LZ4_compressBound(nbytes);
         char* dst = malloc(maxsize);
-        const char* src = (const char*) payload;
+        char const* src = (char const*) payload;
         assert(nbytes < LZ4_MAX_INPUT_SIZE);
         csize = LZ4_compress_default(src, dst, nbytes, maxsize);
         fwrite(dst, 1, csize, cachefile);
@@ -250,7 +250,7 @@ void par_filecache_evict_all()
 
 // Adds the given item to the table and evicts the LRU items if the total cache
 // size exceeds the specified maxsize.
-static void _append_table(const char* item_name, int item_size)
+static void _append_table(char const* item_name, int item_size)
 {
     time_t now = time(0);
     if (!_table) {
@@ -273,7 +273,7 @@ static void _append_table(const char* item_name, int item_size)
 }
 
 // Updates the timestamp associated with the given item.
-static void _update_table(const char* item_name, int item_size)
+static void _update_table(char const* item_name, int item_size)
 {
     time_t now = time(0);
     if (!_table) {
@@ -369,7 +369,7 @@ static void _evict_lru()
 
 // https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function
 
-static uint64_t _hash(const char* name)
+static uint64_t _hash(char const* name)
 {
     const uint64_t OFFSET = 14695981039346656037ull;
     const uint64_t PRIME = 1099511628211ull;
