@@ -5,22 +5,16 @@
 // is passed in when initializing the cache.  You'll probably want to specify
 // a folder path for your prefix, including the trailing slash.
 //
-// Each item is divided into a payload (arbitrary size) and a header (a priori
-// size). The structure of the payload and header are completely up to you. The
-// list of items is stored in a text file at "{PREFIX}table", which contains a
-// list of names, timestamps, and byte counts.  This table is loaded only once,
-// but is saved every time the client fetches a blob from the cache, so that
-// the most-recently-accessed timestamps are always up to date, even when
-// your application doesn't close gracefully.
+// Each item is divided into a payload (arbitrary size) and an optional header
+// (fixed size). The structure of the payload and header are completely up to
+// you. The list of items is stored in a text file at "{PREFIX}table", which
+// contains a list of names, timestamps, and byte counts.  This table is loaded
+// only once, but is saved every time the client fetches a blob from the cache,
+// so that the most-recently-accessed timestamps are always up to date, even
+// when your application doesn't close gracefully.
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
-
-// Set this to zero if you wish to avoid LZ4 compression.  I recommend using
-// it though, because it's very fast and it's a two-file library.
-#ifndef ENABLE_LZ4
-#define ENABLE_LZ4 0
-#endif
 
 // -----------------------------------------------------------------------------
 // BEGIN PUBLIC API
@@ -48,6 +42,12 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
 
 // Remove all items from the cache.
 void par_filecache_evict_all();
+
+// Set this to zero if you wish to avoid LZ4 compression.  I recommend using
+// it though, because it's very fast and it's a two-file library.
+#ifndef ENABLE_LZ4
+#define ENABLE_LZ4 0
+#endif
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API

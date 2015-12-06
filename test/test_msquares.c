@@ -31,6 +31,30 @@ static void test_color()
     FILE* objfile;
 
     // -----------------------------
+    // msquares_color_default
+    // -----------------------------
+    flags = 0;
+    mlist = par_msquares_from_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        OCEAN_COLOR, 4, flags);
+    mesh = par_msquares_get_mesh(mlist, 0);
+    objfile = fopen("build/msquares_color_default.obj", "wt");
+    pt = mesh->points;
+    for (i = 0; i < mesh->npoints; i++) {
+        float z = mesh->dim > 2 ? pt[2] : 0;
+        fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+        pt += mesh->dim;
+    }
+    index = mesh->triangles;
+    for (i = 0; i < mesh->ntriangles; i++) {
+        int a = 1 + *index++;
+        int b = 1 + *index++;
+        int c = 1 + *index++;
+        fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+    }
+    fclose(objfile);
+    par_msquares_free(mlist);
+
+    // -----------------------------
     // msquares_color_invert_heights
     // -----------------------------
     flags = PAR_MSQUARES_INVERT | PAR_MSQUARES_HEIGHTS;
@@ -49,6 +73,47 @@ static void test_color()
         int a = 1 + *index++;
         int b = 1 + *index++;
         int c = 1 + *index++;
+        fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+    }
+    fclose(objfile);
+    par_msquares_free(mlist);
+
+    // -----------------------------
+    // msquares_color_dual_heights
+    // -----------------------------
+    flags = PAR_MSQUARES_DUAL | PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_SNAP |
+        PAR_MSQUARES_CONNECT | PAR_MSQUARES_SIMPLIFY;
+    mlist = par_msquares_from_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        OCEAN_COLOR, 4, flags);
+    mesh = par_msquares_get_mesh(mlist, 0);
+    objfile = fopen("build/msquares_color_simplify.obj", "wt");
+    pt = mesh->points;
+    for (i = 0; i < mesh->npoints; i++) {
+        float z = mesh->dim > 2 ? pt[2] : 0;
+        fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+        pt += mesh->dim;
+    }
+    index = mesh->triangles;
+    int offset = 1;
+    for (i = 0; i < mesh->ntriangles; i++) {
+        int a = offset + *index++;
+        int b = offset + *index++;
+        int c = offset + *index++;
+        fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+    }
+    offset = mesh->npoints + 1;
+    mesh = par_msquares_get_mesh(mlist, 1);
+    pt = mesh->points;
+    for (i = 0; i < mesh->npoints; i++) {
+        float z = mesh->dim > 2 ? pt[2] : 0;
+        fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+        pt += mesh->dim;
+    }
+    index = mesh->triangles;
+    for (i = 0; i < mesh->ntriangles; i++) {
+        int a = offset + *index++;
+        int b = offset + *index++;
+        int c = offset + *index++;
         fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
     }
     fclose(objfile);
@@ -270,8 +335,7 @@ static void test_grayscale()
     // ------------------------------
     // msquares_gray_heights_simplify
     // ------------------------------
-    flags = PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_DUAL | PAR_MSQUARES_SNAP |
-        PAR_MSQUARES_CONNECT | PAR_MSQUARES_SIMPLIFY;
+    flags = PAR_MSQUARES_SIMPLIFY;
     mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     objfile = fopen("build/msquares_gray_heights_simplify.obj", "wt");
@@ -284,21 +348,6 @@ static void test_grayscale()
     }
     index = mesh->triangles;
     offset = 1;
-    for (i = 0; i < mesh->ntriangles; i++) {
-        int a = offset + *index++;
-        int b = offset + *index++;
-        int c = offset + *index++;
-        fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
-    }
-    offset = mesh->npoints + 1;
-    mesh = par_msquares_get_mesh(mlist, 1);
-    pt = mesh->points;
-    for (i = 0; i < mesh->npoints; i++) {
-        float z = mesh->dim > 2 ? pt[2] : 0;
-        fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
-        pt += mesh->dim;
-    }
-    index = mesh->triangles;
     for (i = 0; i < mesh->ntriangles; i++) {
         int a = offset + *index++;
         int b = offset + *index++;

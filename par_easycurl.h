@@ -1,4 +1,4 @@
-// EASYCURL :: https://github.com/prideout/parg
+// EASYCURL :: https://github.com/prideout/par
 // Wrapper around libcurl for performing simple synchronous HTTP requests.
 //
 // The MIT License

@@ -1,20 +1,19 @@
 [![Build Status](https://travis-ci.org/prideout/par.svg?branch=master)](https://travis-ci.org/prideout/par)
 
-par
-===
+## par
 
 Single-file C libraries under the MIT license.
-<a name="par_libs"></a>
 
 library    | description
 ------------------- | ----
 **par_msquares.h** | efficient marching squares implementation
 **par_easycurl.h** | simple HTTP requests using libcurl
 **par_filecache.h** | LRU caching on your device's filesystem
+**par_bluenoise.h** | generate progressive 2D point sequences
 
-## Running Tests
+## tests
 
-The dependencies are CMake and libcurl.  On OS X, these can be installed with homebrew:
+To run tests, you need CMake and libcurl.  On OS X, these can be installed with homebrew:
 
 ```bash
 $ brew install cmake pkg-config curl
@@ -30,4 +29,5 @@ $ cmake --build build  # Invoke the build
 The tests are executed by simply running the programs:
 ```bash
 $ build/test_msquares
+$ build/test_bluenoise
 ```

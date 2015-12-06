@@ -19,6 +19,18 @@ add_executable(
     sds.c
     whereami.c)
 
+add_executable(
+    test_bluenoise
+    test_bluenoise.c
+    lz4.cpp
+    lodepng.c
+    sds.c
+    whereami.c)
+
 target_link_libraries(
     test_msquares
+    ${CURL_LIBRARIES})
+
+target_link_libraries(
+    test_bluenoise
     ${CURL_LIBRARIES})
