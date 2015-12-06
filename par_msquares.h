@@ -58,16 +58,8 @@ typedef struct {
 par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags);
 
-par_msquares_meshlist* par_msquares_from_levels(float const* data, int width,
-    int height, int cellsize, float const* thresholds, int nthresholds,
-    int flags);
-
 par_msquares_meshlist* par_msquares_from_color(par_byte const* data, int width,
     int height, int cellsize, uint32_t color, int bpp, int flags);
-
-par_msquares_meshlist* par_msquares_from_colors(par_byte const* data, int width,
-    int height, int cellsize, uint32_t const* colors, int ncolors, int bpp,
-    int flags);
 
 typedef int (*par_msquares_inside_fn)(int, void*);
 typedef float (*par_msquares_height_fn)(float, float, void*);
