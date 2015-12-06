@@ -38,6 +38,8 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
+typedef unsigned char par_byte;
+
 // Encapsulates a tile set and an optional density function.
 typedef struct par_bluenoise_context_s par_bluenoise_context;
 
@@ -51,7 +53,7 @@ par_bluenoise_context* par_bluenoise_from_file(char const* path, int maxpts);
 // The third argument is the maximum number of points that you expect to ever
 // be generated.
 par_bluenoise_context* par_bluenoise_from_buffer(
-    char const* buffer, int nbytes, int maxpts);
+    par_byte const* buffer, int nbytes, int maxpts);
 
 // Sets up a scissoring rectangle using the given lower-left and upper-right
 // coordinates.  By default the scissor encompasses [-0.5, -0.5] - [0.5, 0.5],
@@ -367,9 +369,9 @@ par_bluenoise_context* par_bluenoise_from_file(char const* path, int maxpts)
 }
 
 par_bluenoise_context* par_bluenoise_from_buffer(
-    char const* buffer, int nbytes, int maxpts)
+    par_byte const* buffer, int nbytes, int maxpts)
 {
-    return par_bluenoise_create(buffer, nbytes, maxpts);
+    return par_bluenoise_create((char const*) buffer, nbytes, maxpts);
 }
 
 void par_bluenoise_density_from_gray(par_bluenoise_context* ctx,

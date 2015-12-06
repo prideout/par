@@ -14,3 +14,4 @@ script:
     - cmake -Htest -Bbuild
     - cmake --build build -- VERBOSE=1
     - build/test_msquares
+    - build/test_bluenoise
