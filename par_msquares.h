@@ -32,17 +32,15 @@ typedef struct {
 } par_msquares_mesh;
 
 // Reverses the "insideness" test.
-// Only applicable with from_grayscale and from_color.
 #define PAR_MSQUARES_INVERT (1 << 0)
 
 // Returns a meshlist with two meshes: one for the inside, one for the outside.
-// Only applicable with from_grayscale and from_color.
 #define PAR_MSQUARES_DUAL (1 << 1)
 
-// Returned meshes have 3-tuple coordinates instead of 2-tuples.
-// With from_color and from_colors, the Z coordinate represents the alpha value
-// of the color.  With from_grayscale and from_levels, the Z coordinate
-// represents the value of the nearest pixel in the source image.
+// Returned meshes have 3-tuple coordinates instead of 2-tuples. When using
+// from_color, the Z coordinate represents the alpha value of the color.  With
+// from_grayscale, the Z coordinate represents the value of the nearest pixel in
+// the source image.
 #define PAR_MSQUARES_HEIGHTS (1 << 2)
 
 // Applies a step function to the Z coordinates.  Requires HEIGHTS and DUAL.
@@ -52,7 +50,7 @@ typedef struct {
 // the PAR_MSQUARES_HEIGHTS flag to be present.
 #define PAR_MSQUARES_CONNECT (1 << 4)
 
-// Enables quicky & dirty (not maximal) simpification of the returned mesh.
+// Enables quick & dirty (not best) simpification of the returned mesh.
 #define PAR_MSQUARES_SIMPLIFY (1 << 5)
 
 par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
