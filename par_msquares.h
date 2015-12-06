@@ -614,11 +614,11 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
                         *pconntris++ = edgemap[i];
                         *pconntris++ = i;
                     } else if ((a % 2) && (c % 2)) {
-                        *pconntris++ = i;
+                        *pconntris++ = edgemap[k];
                         *pconntris++ = k;
-                        *pconntris++ = edgemap[k];
-                        *pconntris++ = edgemap[k];
+                        *pconntris++ = i;
                         *pconntris++ = edgemap[i];
+                        *pconntris++ = edgemap[k];
                         *pconntris++ = i;
                     } else if ((b % 2) && (c % 2)) {
                         *pconntris++ = j;
