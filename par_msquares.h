@@ -256,6 +256,9 @@ void par_msquares_free(par_msquares_meshlist* mlist)
     free(mlist);
 }
 
+// Combine multiple meshlists by moving mesh pointers, and optionally apply
+// a "snap" operation that assigns a single Z value across all verts in each
+// mesh.  The Z value determined by the mesh's position in the final mesh list.
 static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     int count, int snap)
 {
@@ -294,6 +297,34 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
         for (int j = 0; j < (*pmesh)->npoints; j++, pzed += 3) {
             *pzed = zed;
         }
+    }
+    if (!(snap & PAR_MSQUARES_CONNECT)) {
+        return merged;
+    }
+    for (int i = 1; i < merged->nmeshes; i++) {
+        par_msquares_mesh* mesh = merged->meshes[i];
+
+        // Find all extrusion points.  This is tightly coupled to the
+        // tessellation code, which generates two "connector" triangles for each
+        // extruded edge.  The first two verts of the second triangle are the
+        // verts that need to be displaced.
+        char* markers = calloc(mesh->npoints, 1);
+        int tri = mesh->ntriangles - mesh->nconntriangles;
+        while (tri < mesh->ntriangles) {
+            markers[mesh->triangles[tri * 3 + 3]] = 1;
+            markers[mesh->triangles[tri * 3 + 4]] = 1;
+            tri += 2;
+        }
+
+        // Displace all extrusion points down to the previous level.
+        float zed = zmin + zextent * (i - 1) / (merged->nmeshes - 1);
+        float* pzed = mesh->points + 2;
+        for (int j = 0; j < mesh->npoints; j++, pzed += 3) {
+            if (markers[j]) {
+                *pzed = zed;
+            }
+        }
+        free(markers);
     }
     return merged;
 }
@@ -344,7 +375,6 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     mlist->meshes = malloc(sizeof(par_msquares_mesh*));
     mlist->meshes[0] = malloc(sizeof(par_msquares_mesh));
     par_msquares_mesh* mesh = mlist->meshes[0];
-    mesh->nconntriangles = 0;
     mesh->dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     int ncols = width / cellsize;
     int nrows = height / cellsize;
