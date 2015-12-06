@@ -113,7 +113,7 @@ static void par_init_tables()
         "6 2 1 2 3 7 5 6\n"
         "7 3 0 2 3 0 3 5 0 5 6\n"
         "8 1 3 4 5\n"
-        "9 2 0 1 7 3 4 5\n"
+        "9 4 0 1 3 0 3 4 0 4 5 0 5 7\n"
         "a 2 1 2 4 4 5 1\n"
         "b 3 0 2 4 0 4 5 0 5 7\n"
         "c 2 7 3 4 4 6 7\n"
@@ -310,10 +310,10 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     int ncols = width / cellsize;
     int nrows = height / cellsize;
 
-    // Worst case is three triangles and six verts per cell, so allocate that
+    // Worst case is four triangles and six verts per cell, so allocate that
     // much.
 
-    int maxtris = ncols * nrows * 3;
+    int maxtris = ncols * nrows * 4;
     uint16_t* tris = malloc(maxtris * 3 * sizeof(uint16_t));
     int ntris = 0;
     int maxpts = ncols * nrows * 6;
@@ -409,82 +409,61 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
                 ppts[1] = vertsy[midp];
 
                 // Adjust the midpoints to a more exact crossing point.
-
-                int begin, end, inc;
                 if (midp == 1) {
-                    if (southeast) {
-                        begin = southi - 1;
-                        end = southi - cellsize;
-                        inc = -1;
-                    } else {
-                        begin = southi - cellsize + 1;
-                        end = southi;
-                        inc = 1;
-                    }
-                    for (int i = begin; i != end; i += inc) {
-                        int inside = invert ^ insidefn(i, context);
-                        if (!inside) {
+                    int begin = southi - cellsize / 2;
+                    int previous = 0;
+                    for (int i = 0; i < cellsize; i++) {
+                        int offset = begin + i / 2 * ((i % 2) ? -1 : 1);
+                        int inside = insidefn(offset, context);
+                        if (i > 0 && inside != previous) {
                             ppts[0] = normalization *
-                                (col * cellsize + i - southi + cellsize);
+                                (col * cellsize + offset - southi + cellsize);
                             break;
                         }
+                        previous = inside;
                     }
                 } else if (midp == 5) {
-                    if (northeast) {
-                        begin = northi - 1;
-                        end = northi - cellsize;
-                        inc = -1;
-                    } else {
-                        begin = northi - cellsize + 1;
-                        end = northi;
-                        inc = 1;
-                    }
-                    for (int i = begin; i != end; i += inc) {
-                        int inside = invert ^ insidefn(i, context);
-                        if (!inside) {
+                    int begin = northi - cellsize / 2;
+                    int previous = 0;
+                    for (int i = 0; i < cellsize; i++) {
+                        int offset = begin + i / 2 * ((i % 2) ? -1 : 1);
+                        int inside = insidefn(offset, context);
+                        if (i > 0 && inside != previous) {
                             ppts[0] = normalization *
-                                (col * cellsize + i - northi + cellsize);
+                                (col * cellsize + offset - northi + cellsize);
                             break;
                         }
+                        previous = inside;
                     }
                 } else if (midp == 3) {
-                    if (northeast) {
-                        begin = northi + width;
-                        end = southi - width;
-                        inc = width;
-                    } else {
-                        begin = southi - width;
-                        end = northi + width;
-                        inc = -width;
-                    }
-                    for (int i = begin; i != end; i += inc) {
-                        int inside = invert ^ insidefn(i, context);
-                        if (!inside) {
-                            ppts[1] =
-                                normalization *
-                                (row * cellsize + (i - northi) / (float) width);
+                    int begin = northi + width * cellsize / 2;
+                    int previous = 0;
+                    for (int i = 0; i < cellsize; i++) {
+                        int offset = begin +
+                            width * (i / 2 * ((i % 2) ? -1 : 1));
+                        int inside = insidefn(offset, context);
+                        if (i > 0 && inside != previous) {
+                            ppts[1] = normalization *
+                                (row * cellsize +
+                                (offset - northi) / (float) width);
                             break;
                         }
+                        previous = inside;
                     }
                 } else if (midp == 7) {
-                    if (northwest) {
-                        begin = northi + width - cellsize;
-                        end = southi - width - cellsize;
-                        inc = width;
-                    } else {
-                        begin = southi - width - cellsize;
-                        end = northi + width - cellsize;
-                        inc = -width;
-                    }
-                    for (int i = begin; i != end; i += inc) {
-                        int inside = invert ^ insidefn(i, context);
-                        if (!inside) {
-                            ppts[1] =
-                                normalization *
+                    int begin = northi + width * cellsize / 2 - cellsize;
+                    int previous = 0;
+                    for (int i = 0; i < cellsize; i++) {
+                        int offset = begin +
+                            width * (i / 2 * ((i % 2) ? -1 : 1));
+                        int inside = insidefn(offset, context);
+                        if (i > 0 && inside != previous) {
+                            ppts[1] = normalization *
                                 (row * cellsize +
-                                (i - northi - cellsize) / (float) width);
+                                (offset - northi - cellsize) / (float) width);
                             break;
                         }
+                        previous = inside;
                     }
                 }
 
