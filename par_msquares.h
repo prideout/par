@@ -2,9 +2,9 @@
 // Converts fp32 grayscale images, or 8-bit color images, into triangles.
 //
 // For grayscale images, a threshold is specified to determine insideness.
-// Color images can be r8, rg16, rgb24, or rgba32.  In all cases, the exact
-// color of each pixel determines insideness.  For a visual overview of
-// the API, see:
+// For color images, an exact color is specified to determine insideness.
+// Color images can be r8, rg16, rgb24, or rgba32. For a visual overview of
+// the API and all the flags, see:
 //
 //     https://....
 //
@@ -12,8 +12,6 @@
 // Copyright (c) 2015 Philip Rideout
 
 #include <stdint.h>
-#include <stdlib.h>
-#include <assert.h>
 
 // -----------------------------------------------------------------------------
 // BEGIN PUBLIC API
@@ -46,12 +44,15 @@ typedef struct {
 // represents the value of the nearest pixel in the source image.
 #define PAR_MSQUARES_HEIGHTS (1 << 2)
 
+// Applies a step function to the Z coordinates.  Requires HEIGHTS and DUAL.
+#define PAR_MSQUARES_SNAP (1 << 3)
+
 // Adds extrusion triangles to each mesh other than the lowest mesh.  Requires
 // the PAR_MSQUARES_HEIGHTS flag to be present.
-#define PAR_MSQUARES_CONNECT (1 << 3)
+#define PAR_MSQUARES_CONNECT (1 << 4)
 
 // Enables quicky & dirty (not maximal) simpification of the returned mesh.
-#define PAR_MSQUARES_SIMPLIFY (1 << 4)
+#define PAR_MSQUARES_SIMPLIFY (1 << 5)
 
 par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags);
@@ -85,6 +86,10 @@ void par_msquares_free(par_msquares_meshlist*);
 // -----------------------------------------------------------------------------
 
 #ifdef PAR_MSQUARES_IMPLEMENTATION
+
+#include <stdlib.h>
+#include <assert.h>
+#include <float.h>
 
 #define MIN(a, b) (a > b ? b : a)
 #define MAX(a, b) (a > b ? a : b)
@@ -251,7 +256,7 @@ void par_msquares_free(par_msquares_meshlist* mlist)
 }
 
 static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
-    int count)
+    int count, int snap)
 {
     par_msquares_meshlist* merged = malloc(sizeof(par_msquares_meshlist));
     merged->nmeshes = 0;
@@ -266,6 +271,28 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
             *pmesh++ = meshlist->meshes[j];
         }
         free(meshlist);
+    }
+    if (!snap) {
+        return merged;
+    }
+    pmesh = merged->meshes;
+    float zmin = FLT_MAX;
+    float zmax = -zmin;
+    for (int i = 0; i < merged->nmeshes; i++, pmesh++) {
+        float* pzed = (*pmesh)->points + 2;
+        for (int j = 0; j < (*pmesh)->npoints; j++, pzed += 3) {
+            zmin = MIN(*pzed, zmin);
+            zmax = MAX(*pzed, zmax);
+        }
+    }
+    float zextent = zmax - zmin;
+    pmesh = merged->meshes;
+    for (int i = 0; i < merged->nmeshes; i++, pmesh++) {
+        float* pzed = (*pmesh)->points + 2;
+        float zed = zmin + zextent * i / (merged->nmeshes - 1);
+        for (int j = 0; j < (*pmesh)->npoints; j++, pzed += 3) {
+            *pzed = zed;
+        }
     }
     return merged;
 }
@@ -286,7 +313,9 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         flags |= PAR_MSQUARES_INVERT;
         m[1] = par_msquares_from_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
-        return par_msquares_merge(m, 2);
+        int snap = flags & PAR_MSQUARES_SNAP;
+        int heights = flags & PAR_MSQUARES_HEIGHTS;
+        return par_msquares_merge(m, 2, snap && heights);
     }
 
     int invert = flags & PAR_MSQUARES_INVERT;
