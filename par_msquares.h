@@ -28,6 +28,7 @@ typedef struct {
     uint16_t* triangles;  // pointer to 3-tuples of vertex indices
     int ntriangles;       // number of 3-tuples
     int dim;              // number of floats per point (either 2 or 3)
+    int nconntriangles;   // internal use only
 } par_msquares_mesh;
 
 // Reverses the "insideness" test.
@@ -305,17 +306,25 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     assert(height > 0 && height % cellsize == 0);
 
     if (flags & PAR_MSQUARES_DUAL) {
-        flags &= ~PAR_MSQUARES_INVERT;
+        int connect = flags & PAR_MSQUARES_CONNECT;
+        int snap = flags & PAR_MSQUARES_SNAP;
+        int heights = flags & PAR_MSQUARES_HEIGHTS;
+        if (!heights) {
+            snap = connect = 0;
+        }
+        flags |= PAR_MSQUARES_INVERT;
         flags &= ~PAR_MSQUARES_DUAL;
+        flags &= ~PAR_MSQUARES_CONNECT;
         par_msquares_meshlist* m[2];
         m[0] = par_msquares_from_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
-        flags |= PAR_MSQUARES_INVERT;
+        flags &= ~PAR_MSQUARES_INVERT;
+        if (connect) {
+            flags |= PAR_MSQUARES_CONNECT;
+        }
         m[1] = par_msquares_from_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
-        int snap = flags & PAR_MSQUARES_SNAP;
-        int heights = flags & PAR_MSQUARES_HEIGHTS;
-        return par_msquares_merge(m, 2, snap && heights);
+        return par_msquares_merge(m, 2, snap | connect);
     }
 
     int invert = flags & PAR_MSQUARES_INVERT;
@@ -335,6 +344,7 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     mlist->meshes = malloc(sizeof(par_msquares_mesh*));
     mlist->meshes[0] = malloc(sizeof(par_msquares_mesh));
     par_msquares_mesh* mesh = mlist->meshes[0];
+    mesh->nconntriangles = 0;
     mesh->dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     int ncols = width / cellsize;
     int nrows = height / cellsize;
@@ -343,22 +353,40 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     // much.
 
     int maxtris = ncols * nrows * 4;
+    int maxpts = ncols * nrows * 6;
+    int maxedges = ncols * nrows * 2;
+
+    // However, if we include extrusion triangles for boundary edges,
+    // we need space for another 4 triangles and 4 points per cell.
+
+    uint16_t* conntris = 0;
+    int nconntris = 0;
+    uint16_t* edgemap = 0;
+    if (flags & PAR_MSQUARES_CONNECT) {
+        conntris = malloc(maxedges * 6 * sizeof(uint16_t));
+        maxtris +=  maxedges * 2;
+        maxpts += maxedges * 2;
+        edgemap = malloc(maxpts * sizeof(uint16_t));
+        for (int i = 0; i < maxpts; i++) {
+            edgemap[i] = 0xffff;
+        }
+    }
+
     uint16_t* tris = malloc(maxtris * 3 * sizeof(uint16_t));
     int ntris = 0;
-    int maxpts = ncols * nrows * 6;
     float* pts = malloc(maxpts * mesh->dim * sizeof(float));
     int npts = 0;
 
     // The "verts" x/y/z arrays are the 4 corners and 4 midpoints around the
-    // square,
-    // in counter-clockwise order.  The origin of "triangle space" is at the
-    // lower-left, although we expect the image data to be in raster order
+    // square, in counter-clockwise order.  The origin of "triangle space" is at
+    // the lower-left, although we expect the image data to be in raster order
     // (starts at top-left).
 
     float normalization = 1.0f / MAX(width, height);
     float normalized_cellsize = cellsize * normalization;
     int maxrow = (height - 1) * width;
     uint16_t* ptris = tris;
+    uint16_t* pconntris = conntris;
     float* ppts = pts;
     float vertsx[8], vertsy[8];
     int* prevrowmasks = calloc(sizeof(int) * ncols, 1);
@@ -517,6 +545,71 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
                 ntris++;
             }
 
+            // Create two extrusion triangles for each boundary edge.
+            if (flags & PAR_MSQUARES_CONNECT) {
+                trianglespec = triangle_table[code];
+                trispeclength = *trianglespec++;
+                while (trispeclength--) {
+                    int a = *trianglespec++;
+                    int b = *trianglespec++;
+                    int c = *trianglespec++;
+                    int i = currinds[a];
+                    int j = currinds[b];
+                    int k = currinds[c];
+                    int u = 0, v = 0, w = 0;
+                    if ((a % 2) && (b % 2)) {
+                        u = v = 1;
+                    } else if ((a % 2) && (c % 2)) {
+                        u = w = 1;
+                    } else if ((b % 2) && (c % 2)) {
+                        v = w = 1;
+                    } else {
+                        continue;
+                    }
+                    if (u && edgemap[i] == 0xffff) {
+                        for (int d = 0; d < mesh->dim; d++) {
+                            *ppts++ = pts[i * mesh->dim + d];
+                        }
+                        edgemap[i] = npts++;
+                    }
+                    if (v && edgemap[j] == 0xffff) {
+                        for (int d = 0; d < mesh->dim; d++) {
+                            *ppts++ = pts[j * mesh->dim + d];
+                        }
+                        edgemap[j] = npts++;
+                    }
+                    if (w && edgemap[k] == 0xffff) {
+                        for (int d = 0; d < mesh->dim; d++) {
+                            *ppts++ = pts[k * mesh->dim + d];
+                        }
+                        edgemap[k] = npts++;
+                    }
+                    if ((a % 2) && (b % 2)) {
+                        *pconntris++ = i;
+                        *pconntris++ = j;
+                        *pconntris++ = edgemap[j];
+                        *pconntris++ = edgemap[j];
+                        *pconntris++ = edgemap[i];
+                        *pconntris++ = i;
+                    } else if ((a % 2) && (c % 2)) {
+                        *pconntris++ = i;
+                        *pconntris++ = k;
+                        *pconntris++ = edgemap[k];
+                        *pconntris++ = edgemap[k];
+                        *pconntris++ = edgemap[i];
+                        *pconntris++ = i;
+                    } else if ((b % 2) && (c % 2)) {
+                        *pconntris++ = j;
+                        *pconntris++ = k;
+                        *pconntris++ = edgemap[k];
+                        *pconntris++ = edgemap[k];
+                        *pconntris++ = edgemap[j];
+                        *pconntris++ = j;
+                    }
+                    nconntris += 2;
+                }
+            }
+
             // Prepare for the next cell.
             prevrowmasks[col] = mask;
             prevrowinds[col * 3 + 0] = currinds[0];
@@ -532,6 +625,18 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         }
     }
 
+    // Append all extrusion triangles to the main triangle array.
+    // We need them to be last so that they form a contiguous sequence.
+    pconntris = conntris;
+    for (int i = 0; i < nconntris; i++) {
+        *ptris++ = *pconntris++;
+        *ptris++ = *pconntris++;
+        *ptris++ = *pconntris++;
+        ntris++;
+    }
+
+    free(edgemap);
+    free(conntris);
     free(prevrowmasks);
     free(prevrowinds);
     assert(npts <= maxpts);
@@ -540,6 +645,7 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     mesh->points = pts;
     mesh->ntriangles = ntris;
     mesh->triangles = tris;
+    mesh->nconntriangles = nconntris;
     return mlist;
 }
 
