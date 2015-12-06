@@ -267,6 +267,47 @@ static void test_grayscale()
     fclose(objfile);
     par_msquares_free(mlist);
 
+    // ------------------------------
+    // msquares_gray_heights_simplify
+    // ------------------------------
+    flags = PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_DUAL | PAR_MSQUARES_SNAP |
+        PAR_MSQUARES_CONNECT | PAR_MSQUARES_SIMPLIFY;
+    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        THRESHOLD, flags);
+    objfile = fopen("build/msquares_gray_heights_simplify.obj", "wt");
+    mesh = par_msquares_get_mesh(mlist, 0);
+    pt = mesh->points;
+    for (i = 0; i < mesh->npoints; i++) {
+        float z = mesh->dim > 2 ? pt[2] : 0;
+        fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+        pt += mesh->dim;
+    }
+    index = mesh->triangles;
+    offset = 1;
+    for (i = 0; i < mesh->ntriangles; i++) {
+        int a = offset + *index++;
+        int b = offset + *index++;
+        int c = offset + *index++;
+        fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+    }
+    offset = mesh->npoints + 1;
+    mesh = par_msquares_get_mesh(mlist, 1);
+    pt = mesh->points;
+    for (i = 0; i < mesh->npoints; i++) {
+        float z = mesh->dim > 2 ? pt[2] : 0;
+        fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+        pt += mesh->dim;
+    }
+    index = mesh->triangles;
+    for (i = 0; i < mesh->ntriangles; i++) {
+        int a = offset + *index++;
+        int b = offset + *index++;
+        int c = offset + *index++;
+        fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+    }
+    fclose(objfile);
+    par_msquares_free(mlist);
+
     free(pixels);
 }
 

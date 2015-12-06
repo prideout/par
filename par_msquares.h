@@ -411,11 +411,21 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     uint16_t* pconntris = conntris;
     float* ppts = pts;
     float vertsx[8], vertsy[8];
-    int* prevrowmasks = calloc(sizeof(int) * ncols, 1);
+    uint8_t* prevrowmasks = calloc(ncols, 1);
     int* prevrowinds = calloc(sizeof(int) * ncols * 3, 1);
 
-    // Do the march!
+    // If simplification is enabled, we need to track all 'F' cells and their
+    // repsective triangle indices.
+    uint8_t* simplification_codes = 0;
+    uint16_t* simplification_tris = 0;
+    uint8_t* simplification_ntris = 0;
+    if (flags & PAR_MSQUARES_SIMPLIFY) {
+        simplification_codes = malloc(nrows * ncols);
+        simplification_tris = malloc(nrows * ncols * sizeof(uint16_t));
+        simplification_ntris = malloc(nrows * ncols);
+    }
 
+    // Do the march!
     for (int row = 0; row < nrows; row++) {
         vertsx[0] = vertsx[6] = vertsx[7] = 0;
         vertsx[1] = vertsx[5] = 0.5 * normalized_cellsize;
@@ -429,7 +439,7 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         int northwest = invert ^ insidefn(northi, context);
         int southwest = invert ^ insidefn(southi, context);
         int previnds[8] = {0};
-        int prevmask = 0;
+        uint8_t prevmask = 0;
 
         for (int col = 0; col < ncols; col++) {
             northi += cellsize;
@@ -447,8 +457,8 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
             int const* pointspec = point_table[code];
             int ptspeclength = *pointspec++;
             int currinds[8] = {0};
-            int mask = 0;
-            int prevrowmask = prevrowmasks[col];
+            uint8_t mask = 0;
+            uint8_t prevrowmask = prevrowmasks[col];
             while (ptspeclength--) {
                 int midp = *pointspec++;
                 int bit = 1 << midp;
@@ -554,9 +564,16 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
                 currinds[midp] = npts++;
             }
 
-            // Add triangles.
             int const* trianglespec = triangle_table[code];
             int trispeclength = *trianglespec++;
+
+            if (flags & PAR_MSQUARES_SIMPLIFY) {
+                simplification_codes[ncols * row + col] = code;
+                simplification_tris[ncols * row + col] = ntris;
+                simplification_ntris[ncols * row + col] = trispeclength;
+            }
+
+            // Add triangles.
             while (trispeclength--) {
                 int a = *trianglespec++;
                 int b = *trianglespec++;
@@ -646,6 +663,127 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
             }
         }
     }
+    free(edgemap);
+    free(prevrowmasks);
+    free(prevrowinds);
+
+    // Perform quick-n-dirty simplification by iterating two rows at a time.
+    // In no way does this create the simplest possible mesh, but at least it's
+    // fast and easy.
+    if (flags & PAR_MSQUARES_SIMPLIFY) {
+        int in_run = 0, start_run;
+
+        // First figure out how many triangles we can eliminate.
+        int neliminated_triangles = 0;
+        for (int row = 0; row < nrows - 1; row += 2) {
+            for (int col = 0; col < ncols; col++) {
+                int a = simplification_codes[ncols * row + col] == 0xf;
+                int b = simplification_codes[ncols * row + col + ncols] == 0xf;
+                if (a && b) {
+                    if (!in_run) {
+                        in_run = 1;
+                        start_run = col;
+                    }
+                    continue;
+                }
+                if (in_run) {
+                    in_run = 0;
+                    int run_width = col - start_run;
+                    neliminated_triangles += run_width * 4 - 2;
+                }
+            }
+            if (in_run) {
+                in_run = 0;
+                int run_width = ncols - start_run;
+                neliminated_triangles += run_width * 4 - 2;
+            }
+        }
+
+        // Build a new index array cell-by-cell.  If any given cell is 'F' and
+        // its neighbor to the south is also 'F', then it's part of a run.
+        int nnewtris = ntris + nconntris - neliminated_triangles;
+        uint16_t* newtris = malloc(nnewtris * 3 * sizeof(uint16_t));
+        uint16_t* pnewtris = newtris;
+        in_run = 0;
+        for (int row = 0; row < nrows - 1; row += 2) {
+            for (int col = 0; col < ncols; col++) {
+                int cell = ncols * row + col;
+                int south = cell + ncols;
+                int a = simplification_codes[cell] == 0xf;
+                int b = simplification_codes[south] == 0xf;
+                if (a && b) {
+                    if (!in_run) {
+                        in_run = 1;
+                        start_run = col;
+                    }
+                    continue;
+                }
+                if (in_run) {
+                    in_run = 0;
+                    int nw_cell = ncols * row + start_run;
+                    int ne_cell = ncols * row + col - 1;
+                    int sw_cell = nw_cell + ncols;
+                    int se_cell = ne_cell + ncols;
+                    int nw_tri = simplification_tris[nw_cell];
+                    int ne_tri = simplification_tris[ne_cell];
+                    int sw_tri = simplification_tris[sw_cell];
+                    int se_tri = simplification_tris[se_cell];
+                    int nw_corner = nw_tri * 3 + 4;
+                    int ne_corner = ne_tri * 3 + 0;
+                    int sw_corner = sw_tri * 3 + 2;
+                    int se_corner = se_tri * 3 + 1;
+                    *pnewtris++ = tris[se_corner];
+                    *pnewtris++ = tris[sw_corner];
+                    *pnewtris++ = tris[nw_corner];
+                    *pnewtris++ = tris[nw_corner];
+                    *pnewtris++ = tris[ne_corner];
+                    *pnewtris++ = tris[se_corner];
+                }
+                int ncelltris = simplification_ntris[cell];
+                int celltri = simplification_tris[cell];
+                for (int t = 0; t < ncelltris; t++, celltri++) {
+                    *pnewtris++ = tris[celltri * 3];
+                    *pnewtris++ = tris[celltri * 3 + 1];
+                    *pnewtris++ = tris[celltri * 3 + 2];
+                }
+                ncelltris = simplification_ntris[south];
+                celltri = simplification_tris[south];
+                for (int t = 0; t < ncelltris; t++, celltri++) {
+                    *pnewtris++ = tris[celltri * 3];
+                    *pnewtris++ = tris[celltri * 3 + 1];
+                    *pnewtris++ = tris[celltri * 3 + 2];
+                }
+            }
+            if (in_run) {
+                in_run = 0;
+                    int nw_cell = ncols * row + start_run;
+                    int ne_cell = ncols * row + ncols - 1;
+                    int sw_cell = nw_cell + ncols;
+                    int se_cell = ne_cell + ncols;
+                    int nw_tri = simplification_tris[nw_cell];
+                    int ne_tri = simplification_tris[ne_cell];
+                    int sw_tri = simplification_tris[sw_cell];
+                    int se_tri = simplification_tris[se_cell];
+                    int nw_corner = nw_tri * 3 + 4;
+                    int ne_corner = ne_tri * 3 + 0;
+                    int sw_corner = sw_tri * 3 + 2;
+                    int se_corner = se_tri * 3 + 1;
+                    *pnewtris++ = tris[se_corner];
+                    *pnewtris++ = tris[sw_corner];
+                    *pnewtris++ = tris[nw_corner];
+                    *pnewtris++ = tris[nw_corner];
+                    *pnewtris++ = tris[ne_corner];
+                    *pnewtris++ = tris[se_corner];
+            }
+        }
+        ptris = pnewtris;
+        ntris -= neliminated_triangles;
+        free(tris);
+        tris = newtris;
+        free(simplification_codes);
+        free(simplification_tris);
+        free(simplification_ntris);
+    }
 
     // Append all extrusion triangles to the main triangle array.
     // We need them to be last so that they form a contiguous sequence.
@@ -656,11 +794,9 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         *ptris++ = *pconntris++;
         ntris++;
     }
-
-    free(edgemap);
     free(conntris);
-    free(prevrowmasks);
-    free(prevrowinds);
+
+    // Final cleanup and return.
     assert(npts <= maxpts);
     assert(ntris <= maxtris);
     mesh->npoints = npts;
