@@ -98,7 +98,7 @@ struct par_msquares_meshlist_s {
 static int** point_table = 0;
 static int** triangle_table = 0;
 
-void init_tables()
+static void par_init_tables()
 {
     point_table = malloc(16 * sizeof(int*));
     triangle_table = malloc(16 * sizeof(int*));
@@ -250,12 +250,45 @@ void par_msquares_free(par_msquares_meshlist* mlist)
     free(mlist);
 }
 
+static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
+    int count)
+{
+    par_msquares_meshlist* merged = malloc(sizeof(par_msquares_meshlist));
+    merged->nmeshes = 0;
+    for (int i = 0; i < count; i++) {
+        merged->nmeshes += lists[i]->nmeshes;
+    }
+    merged->meshes = malloc(sizeof(par_msquares_mesh*) * merged->nmeshes);
+    par_msquares_mesh** pmesh = merged->meshes;
+    for (int i = 0; i < count; i++) {
+        par_msquares_meshlist* meshlist = lists[i];
+        for (int j = 0; j < meshlist->nmeshes; j++) {
+            *pmesh++ = meshlist->meshes[j];
+        }
+        free(meshlist);
+    }
+    return merged;
+}
+
 par_msquares_meshlist* par_msquares_from_function(int width, int height,
     int cellsize, int flags, void* context, par_msquares_inside_fn insidefn,
     par_msquares_height_fn heightfn)
 {
     assert(width > 0 && width % cellsize == 0);
     assert(height > 0 && height % cellsize == 0);
+
+    if (flags & PAR_MSQUARES_DUAL) {
+        flags &= ~PAR_MSQUARES_INVERT;
+        flags &= ~PAR_MSQUARES_DUAL;
+        par_msquares_meshlist* m[2];
+        m[0] = par_msquares_from_function(width, height, cellsize, flags,
+            context, insidefn, heightfn);
+        flags |= PAR_MSQUARES_INVERT;
+        m[1] = par_msquares_from_function(width, height, cellsize, flags,
+            context, insidefn, heightfn);
+        return par_msquares_merge(m, 2);
+    }
+
     int invert = flags & PAR_MSQUARES_INVERT;
 
     // Create the two code tables if we haven't already.  These are tables of
@@ -263,7 +296,7 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     // allocation for them.  However it's easy and it's one-time-only.
 
     if (!point_table) {
-        init_tables();
+        par_init_tables();
     }
 
     // Allocate the meshlist and the first mesh.
