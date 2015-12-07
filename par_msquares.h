@@ -6,7 +6,7 @@
 // Color images can be r8, rg16, rgb24, or rgba32. For a visual overview of
 // the API and all the flags, see:
 //
-//     https://....
+//     http://github.prideout.net/marching-cubes/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
