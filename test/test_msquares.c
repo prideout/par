@@ -27,7 +27,7 @@ static void test_color()
     uint16_t* index;
     float* pt;
     par_msquares_meshlist* mlist;
-    par_msquares_mesh* mesh;
+    par_msquares_mesh const* mesh;
     FILE* objfile;
 
     // -----------------------------
@@ -132,7 +132,7 @@ static void test_grayscale()
     uint16_t* index;
     float* pt;
     par_msquares_meshlist* mlist;
-    par_msquares_mesh* mesh;
+    par_msquares_mesh const* mesh;
     FILE* objfile;
     int offset = 1;
 

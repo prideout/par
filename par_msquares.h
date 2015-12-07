@@ -66,7 +66,7 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     int cellsize, int flags, void* context, par_msquares_inside_fn insidefn,
     par_msquares_height_fn heightfn);
 
-par_msquares_mesh* par_msquares_get_mesh(par_msquares_meshlist*, int n);
+par_msquares_mesh const* par_msquares_get_mesh(par_msquares_meshlist*, int n);
 
 int par_msquares_get_count(par_msquares_meshlist*);
 
@@ -221,7 +221,7 @@ par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
         width, height, cellsize, flags, &context, gray_inside, gray_height);
 }
 
-par_msquares_mesh* par_msquares_get_mesh(
+par_msquares_mesh const* par_msquares_get_mesh(
     par_msquares_meshlist* mlist, int mindex)
 {
     assert(mlist && mindex < mlist->nmeshes);
