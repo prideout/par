@@ -333,13 +333,13 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         if (!heights) {
             snap = connect = 0;
         }
-        flags |= PAR_MSQUARES_INVERT;
+        flags ^= PAR_MSQUARES_INVERT;
         flags &= ~PAR_MSQUARES_DUAL;
         flags &= ~PAR_MSQUARES_CONNECT;
         par_msquares_meshlist* m[2];
         m[0] = par_msquares_from_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
-        flags &= ~PAR_MSQUARES_INVERT;
+        flags ^= PAR_MSQUARES_INVERT;
         if (connect) {
             flags |= PAR_MSQUARES_CONNECT;
         }
