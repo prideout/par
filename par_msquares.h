@@ -781,6 +781,47 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         free(simplification_codes);
         free(simplification_tris);
         free(simplification_ntris);
+
+        // Remove unreferenced points.
+        char* markers = calloc(npts, 1);
+        ptris = tris;
+        for (int i = 0; i < ntris * 3; i++) {
+            markers[*ptris++] = 1;
+        }
+        float* newpts = malloc(npts * mesh->dim * sizeof(float));
+        uint16_t* mapping = malloc(ntris * 3 * sizeof(uint16_t));
+        ppts = pts;
+        float* pnewpts = newpts;
+        int j = 0;
+        if (mesh->dim == 3) {
+            for (int i = 0; i < npts; i++, ppts += 3) {
+                if (markers[i]) {
+                    *pnewpts++ = ppts[0];
+                    *pnewpts++ = ppts[1];
+                    *pnewpts++ = ppts[2];
+                    mapping[i] = j++;
+                }
+            }
+        } else {
+            for (int i = 0; i < npts; i++, ppts += 2) {
+                if (markers[i]) {
+                    *pnewpts++ = ppts[0];
+                    *pnewpts++ = ppts[1];
+                    mapping[i] = j++;
+                }
+            }
+        }
+        free(pts);
+        pts = newpts;
+        free(markers);
+        newtris = malloc((ntris + nconntris) * 3 * sizeof(uint16_t));
+        ptris = newtris;
+        for (int i = 0; i < ntris * 3; i++) {
+            *ptris++ = mapping[tris[i]];
+        }
+        free(tris);
+        tris = newtris;
+        free(mapping);
     }
 
     // Append all extrusion triangles to the main triangle array.
