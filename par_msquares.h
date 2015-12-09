@@ -785,11 +785,21 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         // Remove unreferenced points.
         char* markers = calloc(npts, 1);
         ptris = tris;
-        for (int i = 0; i < ntris * 3; i++) {
-            markers[*ptris++] = 1;
+        int newnpts = 0;
+        for (int i = 0; i < ntris * 3; i++, ptris++) {
+            if (!markers[*ptris]) {
+                newnpts++;
+                markers[*ptris] = 1;
+            }
         }
-        float* newpts = malloc(npts * mesh->dim * sizeof(float));
-        uint16_t* mapping = malloc(ntris * 3 * sizeof(uint16_t));
+        for (int i = 0; i < nconntris * 3; i++) {
+            if (!markers[conntris[i]]) {
+                newnpts++;
+                markers[conntris[i]] = 1;
+            }
+        }
+        float* newpts = malloc(newnpts * mesh->dim * sizeof(float));
+        uint16_t* mapping = malloc((ntris + nconntris) * 3 * sizeof(uint16_t));
         ppts = pts;
         float* pnewpts = newpts;
         int j = 0;
@@ -812,15 +822,15 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
             }
         }
         free(pts);
-        pts = newpts;
         free(markers);
-        newtris = malloc((ntris + nconntris) * 3 * sizeof(uint16_t));
-        ptris = newtris;
+        pts = newpts;
+        npts = newnpts;
         for (int i = 0; i < ntris * 3; i++) {
-            *ptris++ = mapping[tris[i]];
+            tris[i] = mapping[tris[i]];
         }
-        free(tris);
-        tris = newtris;
+        for (int i = 0; i < nconntris * 3; i++) {
+            conntris[i] = mapping[conntris[i]];
+        }
         free(mapping);
     }
 
