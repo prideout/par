@@ -145,6 +145,8 @@ int WAI_PREFIX(getModulePath)(char* out, int capacity, int* dirname_length)
 #endif
 #include <inttypes.h>
 
+char *realpath(const char * pathname, char * resolved_path);
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif

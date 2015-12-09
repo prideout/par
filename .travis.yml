@@ -18,4 +18,4 @@ script:
     - rm -rf build
     - export CC=clang CXX=clang++
     - cmake -Htest -Bbuild
-    - cmake --build build -- VERBOSE=1
+    - cmake --build build
