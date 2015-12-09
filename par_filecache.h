@@ -164,13 +164,16 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     long fsize = ftell(cachefile);
     fseek(cachefile, 0, SEEK_SET);
     if (headersize > 0) {
-        fread(header, headersize, 1, cachefile);
+        size_t consumed = fread(header, headersize, 1, cachefile);
+        assert(consumed == headersize);
     }
     int32_t dnbytes;
     long cnbytes = fsize - headersize - sizeof(dnbytes);
-    fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
+    size_t consumed = fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
+    assert(consumed == sizeof(dnbytes));
     char* cbuff = malloc(cnbytes);
-    fread(cbuff, 1, cnbytes, cachefile);
+    consumed = fread(cbuff, 1, cnbytes, cachefile);
+    assert(consumed == cnbytes);
 #if ENABLE_LZ4
     char* dbuff = malloc(dnbytes);
     LZ4_decompress_safe(cbuff, dbuff, (int) cnbytes, dnbytes);
