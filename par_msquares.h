@@ -59,6 +59,12 @@ par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
 par_msquares_meshlist* par_msquares_from_color(par_byte const* data, int width,
     int height, int cellsize, uint32_t color, int bpp, int flags);
 
+par_msquares_mesh const* par_msquares_get_mesh(par_msquares_meshlist*, int n);
+
+int par_msquares_get_count(par_msquares_meshlist*);
+
+void par_msquares_free(par_msquares_meshlist*);
+
 typedef int (*par_msquares_inside_fn)(int, void*);
 typedef float (*par_msquares_height_fn)(float, float, void*);
 
@@ -66,11 +72,9 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
     int cellsize, int flags, void* context, par_msquares_inside_fn insidefn,
     par_msquares_height_fn heightfn);
 
-par_msquares_mesh const* par_msquares_get_mesh(par_msquares_meshlist*, int n);
-
-int par_msquares_get_count(par_msquares_meshlist*);
-
-void par_msquares_free(par_msquares_meshlist*);
+par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
+    int width, int height, int cellsize, float const* thresholds,
+    int nthresholds, int flags);
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -93,6 +97,9 @@ struct par_msquares_meshlist_s {
 
 static int** point_table = 0;
 static int** triangle_table = 0;
+
+static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
+    int count, int snap);
 
 static void par_init_tables()
 {
@@ -145,6 +152,8 @@ static void par_init_tables()
 typedef struct {
     float const* data;
     float threshold;
+    float lower_bound;
+    float upper_bound;
     int width;
     int height;
 } gray_context;
@@ -153,6 +162,15 @@ static int gray_inside(int location, void* contextptr)
 {
     gray_context* context = (gray_context*) contextptr;
     return context->data[location] > context->threshold;
+}
+
+static int gray_multi_inside(int location, void* contextptr)
+{
+    gray_context* context = (gray_context*) contextptr;
+    float val = context->data[location];
+    float upper = context->upper_bound;
+    float lower = context->lower_bound;
+    return val >= lower && val < upper;
 }
 
 static float gray_height(float x, float y, void* contextptr)
@@ -219,6 +237,47 @@ par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
     context.threshold = threshold;
     return par_msquares_from_function(
         width, height, cellsize, flags, &context, gray_inside, gray_height);
+}
+
+par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
+    int width, int height, int cellsize, float const* thresholds,
+    int nthresholds, int flags)
+{
+    par_msquares_meshlist* mlists[2];
+    mlists[0] = calloc(sizeof(par_msquares_meshlist), 1);
+    int connect = flags & PAR_MSQUARES_CONNECT;
+    int snap = flags & PAR_MSQUARES_SNAP;
+    int heights = flags & PAR_MSQUARES_HEIGHTS;
+    if (!heights) {
+        snap = connect = 0;
+    }
+    flags &= ~PAR_MSQUARES_INVERT;
+    flags &= ~PAR_MSQUARES_DUAL;
+    flags &= ~PAR_MSQUARES_CONNECT;
+    flags &= ~PAR_MSQUARES_SNAP;
+    gray_context context;
+    context.width = width;
+    context.height = height;
+    context.data = data;
+    context.lower_bound = -FLT_MAX;
+    for (int i = 0; i <= nthresholds; i++) {
+        if (i == nthresholds) {
+            context.upper_bound = FLT_MAX;
+            if (snap) {
+                flags |= PAR_MSQUARES_SNAP;
+            }
+        } else {
+            context.upper_bound = thresholds[i];
+        }
+        mlists[1] = par_msquares_from_function(width, height, cellsize, flags,
+            &context, gray_multi_inside, gray_height);
+        mlists[0] = par_msquares_merge(mlists, 2, 0);
+        context.lower_bound = context.upper_bound;
+        if (connect) {
+            flags |= PAR_MSQUARES_CONNECT;
+        }
+    }
+    return mlists[0];
 }
 
 par_msquares_mesh const* par_msquares_get_mesh(

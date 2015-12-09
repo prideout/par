@@ -357,6 +357,37 @@ static void test_grayscale()
     fclose(objfile);
     par_msquares_free(mlist);
 
+    // ------------------------------
+    // msquares_gray_multi_simplify
+    // ------------------------------
+    float thresholds[] = {0.0, 0.1};
+    mlist = par_msquares_grayscale_multi(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        thresholds, 2, PAR_MSQUARES_SIMPLIFY);
+    objfile = fopen("build/msquares_gray_multi_simplify.obj", "wt");
+    assert(par_msquares_get_count(mlist) == 3);
+    for (int m = 0; m < 3; m++) {
+        mesh = par_msquares_get_mesh(mlist, m);
+        pt = mesh->points;
+        for (i = 0; i < mesh->npoints; i++) {
+            float z = mesh->dim > 2 ? pt[2] : 0;
+            fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+            pt += mesh->dim;
+        }
+    }
+    offset = 1;
+    for (int m = 0; m < 3; m++) {
+        mesh = par_msquares_get_mesh(mlist, m);
+        index = mesh->triangles;
+        for (i = 0; i < mesh->ntriangles; i++) {
+            int a = offset + *index++;
+            int b = offset + *index++;
+            int c = offset + *index++;
+            fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+        }
+        offset += mesh->npoints;
+    }
+    fclose(objfile);
+    par_msquares_free(mlist);
     free(pixels);
 }
 
