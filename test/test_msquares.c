@@ -34,7 +34,7 @@ static void test_color()
     // msquares_color_default
     // -----------------------------
     flags = 0;
-    mlist = par_msquares_from_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         OCEAN_COLOR, 4, flags);
     mesh = par_msquares_get_mesh(mlist, 0);
     objfile = fopen("build/msquares_color_default.obj", "wt");
@@ -58,7 +58,7 @@ static void test_color()
     // msquares_color_invert_heights
     // -----------------------------
     flags = PAR_MSQUARES_INVERT | PAR_MSQUARES_HEIGHTS;
-    mlist = par_msquares_from_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         OCEAN_COLOR, 4, flags);
     mesh = par_msquares_get_mesh(mlist, 0);
     objfile = fopen("build/msquares_color_invert_heights.obj", "wt");
@@ -83,7 +83,7 @@ static void test_color()
     // -----------------------------
     flags = PAR_MSQUARES_DUAL | PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_SNAP |
         PAR_MSQUARES_CONNECT | PAR_MSQUARES_SIMPLIFY;
-    mlist = par_msquares_from_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_color(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         OCEAN_COLOR, 4, flags);
     mesh = par_msquares_get_mesh(mlist, 0);
     objfile = fopen("build/msquares_color_simplify.obj", "wt");
@@ -140,7 +140,7 @@ static void test_grayscale()
     // msquares_gray_default
     // -----------------------------
     flags = 0;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     assert(par_msquares_get_count(mlist) == 1);
     objfile = fopen("build/msquares_gray_default.obj", "wt");
@@ -165,7 +165,7 @@ static void test_grayscale()
     // msquares_gray_invert
     // -----------------------------
     flags = PAR_MSQUARES_INVERT;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     assert(par_msquares_get_count(mlist) == 1);
     objfile = fopen("build/msquares_gray_invert.obj", "wt");
@@ -190,7 +190,7 @@ static void test_grayscale()
     // msquares_gray_dual
     // -----------------------------
     flags = PAR_MSQUARES_DUAL;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     assert(par_msquares_get_count(mlist) == 2);
     objfile = fopen("build/msquares_gray_dual.obj", "wt");
@@ -231,7 +231,7 @@ static void test_grayscale()
     // msquares_gray_heights
     // -----------------------------
     flags = PAR_MSQUARES_HEIGHTS;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     mesh = par_msquares_get_mesh(mlist, 0);
     objfile = fopen("build/msquares_gray_heights.obj", "wt");
@@ -255,7 +255,7 @@ static void test_grayscale()
     // msquares_gray_heights_dual_snap
     // ------------------------------------
     flags = PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_DUAL | PAR_MSQUARES_SNAP;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     objfile = fopen("build/msquares_gray_heights_dual_snap.obj", "wt");
     mesh = par_msquares_get_mesh(mlist, 0);
@@ -296,7 +296,7 @@ static void test_grayscale()
     // --------------------------------------------
     flags = PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_DUAL | PAR_MSQUARES_SNAP |
          PAR_MSQUARES_CONNECT;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     objfile = fopen("build/msquares_gray_heights_dual_snap_connect.obj", "wt");
     mesh = par_msquares_get_mesh(mlist, 0);
@@ -336,7 +336,7 @@ static void test_grayscale()
     // msquares_gray_heights_simplify
     // ------------------------------
     flags = PAR_MSQUARES_SIMPLIFY;
-    mlist = par_msquares_from_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
         THRESHOLD, flags);
     objfile = fopen("build/msquares_gray_heights_simplify.obj", "wt");
     mesh = par_msquares_get_mesh(mlist, 0);

@@ -53,10 +53,10 @@ typedef struct {
 // Enables quick & dirty (not best) simpification of the returned mesh.
 #define PAR_MSQUARES_SIMPLIFY (1 << 5)
 
-par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
+par_msquares_meshlist* par_msquares_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags);
 
-par_msquares_meshlist* par_msquares_from_color(par_byte const* data, int width,
+par_msquares_meshlist* par_msquares_color(par_byte const* data, int width,
     int height, int cellsize, uint32_t color, int bpp, int flags);
 
 par_msquares_mesh const* par_msquares_get_mesh(par_msquares_meshlist*, int n);
@@ -68,7 +68,7 @@ void par_msquares_free(par_msquares_meshlist*);
 typedef int (*par_msquares_inside_fn)(int, void*);
 typedef float (*par_msquares_height_fn)(float, float, void*);
 
-par_msquares_meshlist* par_msquares_from_function(int width, int height,
+par_msquares_meshlist* par_msquares_function(int width, int height,
     int cellsize, int flags, void* context, par_msquares_inside_fn insidefn,
     par_msquares_height_fn heightfn);
 
@@ -211,7 +211,7 @@ static float color_height(float x, float y, void* contextptr)
     return context->data[k * 4 + 3] / 255.0;
 }
 
-par_msquares_meshlist* par_msquares_from_color(par_byte const* data, int width,
+par_msquares_meshlist* par_msquares_color(par_byte const* data, int width,
     int height, int cellsize, uint32_t color, int bpp, int flags)
 {
     color_context context;
@@ -223,11 +223,11 @@ par_msquares_meshlist* par_msquares_from_color(par_byte const* data, int width,
     context.data = data;
     context.width = width;
     context.height = height;
-    return par_msquares_from_function(
+    return par_msquares_function(
         width, height, cellsize, flags, &context, color_inside, color_height);
 }
 
-par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
+par_msquares_meshlist* par_msquares_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags)
 {
     gray_context context;
@@ -235,7 +235,7 @@ par_msquares_meshlist* par_msquares_from_grayscale(float const* data, int width,
     context.height = height;
     context.data = data;
     context.threshold = threshold;
-    return par_msquares_from_function(
+    return par_msquares_function(
         width, height, cellsize, flags, &context, gray_inside, gray_height);
 }
 
@@ -269,7 +269,7 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
         } else {
             context.upper_bound = thresholds[i];
         }
-        mlists[1] = par_msquares_from_function(width, height, cellsize, flags,
+        mlists[1] = par_msquares_function(width, height, cellsize, flags,
             &context, gray_multi_inside, gray_height);
         mlists[0] = par_msquares_merge(mlists, 2, 0);
         context.lower_bound = context.upper_bound;
@@ -378,7 +378,7 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     return merged;
 }
 
-par_msquares_meshlist* par_msquares_from_function(int width, int height,
+par_msquares_meshlist* par_msquares_function(int width, int height,
     int cellsize, int flags, void* context, par_msquares_inside_fn insidefn,
     par_msquares_height_fn heightfn)
 {
@@ -396,13 +396,13 @@ par_msquares_meshlist* par_msquares_from_function(int width, int height,
         flags &= ~PAR_MSQUARES_DUAL;
         flags &= ~PAR_MSQUARES_CONNECT;
         par_msquares_meshlist* m[2];
-        m[0] = par_msquares_from_function(width, height, cellsize, flags,
+        m[0] = par_msquares_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
         flags ^= PAR_MSQUARES_INVERT;
         if (connect) {
             flags |= PAR_MSQUARES_CONNECT;
         }
-        m[1] = par_msquares_from_function(width, height, cellsize, flags,
+        m[1] = par_msquares_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
         return par_msquares_merge(m, 2, snap | connect);
     }
