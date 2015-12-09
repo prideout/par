@@ -14,6 +14,8 @@ script:
     - cmake --build build
     - build/test_msquares
     - build/test_bluenoise
+    - echo Switching from gcc to clang...
+    - rm -rf build
     - export CC=clang CXX=clang++
     - cmake -Htest -Bbuild
-    - cmake --build build --clean-first -- VERBOSE=1
+    - cmake --build build -- VERBOSE=1

@@ -113,10 +113,11 @@ void par_bluenoise_sort_by_rank(float* pts, int npts);
 #include <math.h>
 #include <string.h>
 
-#define clamp(x, min, max) ((x < min) ? min : ((x > max) ? max : x))
-#define sqr(a) (a * a)
-#define mini(a, b) ((a < b) ? a : b)
-#define maxi(a, b) ((a > b) ? a : b)
+#define PAR_CLAMP(x, min, max) ((x < min) ? min : ((x > max) ? max : x))
+#define PAR_SQR(a) (a * a)
+#define PAR_MINI(a, b) ((a < b) ? a : b)
+#define PAR_MAXI(a, b) ((a > b) ? a : b)
+#define PAR_ALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 
 typedef struct {
     float x;
@@ -165,14 +166,14 @@ static float sample_density(par_bluenoise_context* ctx, float x, float y)
     y = 1 - y;
     x -= 0.5;
     y -= 0.5;
-    float tx = x * maxi(width, height);
-    float ty = y * maxi(width, height);
+    float tx = x * PAR_MAXI(width, height);
+    float ty = y * PAR_MAXI(width, height);
     x += 0.5;
     y += 0.5;
     tx += width / 2;
     ty += height / 2;
-    int ix = clamp((int) tx, 0, width - 2);
-    int iy = clamp((int) ty, 0, height - 2);
+    int ix = PAR_CLAMP((int) tx, 0, width - 2);
+    int iy = PAR_CLAMP((int) ty, 0, height - 2);
     return density[iy * width + ix] / 255.0f;
 }
 
@@ -188,7 +189,7 @@ static void recurse_tile(
     }
     float depth = powf(ctx->nsubtiles, 2 * level);
     float threshold = mag / depth * ctx->global_density - tile->npoints;
-    int ntests = mini(tile->nsubpts, threshold);
+    int ntests = PAR_MINI(tile->nsubpts, threshold);
     float factor = 1.f / mag * depth / ctx->global_density;
     for (int i = 0; i < ntests; i++) {
         float px = x + tile->subpts[i].x * tileSize;
@@ -241,10 +242,10 @@ void par_bluenoise_set_viewport(par_bluenoise_context* ctx, float left,
     ctx->mag = powf(scale, -2);
 
     // The density function is only sampled in [0, +1].
-    ctx->left = clamp(left, 0, 1);
-    ctx->right = clamp(right, 0, 1);
-    ctx->bottom = clamp(bottom, 0, 1);
-    ctx->top = clamp(top, 0, 1);
+    ctx->left = PAR_CLAMP(left, 0, 1);
+    ctx->right = PAR_CLAMP(right, 0, 1);
+    ctx->bottom = PAR_CLAMP(bottom, 0, 1);
+    ctx->top = PAR_CLAMP(top, 0, 1);
 }
 
 float* par_bluenoise_generate(
@@ -258,7 +259,7 @@ float* par_bluenoise_generate(
     float top = ctx->top;
     float mag = ctx->mag;
 
-    int ntests = mini(ctx->tiles[0].npoints, mag * ctx->global_density);
+    int ntests = PAR_MINI(ctx->tiles[0].npoints, mag * ctx->global_density);
     float factor = 1.f / mag / ctx->global_density;
     for (int i = 0; i < ntests; i++) {
         float px = ctx->tiles[0].points[i].x;
@@ -326,8 +327,8 @@ static par_bluenoise_context* par_bluenoise_create(
         tiles[i].w = freadi();
         tiles[i].subdivs = malloc(sizeof(int*) * nsubdivs);
         for (int j = 0; j < nsubdivs; j++) {
-            int* subdiv = malloc(sizeof(int) * sqr(nsubtiles));
-            for (int k = 0; k < sqr(nsubtiles); k++) {
+            int* subdiv = malloc(sizeof(int) * PAR_SQR(nsubtiles));
+            for (int k = 0; k < PAR_SQR(nsubtiles); k++) {
                 subdiv[k] = freadi();
             }
             tiles[i].subdivs[j] = subdiv;
@@ -510,9 +511,10 @@ float* par_bluenoise_generate_exact(
     return &ctx->points->x;
 }
 
-#undef clamp
-#undef sqr
-#undef mini
-#undef maxi
+#undef PAR_CLAMP
+#undef PAR_SQR
+#undef PAR_MINI
+#undef PAR_MAXI
+#undef PAR_ALLOC
 
 #endif

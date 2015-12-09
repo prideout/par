@@ -111,7 +111,6 @@ bool curlToMemory(char const* url, uint8_t** data, int* nbytes)
     BLAZE_ERROR("%s\n", [[error localizedDescription] UTF8String]);
     return false;
 }
-
 #endif
 
 int par_easycurl_to_memory(char const* url, par_byte** data, int* nbytes)

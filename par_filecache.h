@@ -88,8 +88,9 @@ static char * _par_strdup(char const* s)
     return 0;
 }
 
-#define MAX_ENTRIES 64
-#define MIN(a, b) (a < b ? a : b)
+#define PAR_MAX_ENTRIES 64
+#define PAR_MIN(a, b) (a < b ? a : b)
+#define PAR_ALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 
 typedef struct {
     time_t last_used_timestamp;
@@ -99,7 +100,7 @@ typedef struct {
 } filecache_entry_t;
 
 typedef struct {
-    filecache_entry_t entries[MAX_ENTRIES];
+    filecache_entry_t entries[PAR_MAX_ENTRIES];
     int nentries;
     int totalbytes;
 } filecache_table_t;
@@ -261,7 +262,7 @@ static void _append_table(char const* item_name, int item_size)
     }
     int64_t hashed_name = _hash(item_name);
     int total = _table->totalbytes + item_size;
-    while (_table->nentries >= MAX_ENTRIES || total > _maxtotalbytes) {
+    while (_table->nentries >= PAR_MAX_ENTRIES || total > _maxtotalbytes) {
         assert(_table->nentries > 0 && "Cache size is too small.");
         _evict_lru();
         total = _table->totalbytes + item_size;
@@ -385,7 +386,7 @@ static uint64_t _hash(char const* name)
     return hval;
 }
 
-#undef MIN
-#undef MAX
-#undef CLAMP
+#undef PAR_MIN
+#undef PAR_ALLOC
+#undef PAR_MAX_ENTRIES
 #endif
