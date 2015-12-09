@@ -9,7 +9,6 @@ addons:
             - g++-5
             - gcc-5
 script:
-    - clang++ --version
     - export CC=gcc-5 CXX=g++-5
     - cmake -Htest -Bbuild
     - cmake --build build
@@ -17,4 +16,4 @@ script:
     - build/test_bluenoise
     - export CC=clang CXX=clang++
     - cmake -Htest -Bbuild
-    - cmake --build build --clean-first
+    - cmake --build build --clean-first -- VERBOSE=1

@@ -3,8 +3,8 @@ project(par)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(CURL REQUIRED libcurl)
 
-set(CMAKE_C_FLAGS "-std=c11 -O3 -Wall")
-set(CMAKE_CXX_FLAGS "-O3 -Wall")
+set(CMAKE_C_FLAGS "-std=c11 -O3 -Wall -Werror")
+set(CMAKE_CXX_FLAGS "-O3 -Wall -Werror")
 
 include_directories(
     .
@@ -27,10 +27,22 @@ add_executable(
     sds.c
     whereami.c)
 
+add_executable(
+    test_cpp
+    test_cpp.cpp
+    lz4.cpp
+    lodepng.c
+    sds.c
+    whereami.c)
+
 target_link_libraries(
     test_msquares
     ${CURL_LIBRARIES})
 
 target_link_libraries(
     test_bluenoise
+    ${CURL_LIBRARIES})
+
+target_link_libraries(
+    test_cpp
     ${CURL_LIBRARIES})

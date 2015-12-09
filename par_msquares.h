@@ -86,9 +86,10 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
 #include <assert.h>
 #include <float.h>
 
-#define MIN(a, b) (a > b ? b : a)
-#define MAX(a, b) (a > b ? a : b)
-#define CLAMP(v, lo, hi) MAX(lo, MIN(hi, v))
+#define PAR_MIN(a, b) (a > b ? b : a)
+#define PAR_MAX(a, b) (a > b ? a : b)
+#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
+#define PAR_ALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
 
 struct par_msquares_meshlist_s {
     int nmeshes;
@@ -103,8 +104,8 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
 
 static void par_init_tables()
 {
-    point_table = malloc(16 * sizeof(int*));
-    triangle_table = malloc(16 * sizeof(int*));
+    point_table = PAR_ALLOC(int*, 16);
+    triangle_table = PAR_ALLOC(int*, 16);
 
     char const* CODE_TABLE =
         "0 0\n"
@@ -131,11 +132,10 @@ static void par_init_tables()
         table_token += 2;
         int ntris = *table_token - '0';
         table_token += 2;
-        int* sqrtris = triangle_table[i] =
-                malloc((ntris + 1) * 3 * sizeof(int));
+        int* sqrtris = triangle_table[i] = PAR_ALLOC(int, (ntris + 1) * 3);
         sqrtris[0] = ntris;
         int mask = 0;
-        int* sqrpts = point_table[i] = malloc(7 * sizeof(int));
+        int* sqrpts = point_table[i] = PAR_ALLOC(int, 7);
         sqrpts[0] = 0;
         for (int j = 0; j < ntris * 3; j++, table_token += 2) {
             int midp = *table_token - '0';
@@ -176,8 +176,8 @@ static int gray_multi_inside(int location, void* contextptr)
 static float gray_height(float x, float y, void* contextptr)
 {
     gray_context* context = (gray_context*) contextptr;
-    int i = CLAMP(context->width * x, 0, context->width - 1);
-    int j = CLAMP(context->height * y, 0, context->height - 1);
+    int i = PAR_CLAMP(context->width * x, 0, context->width - 1);
+    int j = PAR_CLAMP(context->height * y, 0, context->height - 1);
     return context->data[i + j * context->width];
 }
 
@@ -205,8 +205,8 @@ static float color_height(float x, float y, void* contextptr)
 {
     color_context* context = (color_context*) contextptr;
     assert(context->bpp == 4);
-    int i = CLAMP(context->width * x, 0, context->width - 1);
-    int j = CLAMP(context->height * y, 0, context->height - 1);
+    int i = PAR_CLAMP(context->width * x, 0, context->width - 1);
+    int j = PAR_CLAMP(context->height * y, 0, context->height - 1);
     int k = i + j * context->width;
     return context->data[k * 4 + 3] / 255.0;
 }
@@ -244,7 +244,7 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
     int nthresholds, int flags)
 {
     par_msquares_meshlist* mlists[2];
-    mlists[0] = calloc(sizeof(par_msquares_meshlist), 1);
+    mlists[0] = PAR_ALLOC(par_msquares_meshlist, 1);
     int connect = flags & PAR_MSQUARES_CONNECT;
     int snap = flags & PAR_MSQUARES_SNAP;
     int heights = flags & PAR_MSQUARES_HEIGHTS;
@@ -311,12 +311,12 @@ void par_msquares_free(par_msquares_meshlist* mlist)
 static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     int count, int snap)
 {
-    par_msquares_meshlist* merged = malloc(sizeof(par_msquares_meshlist));
+    par_msquares_meshlist* merged = PAR_ALLOC(par_msquares_meshlist, 1);
     merged->nmeshes = 0;
     for (int i = 0; i < count; i++) {
         merged->nmeshes += lists[i]->nmeshes;
     }
-    merged->meshes = malloc(sizeof(par_msquares_mesh*) * merged->nmeshes);
+    merged->meshes = PAR_ALLOC(par_msquares_mesh*, merged->nmeshes);
     par_msquares_mesh** pmesh = merged->meshes;
     for (int i = 0; i < count; i++) {
         par_msquares_meshlist* meshlist = lists[i];
@@ -334,8 +334,8 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     for (int i = 0; i < merged->nmeshes; i++, pmesh++) {
         float* pzed = (*pmesh)->points + 2;
         for (int j = 0; j < (*pmesh)->npoints; j++, pzed += 3) {
-            zmin = MIN(*pzed, zmin);
-            zmax = MAX(*pzed, zmax);
+            zmin = PAR_MIN(*pzed, zmin);
+            zmax = PAR_MAX(*pzed, zmax);
         }
     }
     float zextent = zmax - zmin;
@@ -357,7 +357,7 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
         // tessellation code, which generates two "connector" triangles for each
         // extruded edge.  The first two verts of the second triangle are the
         // verts that need to be displaced.
-        char* markers = calloc(mesh->npoints, 1);
+        char* markers = PAR_ALLOC(char, mesh->npoints);
         int tri = mesh->ntriangles - mesh->nconntriangles;
         while (tri < mesh->ntriangles) {
             markers[mesh->triangles[tri * 3 + 3]] = 1;
@@ -419,10 +419,10 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
 
     // Allocate the meshlist and the first mesh.
 
-    par_msquares_meshlist* mlist = malloc(sizeof(par_msquares_meshlist));
+    par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = 1;
-    mlist->meshes = malloc(sizeof(par_msquares_mesh*));
-    mlist->meshes[0] = malloc(sizeof(par_msquares_mesh));
+    mlist->meshes = PAR_ALLOC(par_msquares_mesh*, 1);
+    mlist->meshes[0] = PAR_ALLOC(par_msquares_mesh, 1);
     par_msquares_mesh* mesh = mlist->meshes[0];
     mesh->dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     int ncols = width / cellsize;
@@ -442,18 +442,18 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     int nconntris = 0;
     uint16_t* edgemap = 0;
     if (flags & PAR_MSQUARES_CONNECT) {
-        conntris = malloc(maxedges * 6 * sizeof(uint16_t));
+        conntris = PAR_ALLOC(uint16_t, maxedges * 6);
         maxtris +=  maxedges * 2;
         maxpts += maxedges * 2;
-        edgemap = malloc(maxpts * sizeof(uint16_t));
+        edgemap = PAR_ALLOC(uint16_t, maxpts);
         for (int i = 0; i < maxpts; i++) {
             edgemap[i] = 0xffff;
         }
     }
 
-    uint16_t* tris = malloc(maxtris * 3 * sizeof(uint16_t));
+    uint16_t* tris = PAR_ALLOC(uint16_t, maxtris * 3);
     int ntris = 0;
-    float* pts = malloc(maxpts * mesh->dim * sizeof(float));
+    float* pts = PAR_ALLOC(float, maxpts * mesh->dim);
     int npts = 0;
 
     // The "verts" x/y/z arrays are the 4 corners and 4 midpoints around the
@@ -461,15 +461,15 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     // the lower-left, although we expect the image data to be in raster order
     // (starts at top-left).
 
-    float normalization = 1.0f / MAX(width, height);
+    float normalization = 1.0f / PAR_MAX(width, height);
     float normalized_cellsize = cellsize * normalization;
     int maxrow = (height - 1) * width;
     uint16_t* ptris = tris;
     uint16_t* pconntris = conntris;
     float* ppts = pts;
     float vertsx[8], vertsy[8];
-    uint8_t* prevrowmasks = calloc(ncols, 1);
-    int* prevrowinds = calloc(sizeof(int) * ncols * 3, 1);
+    uint8_t* prevrowmasks = PAR_ALLOC(uint8_t, ncols);
+    int* prevrowinds = PAR_ALLOC(int, ncols * 3);
 
     // If simplification is enabled, we need to track all 'F' cells and their
     // repsective triangle indices.
@@ -477,9 +477,9 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     uint16_t* simplification_tris = 0;
     uint8_t* simplification_ntris = 0;
     if (flags & PAR_MSQUARES_SIMPLIFY) {
-        simplification_codes = malloc(nrows * ncols);
-        simplification_tris = malloc(nrows * ncols * sizeof(uint16_t));
-        simplification_ntris = malloc(nrows * ncols);
+        simplification_codes = PAR_ALLOC(uint8_t, nrows * ncols);
+        simplification_tris = PAR_ALLOC(uint16_t, nrows * ncols);
+        simplification_ntris = PAR_ALLOC(uint8_t, nrows * ncols);
     }
 
     // Do the march!
@@ -492,7 +492,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
         vertsy[3] = vertsy[7] = normalized_cellsize * (row + 0.5);
 
         int northi = row * cellsize * width;
-        int southi = MIN(northi + cellsize * width, maxrow);
+        int southi = PAR_MIN(northi + cellsize * width, maxrow);
         int northwest = invert ^ insidefn(northi, context);
         int southwest = invert ^ insidefn(southi, context);
         int previnds[8] = {0};
@@ -759,7 +759,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
         // Build a new index array cell-by-cell.  If any given cell is 'F' and
         // its neighbor to the south is also 'F', then it's part of a run.
         int nnewtris = ntris + nconntris - neliminated_triangles;
-        uint16_t* newtris = malloc(nnewtris * 3 * sizeof(uint16_t));
+        uint16_t* newtris = PAR_ALLOC(uint16_t, nnewtris * 3);
         uint16_t* pnewtris = newtris;
         in_run = 0;
         for (int row = 0; row < nrows - 1; row += 2) {
@@ -842,7 +842,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
         free(simplification_ntris);
 
         // Remove unreferenced points.
-        char* markers = calloc(npts, 1);
+        char* markers = PAR_ALLOC(char, npts);
         ptris = tris;
         int newnpts = 0;
         for (int i = 0; i < ntris * 3; i++, ptris++) {
@@ -857,8 +857,8 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
                 markers[conntris[i]] = 1;
             }
         }
-        float* newpts = malloc(newnpts * mesh->dim * sizeof(float));
-        uint16_t* mapping = malloc((ntris + nconntris) * 3 * sizeof(uint16_t));
+        float* newpts = PAR_ALLOC(float, newnpts * mesh->dim);
+        uint16_t* mapping = PAR_ALLOC(uint16_t, (ntris + nconntris) * 3);
         ppts = pts;
         float* pnewpts = newpts;
         int j = 0;
@@ -915,7 +915,8 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     return mlist;
 }
 
-#undef MIN
-#undef MAX
-#undef CLAMP
+#undef PAR_MIN
+#undef PAR_MAX
+#undef PAR_CLAMP
+#undef PAR_ALLOC
 #endif

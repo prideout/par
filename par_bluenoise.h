@@ -309,7 +309,8 @@ static par_bluenoise_context* par_bluenoise_create(
         nbytes = (int) ftell(fin);
         fseek(fin, 0, SEEK_SET);
         buf = malloc(nbytes);
-        fread(buf, nbytes, 1, fin);
+        size_t consumed = fread(buf, nbytes, 1, fin);
+        assert(consumed == nbytes);
         fclose(fin);
     }
 
