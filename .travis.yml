@@ -10,8 +10,12 @@ addons:
             - gcc-5
 script:
     - ls -l /usr/bin/gcc*
+    - clang++ --version
     - export CC=gcc-5 CXX=g++-5
     - cmake -Htest -Bbuild
     - cmake --build build -- VERBOSE=1
     - build/test_msquares
     - build/test_bluenoise
+    - export CC=clang CXX=clang++
+    - cmake -Htest -Bbuild
+    - cmake --build build -- VERBOSE=1
