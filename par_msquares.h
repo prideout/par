@@ -261,21 +261,18 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
     context.data = data;
     context.lower_bound = -FLT_MAX;
     for (int i = 0; i <= nthresholds; i++) {
+        int mergeconf = i > 0 ? connect : 0;
         if (i == nthresholds) {
             context.upper_bound = FLT_MAX;
-            if (snap) {
-                flags |= PAR_MSQUARES_SNAP;
-            }
+            mergeconf |= snap;
         } else {
             context.upper_bound = thresholds[i];
         }
         mlists[1] = par_msquares_function(width, height, cellsize, flags,
             &context, gray_multi_inside, gray_height);
-        mlists[0] = par_msquares_merge(mlists, 2, 0);
+        mlists[0] = par_msquares_merge(mlists, 2, mergeconf);
         context.lower_bound = context.upper_bound;
-        if (connect) {
-            flags |= PAR_MSQUARES_CONNECT;
-        }
+        flags |= connect;
     }
     return mlists[0];
 }
