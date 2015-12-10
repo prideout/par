@@ -169,9 +169,15 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
         assert(consumed == headersize);
     }
     int32_t dnbytes;
+    size_t consumed;
+#if ENABLE_LZ4
     long cnbytes = fsize - headersize - sizeof(dnbytes);
-    size_t consumed = fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
+    consumed = fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
     assert(consumed == sizeof(dnbytes));
+#else
+    long cnbytes = fsize - headersize;
+    dnbytes = (int32_t) cnbytes;
+#endif
     char* cbuff = malloc(cnbytes);
     consumed = fread(cbuff, 1, cnbytes, cachefile);
     assert(consumed == cnbytes);
@@ -181,7 +187,6 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     free(cbuff);
 #else
     char* dbuff = cbuff;
-    dnbytes = (int32_t) cnbytes;
 #endif
     fclose(cachefile);
     *payload = (par_byte*) dbuff;
@@ -208,9 +213,9 @@ void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
     }
     int csize = 0;
     if (payloadsize > 0) {
+#if ENABLE_LZ4
         int32_t nbytes = payloadsize;
         fwrite(&nbytes, 1, sizeof(nbytes), cachefile);
-#if ENABLE_LZ4
         int maxsize = LZ4_compressBound(nbytes);
         char* dst = malloc(maxsize);
         char const* src = (char const*) payload;
