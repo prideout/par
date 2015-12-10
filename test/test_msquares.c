@@ -119,6 +119,51 @@ static void test_color()
     fclose(objfile);
     par_msquares_free(mlist);
 
+    // ------------------------------
+    // msquares_color_multi_everything
+    // ------------------------------
+    uint32_t colors[46] = {
+        0x00214562, 0x1f74a99c, 0x3b74a99c, 0x5774a99c, 0x738cbb9b,
+        0x738ba578, 0x73ecc15e, 0x7374a99c, 0x8fbac270, 0x8fc7cc8e,
+        0x8f74a99c, 0x8fecc15e, 0x8f62918c, 0x8f8cbb9b, 0x8f8ba578,
+        0xab62918c, 0xab8cbb9b, 0xab74a99c, 0xab98688e, 0xabc55d55,
+        0xabc7cc8e, 0xabecc15e, 0xab8ba578, 0xab4a7957, 0xab768e6c,
+        0xabe59f5f, 0xabbac270, 0xabffe48c, 0xc7e59f5f, 0xc762918c,
+        0xc7c55d55, 0xc7b29264, 0xc7bac270, 0xc74a7957, 0xc7778b52,
+        0xc7b36b82, 0xc78ba578, 0xc78cbb9b, 0xc7c7cc8e, 0xc774a99c,
+        0xc7ffe48c, 0xc7f2c664, 0xc798688e, 0xc7ecc15e, 0xc77b576a,
+        0xc7768e6c
+    };
+    int ncolors = 46;
+    flags = PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_SNAP | PAR_MSQUARES_CONNECT |
+        PAR_MSQUARES_SIMPLIFY;
+    mlist = par_msquares_color_multi(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        colors, ncolors, 4, flags);
+    objfile = fopen("build/msquares_color_multi_everything.obj", "wt");
+    for (int m = 0; m < par_msquares_get_count(mlist); m++) {
+        mesh = par_msquares_get_mesh(mlist, m);
+        pt = mesh->points;
+        for (i = 0; i < mesh->npoints; i++) {
+            float z = mesh->dim > 2 ? pt[2] : 0;
+            fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+            pt += mesh->dim;
+        }
+    }
+    offset = 1;
+    for (int m = 0; m < par_msquares_get_count(mlist); m++) {
+        mesh = par_msquares_get_mesh(mlist, m);
+        index = mesh->triangles;
+        for (i = 0; i < mesh->ntriangles; i++) {
+            int a = offset + *index++;
+            int b = offset + *index++;
+            int c = offset + *index++;
+            fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+        }
+        offset += mesh->npoints;
+    }
+    fclose(objfile);
+    par_msquares_free(mlist);
+
     free(pixels);
 }
 

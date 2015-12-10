@@ -76,6 +76,10 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
     int width, int height, int cellsize, float const* thresholds,
     int nthresholds, int flags);
 
+par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
+    int height, int cellsize, uint32_t const* colors, int ncolors, int bpp,
+    int flags);
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
@@ -272,6 +276,45 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
             &context, gray_multi_inside, gray_height);
         mlists[0] = par_msquares_merge(mlists, 2, mergeconf);
         context.lower_bound = context.upper_bound;
+        flags |= connect;
+    }
+    return mlists[0];
+}
+
+par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
+    int height, int cellsize, uint32_t const* colors, int ncolors, int bpp,
+    int flags)
+{
+    par_msquares_meshlist* mlists[2];
+    mlists[0] = PAR_ALLOC(par_msquares_meshlist, 1);
+    int connect = flags & PAR_MSQUARES_CONNECT;
+    int snap = flags & PAR_MSQUARES_SNAP;
+    int heights = flags & PAR_MSQUARES_HEIGHTS;
+    if (!heights) {
+        snap = connect = 0;
+    }
+    flags &= ~PAR_MSQUARES_INVERT;
+    flags &= ~PAR_MSQUARES_DUAL;
+    flags &= ~PAR_MSQUARES_CONNECT;
+    flags &= ~PAR_MSQUARES_SNAP;
+    color_context context;
+    context.width = width;
+    context.height = height;
+    context.data = data;
+    context.bpp = bpp;
+    for (int i = 0; i < ncolors; i++) {
+        uint32_t color = colors[i];
+        context.color[0] = (color >> 16) & 0xff;
+        context.color[1] = (color >> 8) & 0xff;
+        context.color[2] = (color & 0xff);
+        context.color[3] = (color >> 24) & 0xff;
+        int mergeconf = i > 0 ? connect : 0;
+        if (i == ncolors - 1) {
+            mergeconf |= snap;
+        }
+        mlists[1] = par_msquares_function(width, height, cellsize, flags,
+            &context, color_inside, color_height);
+        mlists[0] = par_msquares_merge(mlists, 2, mergeconf);
         flags |= connect;
     }
     return mlists[0];
