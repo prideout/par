@@ -1,0 +1,109 @@
+<style type="text/css">
+#diagram {
+    background:#303030;
+    width:400px;
+    height:5120px;
+    padding:5px
+}
+</style>
+
+<script src="http://cdnjs.cloudflare.com/ajax/libs/bonsai/0.4/bonsai.min.js">
+</script>
+
+<div id="diagram">
+</div>
+
+<script>
+
+function main()
+{
+    var colors = [
+        '#f33',
+        '#0d0',
+        '#dd0',
+        '#2af'
+    ]
+    for (var i = 0; i < 256; i++) {
+        new Text('' + i).addTo(stage).attr({
+            x: 24,
+            y: 4 + i * 20,
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '15',
+            textFillColor: '#aaa',
+            textStrokeWidth: 0 });
+        var a = i & 0x3;
+        var b = (i >> 2) & 0x3;
+        var c = (i >> 4) & 0x3;
+        var d = (i >> 6) & 0x3;
+        new Text('' + d + c + b + a).addTo(stage).attr({
+            x: 55,
+            y: 4 + i * 20,
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '15',
+            textFillColor: '#e77',
+            textStrokeWidth: 0 });
+
+        var x = 0;
+        new Rect(x + 1, 1 + i * 20, 18, 18)
+            .addTo(stage)
+            .attr('fillColor', '#555');
+        var nw = new Circle(x + 4, i * 20 + 4, 2).addTo(stage);
+        var ne = new Circle(x + 16, i * 20 + 4, 2).addTo(stage);
+        var sw = new Circle(x + 4, i * 20 + 15, 2).addTo(stage);
+        var se = new Circle(x + 16, i * 20 + 15, 2).addTo(stage);
+        sw.fill(colors[d]);
+        se.fill(colors[c]);
+        ne.fill(colors[b]);
+        nw.fill(colors[a]);
+
+        var x = 100;
+        new Rect(x + 1, 1 + i * 20, 18, 18)
+            .addTo(stage)
+            .attr('fillColor', '#555');
+        var nw = new Circle(x + 4, i * 20 + 4, 2).addTo(stage);
+        var ne = new Circle(x + 16, i * 20 + 4, 2).addTo(stage);
+        var sw = new Circle(x + 4, i * 20 + 15, 2).addTo(stage);
+        var se = new Circle(x + 16, i * 20 + 15, 2).addTo(stage);
+        sw.fill(colors[d]);
+        se.fill(colors[c]);
+        ne.fill(colors[b]);
+        nw.fill(colors[a]);
+
+/*
+        var pts = [
+            [x + 1, ?], // sw
+            [], // s
+            [], // se
+            [], // e
+            [], // ne
+            [], // n
+            [], // nw
+            [], // w
+            [], // center
+        ];
+
+        var draw_triangle = function(a, b, c) {
+        };
+*/
+
+        var tri0 = new Path().moveTo(x, 0).lineTo(x + 10, 10).lineTo(x, 10).closePath();
+        tri0.addTo(stage);
+        tri0.stroke('#000');
+        tri0.attr({strokeWidth: 1});
+        tri0.fill('#ff0');
+    }
+}
+
+var el = document.getElementById('diagram');
+
+bonsai.run(el, {
+    code: main,
+    width: 400,
+    height: 5120
+});
+
+setTimeout(function() {
+    window.console.log(el.children[0].innerHTML);
+}, 1000);
+
+</script>
