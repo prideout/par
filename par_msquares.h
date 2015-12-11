@@ -96,48 +96,45 @@ struct par_msquares_meshlist_s {
     par_msquares_mesh** meshes;
 };
 
-static int** point_table = 0;
-static int** triangle_table = 0;
+static int** par_msquares_binary_point_table = 0;
+static int** par_msquares_binary_triangle_table = 0;
 
 static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     int count, int snap);
 
 static void par_init_tables()
 {
-    point_table = PAR_ALLOC(int*, 16);
-    triangle_table = PAR_ALLOC(int*, 16);
+    par_msquares_binary_point_table = PAR_ALLOC(int*, 16);
+    par_msquares_binary_triangle_table = PAR_ALLOC(int*, 16);
 
     char const* CODE_TABLE =
-        "0 0\n"
-        "1 1 0 1 7\n"
-        "2 1 1 2 3\n"
-        "3 2 0 2 3 3 7 0\n"
-        "4 1 7 5 6\n"
-        "5 2 0 1 5 5 6 0\n"
-        "6 2 1 2 3 7 5 6\n"
-        "7 3 0 2 3 0 3 5 0 5 6\n"
-        "8 1 3 4 5\n"
-        "9 4 0 1 3 0 3 4 0 4 5 0 5 7\n"
-        "a 2 1 2 4 4 5 1\n"
-        "b 3 0 2 4 0 4 5 0 5 7\n"
-        "c 2 7 3 4 4 6 7\n"
-        "d 3 0 1 3 0 3 4 0 4 6\n"
-        "e 3 1 2 4 1 4 6 1 6 7\n"
-        "f 2 0 2 4 4 6 0\n";
+        "0"
+        "1017"
+        "1123"
+        "2023370"
+        "1756"
+        "2015560"
+        "2123756"
+        "3023035056"
+        "1345"
+        "4013034045057"
+        "2124451"
+        "3024045057"
+        "2734467"
+        "3013034046"
+        "3124146167"
+        "2024460";
 
     char const* table_token = CODE_TABLE;
     for (int i = 0; i < 16; i++) {
-        char code = *table_token;
-        assert(i == code - (code >= 'a' ? ('a' - 0xa) : '0'));
-        table_token += 2;
         int ntris = *table_token - '0';
-        table_token += 2;
-        int* sqrtris = triangle_table[i] = PAR_ALLOC(int, (ntris + 1) * 3);
+        table_token++;
+        int* sqrtris = par_msquares_binary_triangle_table[i] = PAR_ALLOC(int, (ntris + 1) * 3);
         sqrtris[0] = ntris;
         int mask = 0;
-        int* sqrpts = point_table[i] = PAR_ALLOC(int, 7);
+        int* sqrpts = par_msquares_binary_point_table[i] = PAR_ALLOC(int, 7);
         sqrpts[0] = 0;
-        for (int j = 0; j < ntris * 3; j++, table_token += 2) {
+        for (int j = 0; j < ntris * 3; j++, table_token++) {
             int midp = *table_token - '0';
             int bit = 1 << midp;
             if (!(mask & bit)) {
@@ -156,17 +153,17 @@ typedef struct {
     float upper_bound;
     int width;
     int height;
-} gray_context;
+} par_gray_context;
 
 static int gray_inside(int location, void* contextptr)
 {
-    gray_context* context = (gray_context*) contextptr;
+    par_gray_context* context = (par_gray_context*) contextptr;
     return context->data[location] > context->threshold;
 }
 
 static int gray_multi_inside(int location, void* contextptr)
 {
-    gray_context* context = (gray_context*) contextptr;
+    par_gray_context* context = (par_gray_context*) contextptr;
     float val = context->data[location];
     float upper = context->upper_bound;
     float lower = context->lower_bound;
@@ -175,7 +172,7 @@ static int gray_multi_inside(int location, void* contextptr)
 
 static float gray_height(float x, float y, void* contextptr)
 {
-    gray_context* context = (gray_context*) contextptr;
+    par_gray_context* context = (par_gray_context*) contextptr;
     int i = PAR_CLAMP(context->width * x, 0, context->width - 1);
     int j = PAR_CLAMP(context->height * y, 0, context->height - 1);
     return context->data[i + j * context->width];
@@ -187,11 +184,11 @@ typedef struct {
     int bpp;
     int width;
     int height;
-} color_context;
+} par_color_context;
 
 static int color_inside(int location, void* contextptr)
 {
-    color_context* context = (color_context*) contextptr;
+    par_color_context* context = (par_color_context*) contextptr;
     par_byte const* data = context->data + location * context->bpp;
     for (int i = 0; i < context->bpp; i++) {
         if (data[i] != context->color[i]) {
@@ -203,7 +200,7 @@ static int color_inside(int location, void* contextptr)
 
 static float color_height(float x, float y, void* contextptr)
 {
-    color_context* context = (color_context*) contextptr;
+    par_color_context* context = (par_color_context*) contextptr;
     assert(context->bpp == 4);
     int i = PAR_CLAMP(context->width * x, 0, context->width - 1);
     int j = PAR_CLAMP(context->height * y, 0, context->height - 1);
@@ -214,7 +211,7 @@ static float color_height(float x, float y, void* contextptr)
 par_msquares_meshlist* par_msquares_color(par_byte const* data, int width,
     int height, int cellsize, uint32_t color, int bpp, int flags)
 {
-    color_context context;
+    par_color_context context;
     context.bpp = bpp;
     context.color[0] = (color >> 16) & 0xff;
     context.color[1] = (color >> 8) & 0xff;
@@ -230,7 +227,7 @@ par_msquares_meshlist* par_msquares_color(par_byte const* data, int width,
 par_msquares_meshlist* par_msquares_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags)
 {
-    gray_context context;
+    par_gray_context context;
     context.width = width;
     context.height = height;
     context.data = data;
@@ -255,7 +252,7 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
     flags &= ~PAR_MSQUARES_DUAL;
     flags &= ~PAR_MSQUARES_CONNECT;
     flags &= ~PAR_MSQUARES_SNAP;
-    gray_context context;
+    par_gray_context context;
     context.width = width;
     context.height = height;
     context.data = data;
@@ -410,7 +407,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     // fixed constants, so it's embarassing that we use dynamic memory
     // allocation for them.  However it's easy and it's one-time-only.
 
-    if (!point_table) {
+    if (!par_msquares_binary_point_table) {
         par_init_tables();
     }
 
@@ -508,7 +505,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
             int code = southwest | (southeast << 1) | (northwest << 2) |
                 (northeast << 3);
 
-            int const* pointspec = point_table[code];
+            int const* pointspec = par_msquares_binary_point_table[code];
             int ptspeclength = *pointspec++;
             int currinds[8] = {0};
             uint8_t mask = 0;
@@ -618,7 +615,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
                 currinds[midp] = npts++;
             }
 
-            int const* trianglespec = triangle_table[code];
+            int const* trianglespec = par_msquares_binary_triangle_table[code];
             int trispeclength = *trianglespec++;
 
             if (flags & PAR_MSQUARES_SIMPLIFY) {
@@ -640,7 +637,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
 
             // Create two extrusion triangles for each boundary edge.
             if (flags & PAR_MSQUARES_CONNECT) {
-                trianglespec = triangle_table[code];
+                trianglespec = par_msquares_binary_triangle_table[code];
                 trispeclength = *trianglespec++;
                 while (trispeclength--) {
                     int a = *trianglespec++;
