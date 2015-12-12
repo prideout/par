@@ -1,7 +1,7 @@
 <style type="text/css">
 #diagram {
     background:#303030;
-    width:400px;
+    width:115px;
     height:5120px;
     padding:5px
 }
@@ -31,11 +31,11 @@ function main()
             fontSize: '15',
             textFillColor: '#aaa',
             textStrokeWidth: 0 });
-        var a = i & 0x3;
-        var b = (i >> 2) & 0x3;
-        var c = (i >> 4) & 0x3;
-        var d = (i >> 6) & 0x3;
-        new Text('' + d + c + b + a).addTo(stage).attr({
+        var d = i & 0x3;
+        var c = (i >> 2) & 0x3;
+        var b = (i >> 4) & 0x3;
+        var a = (i >> 6) & 0x3;
+        new Text('' + a + b + c + d).addTo(stage).attr({
             x: 55,
             y: 4 + i * 20,
             fontFamily: 'Arial, sans-serif',
@@ -47,50 +47,82 @@ function main()
         new Rect(x + 1, 1 + i * 20, 18, 18)
             .addTo(stage)
             .attr('fillColor', '#555');
-        var nw = new Circle(x + 4, i * 20 + 4, 2).addTo(stage);
-        var ne = new Circle(x + 16, i * 20 + 4, 2).addTo(stage);
-        var sw = new Circle(x + 4, i * 20 + 15, 2).addTo(stage);
-        var se = new Circle(x + 16, i * 20 + 15, 2).addTo(stage);
-        sw.fill(colors[d]);
-        se.fill(colors[c]);
-        ne.fill(colors[b]);
-        nw.fill(colors[a]);
+        var nw = new Circle(x + 4,  i * 20 + 4,  2).addTo(stage);
+        var ne = new Circle(x + 16, i * 20 + 4,  2).addTo(stage);
+        var sw = new Circle(x + 4,  i * 20 + 16, 2).addTo(stage);
+        var se = new Circle(x + 16, i * 20 + 16, 2).addTo(stage);
+        sw.fill(colors[a]);
+        se.fill(colors[b]);
+        ne.fill(colors[c]);
+        nw.fill(colors[d]);
 
-        var x = 100;
+        var x = 95;
         new Rect(x + 1, 1 + i * 20, 18, 18)
             .addTo(stage)
             .attr('fillColor', '#555');
-        var nw = new Circle(x + 4, i * 20 + 4, 2).addTo(stage);
-        var ne = new Circle(x + 16, i * 20 + 4, 2).addTo(stage);
-        var sw = new Circle(x + 4, i * 20 + 15, 2).addTo(stage);
-        var se = new Circle(x + 16, i * 20 + 15, 2).addTo(stage);
-        sw.fill(colors[d]);
-        se.fill(colors[c]);
-        ne.fill(colors[b]);
-        nw.fill(colors[a]);
+        var nw = new Circle(x + 4,  i * 20 + 4,  2).addTo(stage);
+        var ne = new Circle(x + 16, i * 20 + 4,  2).addTo(stage);
+        var sw = new Circle(x + 4,  i * 20 + 16, 2).addTo(stage);
+        var se = new Circle(x + 16, i * 20 + 16, 2).addTo(stage);
+        sw.fill(colors[a]);
+        se.fill(colors[b]);
+        ne.fill(colors[c]);
+        nw.fill(colors[d]);
 
-/*
         var pts = [
-            [x + 1, ?], // sw
-            [], // s
-            [], // se
-            [], // e
-            [], // ne
-            [], // n
-            [], // nw
-            [], // w
-            [], // center
+            [x + 4,  i * 20 + 16], // sw 0
+            [x + 10, i * 20 + 16], // s  1
+            [x + 16, i * 20 + 16], // se 2
+            [x + 16, i * 20 + 10], // e  3
+            [x + 16, i * 20 + 4],  // ne 4
+            [x + 10, i * 20 + 4],  // n  5
+            [x + 4,  i * 20 + 4],  // nw 6
+            [x + 4,  i * 20 + 10], // w  7
+            [x + 10, i * 20 + 10], // center
         ];
 
-        var draw_triangle = function(a, b, c) {
+        var draw_triangle = function(color_index, a, b, c) {
+            var pa = pts[a];
+            var pb = pts[b];
+            var pc = pts[c];
+            var tri0 = new Path()
+                .moveTo(pa[0], pa[1])
+                .lineTo(pb[0], pb[1])
+                .lineTo(pc[0], pc[1])
+                .closePath();
+            tri0.addTo(stage);
+            tri0.stroke('#000');
+            tri0.attr({
+                strokeWidth: 0.5,
+                join: 'round'
+            });
+            tri0.fill(colors[color_index]);
         };
-*/
 
-        var tri0 = new Path().moveTo(x, 0).lineTo(x + 10, 10).lineTo(x, 10).closePath();
-        tri0.addTo(stage);
-        tri0.stroke('#000');
-        tri0.attr({strokeWidth: 1});
-        tri0.fill('#ff0');
+        if (a == b && b == c && c == d) {
+            draw_triangle(a, 0, 2, 4);
+            draw_triangle(a, 4, 6, 0);
+            continue;
+        }
+
+        if (a != b && b != c && c != d && a != c && a != d && b != d) {
+            draw_triangle(a, 0, 1, 8);
+            draw_triangle(a, 8, 7, 0);
+            draw_triangle(b, 1, 2, 3);
+            draw_triangle(b, 3, 8, 1);
+            draw_triangle(c, 8, 3, 4);
+            draw_triangle(c, 4, 5, 8);
+            draw_triangle(d, 7, 8, 5);
+            draw_triangle(d, 5, 6, 7);
+            continue;
+        }
+
+        if (a == b && b == c) {
+            draw_triangle(a, 0, 2, 4); // TODO
+            draw_triangle(d, 7, 5, 6);
+            continue;
+        }
+
     }
 }
 
@@ -98,12 +130,12 @@ var el = document.getElementById('diagram');
 
 bonsai.run(el, {
     code: main,
-    width: 400,
+    width: 115,
     height: 5120
 });
 
-setTimeout(function() {
-    window.console.log(el.children[0].innerHTML);
-}, 1000);
+// setTimeout(function() {
+//     window.console.log(el.children[0].innerHTML);
+// }, 5000);
 
 </script>
