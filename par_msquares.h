@@ -76,6 +76,9 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
     int width, int height, int cellsize, float const* thresholds,
     int nthresholds, int flags);
 
+par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
+    int height, int cellsize, int bpp, int flags);
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
@@ -85,6 +88,7 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
 #include <stdlib.h>
 #include <assert.h>
 #include <float.h>
+#include <string.h>
 
 #define PAR_MIN(a, b) (a > b ? b : a)
 #define PAR_MAX(a, b) (a > b ? a : b)
@@ -98,7 +102,7 @@ struct par_msquares_meshlist_s {
 
 static int** par_msquares_binary_point_table = 0;
 static int** par_msquares_binary_triangle_table = 0;
-static int** par_msquares_quaternary_triangle_table = 0;
+static int* par_msquares_quaternary_triangle_table[256][4];
 
 static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     int count, int snap);
@@ -405,29 +409,43 @@ static void par_init_tables()
         "0002024046";
     char const* quaternary_token = QUATERNARY_TABLE;
 
-    par_msquares_quaternary_triangle_table = PAR_ALLOC(int*, 256);
+    int* quaternary_values = PAR_ALLOC(int, strlen(QUATERNARY_TABLE));
+    int* vals = quaternary_values;
     for (int i = 0; i < 256; i++) {
         int ntris = *quaternary_token++ - '0';
+        *vals = ntris;
+        par_msquares_quaternary_triangle_table[i][0] = vals++;
         for (int j = 0; j < ntris * 3; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
         }
         ntris = *quaternary_token++ - '0';
+        *vals = ntris;
+        par_msquares_quaternary_triangle_table[i][1] = vals++;
         for (int j = 0; j < ntris * 3; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
         }
         ntris = *quaternary_token++ - '0';
+        *vals = ntris;
+        par_msquares_quaternary_triangle_table[i][2] = vals++;
         for (int j = 0; j < ntris * 3; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
         }
         ntris = *quaternary_token++ - '0';
+        *vals = ntris;
+        par_msquares_quaternary_triangle_table[i][3] = vals++;
         for (int j = 0; j < ntris * 3; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
         }
     }
+    assert(vals = quaternary_values + strlen(QUATERNARY_TABLE));
 }
 
 typedef struct {
@@ -573,6 +591,9 @@ int par_msquares_get_count(par_msquares_meshlist* mlist)
 
 void par_msquares_free(par_msquares_meshlist* mlist)
 {
+    if (!mlist) {
+        return;
+    }
     par_msquares_mesh** meshes = mlist->meshes;
     for (int i = 0; i < mlist->nmeshes; i++) {
         free(meshes[i]->points);
@@ -1191,6 +1212,12 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     mesh->triangles = tris;
     mesh->nconntriangles = nconntris;
     return mlist;
+}
+
+par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
+    int height, int cellsize, int bpp, int flags)
+{
+    return 0;
 }
 
 #undef PAR_MIN
