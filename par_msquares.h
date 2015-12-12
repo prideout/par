@@ -28,6 +28,7 @@ typedef struct {
     uint16_t* triangles;  // pointer to 3-tuples of vertex indices
     int ntriangles;       // number of 3-tuples
     int dim;              // number of floats per point (either 2 or 3)
+    uint32_t color;       // used only with par_msquares_color_multi
     int nconntriangles;   // internal use only
 } par_msquares_mesh;
 
@@ -760,13 +761,13 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     // the lower-left, although we expect the image data to be in raster order
     // (starts at top-left).
 
+    float vertsx[8], vertsy[8];
     float normalization = 1.0f / PAR_MAX(width, height);
     float normalized_cellsize = cellsize * normalization;
     int maxrow = (height - 1) * width;
     uint16_t* ptris = tris;
     uint16_t* pconntris = conntris;
     float* ppts = pts;
-    float vertsx[8], vertsy[8];
     uint8_t* prevrowmasks = PAR_ALLOC(uint8_t, ncols);
     int* prevrowinds = PAR_ALLOC(int, ncols * 3);
 
@@ -1214,10 +1215,189 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     return mlist;
 }
 
+static int par_msquares_cmp(const void *a, const void *b)
+{
+    uint32_t* p0 = (uint32_t*) a;
+    uint32_t* p1 = (uint32_t*) b;
+    return *p0 - *p1;
+}
+
+typedef int (*par_msquares_code_fn)(int, int, int, int, void*);
+
+static int par_msquares_multi_code(int sw, int se, int ne, int nw)
+{
+    int colors[4];
+    int code[4];
+    int ncols = 0;
+    colors[ncols] = sw;
+    code[0] = ncols++;
+    if (se == sw) {
+        code[1] = code[0];
+    } else {
+        colors[ncols] = se;
+        code[1] = ncols++;
+    }
+    if (ne == se) {
+        code[2] = code[1];
+    } else if (ne == sw) {
+        code[2] = code[0];
+    } else {
+        colors[ncols] = ne;
+        code[2] = ncols++;
+    }
+    if (nw == ne) {
+        code[3] = code[2];
+    } else if (nw == se) {
+        code[3] = code[1];
+    } else if (nw == sw) {
+        code[3] = code[0];
+    } else {
+        colors[ncols] = nw;
+        code[3] = ncols++;
+    }
+    return code[3] | (code[2] << 2) | (code[1] << 4) | (code[0] << 6);
+}
+
 par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     int height, int cellsize, int bpp, int flags)
 {
-    return 0;
+    if (!par_msquares_binary_point_table) {
+        par_init_tables();
+    }
+
+    // Find all unique colors and ensure there are no more than 256 colors.
+    uint32_t colors[256];
+    int ncolors = 0;
+    par_byte const* pdata = data;
+    for (int i = 0; i < width * height; i++, pdata += bpp) {
+        uint32_t color = 0;
+        for (int j = 0; j < bpp; j++) {
+            color <<= 8;
+            color |= pdata[j];
+        }
+        if (0 == bsearch(&color, colors, ncolors, 4, par_msquares_cmp)) {
+            assert(ncolors < 256);
+            colors[ncolors++] = color;
+            qsort(colors, ncolors, sizeof(uint32_t), par_msquares_cmp);
+        }
+    }
+
+    // Convert the color image to grayscale using the mapping table.
+    par_byte* pixels = PAR_ALLOC(par_byte, width * height);
+    pdata = data;
+    for (int i = 0; i < width * height; i++, pdata += bpp) {
+        uint32_t color = 0;
+        for (int j = 0; j < bpp; j++) {
+            color <<= 8;
+            color |= pdata[j];
+        }
+        void* result = bsearch(&color, colors, ncolors, 4, par_msquares_cmp);
+        pixels[i] = (uint32_t*) result - &colors[0];
+    }
+
+    // Allocate 1 mesh for each color.
+    par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
+    mlist->nmeshes = ncolors;
+    mlist->meshes = PAR_ALLOC(par_msquares_mesh*, ncolors);
+    const int MAXTRIS_PER_CELL = 6;
+    const int MAXPTS_PER_CELL = 9;
+    int ncols = width / cellsize;
+    int nrows = height / cellsize;
+    int maxrow = (height - 1) * width;
+    int ncells = ncols * nrows;
+    int dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
+    par_msquares_mesh* mesh;
+    for (int i = 0; i < ncolors; i++) {
+        mesh = mlist->meshes[i] = PAR_ALLOC(par_msquares_mesh, 1);
+        mesh->color = colors[i];
+        mesh->points = PAR_ALLOC(float, ncells * MAXPTS_PER_CELL * dim);
+        mesh->triangles = PAR_ALLOC(uint16_t, ncells * MAXTRIS_PER_CELL * 3);
+        mesh->dim = 2;
+    }
+
+    // The "verts" x/y/z arrays are the 4 corners and 4 midpoints around the
+    // square, in counter-clockwise order, starting at the lower-left.  The
+    // ninth vert is the center point.
+
+    float vertsx[9], vertsy[9];
+    float normalization = 1.0f / PAR_MAX(width, height);
+    float normalized_cellsize = cellsize * normalization;
+
+    // Do the march!
+    for (int row = 0; row < nrows; row++) {
+        vertsx[0] = vertsx[6] = vertsx[7] = 0;
+        vertsx[1] = vertsx[5] = vertsx[8] = 0.5 * normalized_cellsize;
+        vertsx[2] = vertsx[3] = vertsx[4] = normalized_cellsize;
+        vertsy[0] = vertsy[1] = vertsy[2] = normalized_cellsize * (row + 1);
+        vertsy[4] = vertsy[5] = vertsy[6] = normalized_cellsize * row;
+        vertsy[3] = vertsy[7] = vertsy[8] = normalized_cellsize * (row + 0.5);
+
+        int northi = row * cellsize * width;
+        int southi = PAR_MIN(northi + cellsize * width, maxrow);
+        int nwval = pixels[northi];
+        int swval = pixels[southi];
+
+        for (int col = 0; col < ncols; col++) {
+            northi += cellsize;
+            southi += cellsize;
+            if (col == ncols - 1) {
+                northi--;
+                southi--;
+            }
+
+            // Obtain 8-bit code and grab the four corresopnding triangle lists.
+            int neval = pixels[northi];
+            int seval = pixels[southi];
+            int code = par_msquares_multi_code(swval, seval, neval, nwval);
+            int const* swspec = par_msquares_quaternary_triangle_table[code][0];
+            int const* sespec = par_msquares_quaternary_triangle_table[code][1];
+            int const* nespec = par_msquares_quaternary_triangle_table[code][2];
+            int const* nwspec = par_msquares_quaternary_triangle_table[code][3];
+
+            // Count the number of triangles to insert.
+            int ntris[4];
+            ntris[0] = *swspec++;
+            ntris[1] = *sespec++;
+            ntris[2] = *nespec++;
+            ntris[3] = *nwspec++;
+
+            // Push triangles and points into the four affected meshes.
+            int const* specs[4] = { swspec, sespec, nespec, nwspec };
+            int vals[4] = { swval, seval, neval, nwval };
+            for (int c = 0; c < 4; c++) {
+                int usedpts[9] = {0};
+                int mapping[9];
+                par_msquares_mesh* mesh = mlist->meshes[vals[c]];
+                uint16_t* tdst = mesh->triangles + mesh->ntriangles * 3;
+                float* pdst = mesh->points + mesh->npoints * mesh->dim;
+                mesh->ntriangles += ntris[c];
+                for (int t = ntris[c] * 3 - 1; t >= 0; t--) {
+                    uint16_t index = specs[c][t];
+                    if (!usedpts[index]) {
+                        *pdst++ = vertsx[index];
+                        *pdst++ = vertsy[index];
+                        if (mesh->dim == 3) {
+                            *pdst++ = 0;
+                        }
+                        mapping[index] = mesh->npoints++;
+                        usedpts[index] = 1;
+                    }
+                    *tdst++ = mapping[index];
+                }
+            }
+
+            nwval = neval;
+            swval = seval;
+            for (int i = 0; i < 9; i++) {
+                vertsx[i] += normalized_cellsize;
+            }
+        }
+    }
+
+    assert(mesh->npoints <= ncells * MAXPTS_PER_CELL);
+    assert(mesh->ntriangles <= ncells * MAXTRIS_PER_CELL);
+    free(pixels);
+    return mlist;
 }
 
 #undef PAR_MIN
