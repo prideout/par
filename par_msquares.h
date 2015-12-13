@@ -1258,6 +1258,23 @@ static int par_msquares_multi_code(int sw, int se, int ne, int nw)
     return code[3] | (code[2] << 2) | (code[1] << 4) | (code[0] << 6);
 }
 
+static uint32_t par_msquares_argb(par_byte const* pdata, int bpp)
+{
+    uint32_t color = 0;
+    if (bpp == 4) {
+        color |= pdata[2];
+        color |= pdata[1] << 8;
+        color |= pdata[0] << 16;
+        color |= pdata[3] << 24;
+        return color;
+    }
+    for (int j = 0; j < bpp; j++) {
+        color <<= 8;
+        color |= pdata[j];
+    }
+    return color;
+}
+
 par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     int height, int cellsize, int bpp, int flags)
 {
@@ -1270,11 +1287,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     int ncolors = 0;
     par_byte const* pdata = data;
     for (int i = 0; i < width * height; i++, pdata += bpp) {
-        uint32_t color = 0;
-        for (int j = 0; j < bpp; j++) {
-            color <<= 8;
-            color |= pdata[j];
-        }
+        uint32_t color = par_msquares_argb(pdata, bpp);
         if (0 == bsearch(&color, colors, ncolors, 4, par_msquares_cmp)) {
             assert(ncolors < 256);
             colors[ncolors++] = color;
@@ -1286,11 +1299,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     par_byte* pixels = PAR_ALLOC(par_byte, width * height);
     pdata = data;
     for (int i = 0; i < width * height; i++, pdata += bpp) {
-        uint32_t color = 0;
-        for (int j = 0; j < bpp; j++) {
-            color <<= 8;
-            color |= pdata[j];
-        }
+        uint32_t color = par_msquares_argb(pdata, bpp);
         void* result = bsearch(&color, colors, ncolors, 4, par_msquares_cmp);
         pixels[i] = (uint32_t*) result - &colors[0];
     }
