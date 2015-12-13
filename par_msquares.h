@@ -95,6 +95,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
 #define PAR_MAX(a, b) (a > b ? a : b)
 #define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
 #define PAR_ALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
 
 struct par_msquares_meshlist_s {
     int nmeshes;
@@ -174,8 +175,8 @@ static void par_init_tables()
         "1701467161262363513450"
         "2015056212414500"
         "3702724745001756"
-        "2018087312414616702785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
+        "2018087212414502785756"
         "2015056212313828348450"
         "4013034045057112301756"
         "2023037028348452785756"
@@ -193,9 +194,9 @@ static void par_init_tables()
         "4013034045057112301756"
         "2018087212313828348452785756"
         "2015056212414500"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "3702724745001756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "2015056212313828348450"
         "2018087212313828348452785756"
         "4013034045057112301756"
@@ -213,13 +214,13 @@ static void par_init_tables()
         "2023037028348452785756"
         "4013034045057112301756"
         "2015056212414500"
-        "2018087312414616702785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
+        "2018087212414502785756"
         "3702724745001756"
         "3702724745001756"
         "2015056212414500"
-        "2018087312414616702785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
+        "2018087212414502785756"
         "2018087212313828348452785756"
         "3560502523013450"
         "1701467161262363513450"
@@ -256,10 +257,10 @@ static void par_init_tables()
         "3560502523013450"
         "2018087212313828348452785756"
         "1701467161262363513450"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "2015056212414500"
         "3702724745001756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "2018087212313828348452785756"
         "2015056212313828348450"
         "4013034045057112301756"
@@ -276,14 +277,14 @@ static void par_init_tables()
         "2015056212313828348450"
         "2023037028348452785756"
         "4013034045057112301756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "2015056212414500"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "3702724745001756"
         "3702724745001756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "2015056212414500"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "4013034045057112301756"
         "2023037028348452785756"
         "2015056212313828348450"
@@ -300,10 +301,10 @@ static void par_init_tables()
         "4013034045057112301756"
         "2015056212313828348450"
         "2018087212313828348452785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "3702724745001756"
         "2015056212414500"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "1701467161262363513450"
         "2018087212313828348452785756"
         "3560502523013450"
@@ -340,13 +341,13 @@ static void par_init_tables()
         "1701467161262363513450"
         "3560502523013450"
         "2018087212313828348452785756"
-        "2018087312414616702785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
+        "2018087212414502785756"
         "2015056212414500"
         "3702724745001756"
         "3702724745001756"
-        "2018087312414616702785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
+        "2018087212414502785756"
         "2015056212414500"
         "4013034045057112301756"
         "2023037028348452785756"
@@ -364,9 +365,9 @@ static void par_init_tables()
         "4013034045057112301756"
         "2018087212313828348452785756"
         "2015056212313828348450"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "3702724745001756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
         "2015056212414500"
         "2018087212313828348452785756"
         "4013034045057112301756"
@@ -384,8 +385,8 @@ static void par_init_tables()
         "2023037028348452785756"
         "4013034045057112301756"
         "2015056212313828348450"
-        "2018087312414616702785756"
-        "2018087312414616702785756"
+        "2018087212414502785756"
+        "2018087212414502785756"
         "3702724745001756"
         "2015056212414500"
         "1701467161262363513450"
@@ -713,13 +714,11 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     // Create the two code tables if we haven't already.  These are tables of
     // fixed constants, so it's embarassing that we use dynamic memory
     // allocation for them.  However it's easy and it's one-time-only.
-
     if (!par_msquares_binary_point_table) {
         par_init_tables();
     }
 
     // Allocate the meshlist and the first mesh.
-
     par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = 1;
     mlist->meshes = PAR_ALLOC(par_msquares_mesh*, 1);
@@ -731,14 +730,12 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
 
     // Worst case is four triangles and six verts per cell, so allocate that
     // much.
-
     int maxtris = ncols * nrows * 4;
     int maxpts = ncols * nrows * 6;
     int maxedges = ncols * nrows * 2;
 
     // However, if we include extrusion triangles for boundary edges,
     // we need space for another 4 triangles and 4 points per cell.
-
     uint16_t* conntris = 0;
     int nconntris = 0;
     uint16_t* edgemap = 0;
@@ -751,7 +748,6 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
             edgemap[i] = 0xffff;
         }
     }
-
     uint16_t* tris = PAR_ALLOC(uint16_t, maxtris * 3);
     int ntris = 0;
     float* pts = PAR_ALLOC(float, maxpts * mesh->dim);
@@ -761,7 +757,6 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     // square, in counter-clockwise order.  The origin of "triangle space" is at
     // the lower-left, although we expect the image data to be in raster order
     // (starts at top-left).
-
     float vertsx[8], vertsy[8];
     float normalization = 1.0f / PAR_MAX(width, height);
     float normalized_cellsize = cellsize * normalization;
@@ -826,7 +821,6 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
                 // number of vertices.  The first three perform welding with the
                 // cell to the west; the latter three perform welding with the
                 // cell to the north.
-
                 if (bit == 1 && (prevmask & 4)) {
                     currinds[midp] = previnds[2];
                     continue;
@@ -1218,9 +1212,11 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
 
 static int par_msquares_cmp(const void *a, const void *b)
 {
-    uint32_t* p0 = (uint32_t*) a;
-    uint32_t* p1 = (uint32_t*) b;
-    return *p0 - *p1;
+    uint32_t arg1 = *((uint32_t const*) a);
+    uint32_t arg2 = *((uint32_t const*) b);
+    if (arg1 < arg2) return -1;
+    if (arg1 > arg2) return 1;
+    return 0;
 }
 
 typedef int (*par_msquares_code_fn)(int, int, int, int, void*);
@@ -1282,6 +1278,15 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     if (!par_msquares_binary_point_table) {
         par_init_tables();
     }
+    const int MAXTRIS_PER_CELL = 6;
+    const int MAXPTS_PER_CELL = 9;
+    int ncols = width / cellsize;
+    int nrows = height / cellsize;
+    int maxrow = (height - 1) * width;
+    int ncells = ncols * nrows;
+    int dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
+    int west_to_east[9] =   {  2, -1, -1, -1, -1, -1,  4,  3, -1 };
+    int north_to_south[9] = { -1, -1, -1, -1,  2,  1,  0, -1, -1 };
 
     // Find all unique colors and ensure there are no more than 256 colors.
     uint32_t colors[256];
@@ -1309,13 +1314,6 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = ncolors;
     mlist->meshes = PAR_ALLOC(par_msquares_mesh*, ncolors);
-    const int MAXTRIS_PER_CELL = 6;
-    const int MAXPTS_PER_CELL = 9;
-    int ncols = width / cellsize;
-    int nrows = height / cellsize;
-    int maxrow = (height - 1) * width;
-    int ncells = ncols * nrows;
-    int dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     par_msquares_mesh* mesh;
     for (int i = 0; i < ncolors; i++) {
         mesh = mlist->meshes[i] = PAR_ALLOC(par_msquares_mesh, 1);
@@ -1332,6 +1330,23 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     float vertsx[9], vertsy[9];
     float normalization = 1.0f / PAR_MAX(width, height);
     float normalized_cellsize = cellsize * normalization;
+    uint8_t cella[256];
+    uint8_t cellb[256];
+    uint8_t* currcell = cella;
+    uint8_t* prevcell = cellb;
+    uint16_t inds0[256 * 9];
+    uint16_t inds1[256 * 9];
+    uint16_t* currinds = inds0;
+    uint16_t* previnds = inds1;
+
+    uint16_t* rowindsa = PAR_ALLOC(uint16_t, ncols * 3 * 256);
+    uint8_t* rowcellsa = PAR_ALLOC(uint8_t, ncols * 256);
+    uint16_t* rowindsb = PAR_ALLOC(uint16_t, ncols * 3 * 256);
+    uint8_t* rowcellsb = PAR_ALLOC(uint8_t, ncols * 256);
+    uint16_t* prevrowinds = rowindsa;
+    uint16_t* currrowinds = rowindsb;
+    uint8_t* prevrowcells = rowcellsa;
+    uint8_t* currrowcells = rowcellsb;
 
     // Do the march!
     for (int row = 0; row < nrows; row++) {
@@ -1341,11 +1356,11 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         vertsy[0] = vertsy[1] = vertsy[2] = normalized_cellsize * (row + 1);
         vertsy[4] = vertsy[5] = vertsy[6] = normalized_cellsize * row;
         vertsy[3] = vertsy[7] = vertsy[8] = normalized_cellsize * (row + 0.5);
-
         int northi = row * cellsize * width;
         int southi = PAR_MIN(northi + cellsize * width, maxrow);
         int nwval = pixels[northi];
         int swval = pixels[southi];
+        memset(currrowcells, 0, ncols * 256);
 
         for (int col = 0; col < ncols; col++) {
             northi += cellsize;
@@ -1374,26 +1389,75 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
             // Push triangles and points into the four affected meshes.
             int const* specs[4] = { swspec, sespec, nespec, nwspec };
             int vals[4] = { swval, seval, neval, nwval };
+            for (int m = 0; m < ncolors; m++) {
+                currcell[m] = 0;
+            }
             for (int c = 0; c < 4; c++) {
+                int color = vals[c];
+                par_msquares_mesh* mesh = mlist->meshes[color];
                 int usedpts[9] = {0};
-                int mapping[9];
-                par_msquares_mesh* mesh = mlist->meshes[vals[c]];
-                uint16_t* tdst = mesh->triangles + mesh->ntriangles * 3;
+                uint16_t* pcurrinds = currinds + 9 * color;
+                uint16_t const* pprevinds = previnds + 9 * color;
+                uint16_t const* pprevrowinds =
+                    prevrowinds + ncols * 3 * color + col * 3;
+                uint8_t prevrowcell = prevrowcells[color * ncols + col];
                 float* pdst = mesh->points + mesh->npoints * mesh->dim;
+                int previndex, prevflag;
+                for (int t = 0; t < ntris[c] * 3; t++) {
+                    uint16_t index = specs[c][t];
+                    if (usedpts[index]) {
+                        continue;
+                    }
+                    usedpts[index] = 1;
+                    if (index < 8) {
+                        currcell[vals[c]] |= 1 << index;
+                    }
+
+                    // Vertical welding.
+                    previndex = north_to_south[index];
+                    prevflag = (previndex > -1) ? (1 << previndex) : 0;
+                    if (row > 0 && (prevrowcell & prevflag)) {
+                        pcurrinds[index] = pprevrowinds[previndex];
+                        continue;
+                    }
+
+                    // Horizontal welding.
+                    previndex = west_to_east[index];
+                    prevflag = (previndex > -1) ? (1 << previndex) : 0;
+                    if (col > 0 && (prevcell[color] & prevflag)) {
+                        pcurrinds[index] = pprevinds[previndex];
+                        continue;
+                    }
+
+                    // Insert brand new point.
+                    *pdst++ = vertsx[index];
+                    *pdst++ = 1 - vertsy[index];
+                    if (mesh->dim == 3) {
+                        *pdst++ = 0;
+                    }
+                    pcurrinds[index] = mesh->npoints++;
+                }
+                uint16_t* tdst = mesh->triangles + mesh->ntriangles * 3;
                 mesh->ntriangles += ntris[c];
                 for (int t = 0; t < ntris[c] * 3; t++) {
                     uint16_t index = specs[c][t];
-                    if (!usedpts[index]) {
-                        *pdst++ = vertsx[index];
-                        *pdst++ = 1 - vertsy[index];
-                        if (mesh->dim == 3) {
-                            *pdst++ = 0;
-                        }
-                        mapping[index] = mesh->npoints++;
-                        usedpts[index] = 1;
-                    }
-                    *tdst++ = mapping[index];
+                    *tdst++ = pcurrinds[index];
                 }
+            }
+
+            // Stash the bottom indices for each mesh in this cell to enable
+            // vertical as-you-go welding.
+            uint8_t* pcurrrowcells = currrowcells;
+            uint16_t* pcurrrowinds = currrowinds;
+            uint16_t const* pcurrinds = currinds;
+            for (int color = 0; color < ncolors; color++) {
+                pcurrrowcells[col] = currcell[color];
+                pcurrrowcells += ncols;
+                pcurrrowinds[col * 3 + 0] = pcurrinds[0];
+                pcurrrowinds[col * 3 + 1] = pcurrinds[1];
+                pcurrrowinds[col * 3 + 2] = pcurrinds[2];
+                pcurrrowinds += ncols * 3;
+                pcurrinds += 9;
             }
 
             // Advance the cursor.
@@ -1402,11 +1466,17 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
             for (int i = 0; i < 9; i++) {
                 vertsx[i] += normalized_cellsize;
             }
+            PAR_SWAP(uint8_t*, prevcell, currcell);
+            PAR_SWAP(uint16_t*, previnds, currinds);
         }
+        PAR_SWAP(uint8_t*, prevrowcells, currrowcells);
+        PAR_SWAP(uint16_t*, prevrowinds, currrowinds);
     }
 
     assert(mesh->npoints <= ncells * MAXPTS_PER_CELL);
     assert(mesh->ntriangles <= ncells * MAXTRIS_PER_CELL);
+    free(prevrowinds);
+    free(prevrowcells);
     free(pixels);
     return mlist;
 }
@@ -1415,4 +1485,5 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
 #undef PAR_MAX
 #undef PAR_CLAMP
 #undef PAR_ALLOC
+#undef PAR_SWAP
 #endif
