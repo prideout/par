@@ -32,11 +32,11 @@ function main()
             fontSize: '15',
             textFillColor: '#aaa',
             textStrokeWidth: 0 });
-        var d = i & 0x3;
-        var c = (i >> 2) & 0x3;
-        var b = (i >> 4) & 0x3;
-        var a = (i >> 6) & 0x3;
-        new Text('' + a + b + c + d).addTo(stage).attr({
+        var a = i & 0x3;
+        var b = (i >> 2) & 0x3;
+        var c = (i >> 4) & 0x3;
+        var d = (i >> 6) & 0x3;
+        new Text('' + d + c + b + a).addTo(stage).attr({
             x: 55,
             y: 4 + i * 20,
             fontFamily: 'Arial, sans-serif',
@@ -85,14 +85,14 @@ function main()
         entry = [[], [], [], []];
         tab.push(entry)
 
-        var draw_polygon = function(color_index, indices) {
+        var draw_polygon = function(color_index, corner_index, indices) {
             var ppts = indices.map(function(i) { return pts[i]; });
             var tri0 = new Path().moveTo(ppts[0][0], ppts[0][1]);
             for (var j = 1; j < ppts.length; j++) {
                 if (j > 1) {
-                    entry[color_index].push(indices[0]);
-                    entry[color_index].push(indices[j - 1]);
-                    entry[color_index].push(indices[j]);
+                    entry[corner_index].push(indices[0]);
+                    entry[corner_index].push(indices[j - 1]);
+                    entry[corner_index].push(indices[j]);
                 }
                 tri0.lineTo(ppts[j][0], ppts[j][1]);
             }
@@ -107,86 +107,86 @@ function main()
         };
 
         if (a == b && b == c && c == d) {
-            draw_polygon(a, [0, 2, 4, 6]);
+            draw_polygon(a, 0, [0, 2, 4, 6]);
             continue;
         }
 
         if ((a != b && b != c && c != d && a != c && a != d && b != d) ||
             (a == c && b == d)) {
-            draw_polygon(a, [0, 1, 8, 7]);
-            draw_polygon(b, [1, 2, 3, 8]);
-            draw_polygon(c, [8, 3, 4, 5]);
-            draw_polygon(d, [7, 8, 5, 6]);
+            draw_polygon(a, 0, [0, 1, 8, 7]);
+            draw_polygon(b, 1, [1, 2, 3, 8]);
+            draw_polygon(c, 2, [8, 3, 4, 5]);
+            draw_polygon(d, 3, [7, 8, 5, 6]);
             continue;
         }
 
         if (a == b && b == c) {
-            draw_polygon(a, [7, 0, 2, 4, 5]);
-            draw_polygon(d, [7, 5, 6]);
+            draw_polygon(a, 0, [7, 0, 2, 4, 5]);
+            draw_polygon(d, 3, [7, 5, 6]);
             continue;
         }
         if (b == c && c == d) {
-            draw_polygon(b, [1, 2, 4, 6, 7]);
-            draw_polygon(a, [7, 0, 1]);
+            draw_polygon(b, 1, [1, 2, 4, 6, 7]);
+            draw_polygon(a, 0, [7, 0, 1]);
             continue;
         }
         if (c == d && d == a) {
-            draw_polygon(a, [3, 4, 6, 0, 1]);
-            draw_polygon(b, [1, 2, 3]);
+            draw_polygon(a, 0, [3, 4, 6, 0, 1]);
+            draw_polygon(b, 1, [1, 2, 3]);
             continue;
         }
         if (b == d && d == a) {
-            draw_polygon(a, [5, 6, 0, 2, 3]);
-            draw_polygon(c, [3, 4, 5]);
+            draw_polygon(a, 0, [5, 6, 0, 2, 3]);
+            draw_polygon(c, 2, [3, 4, 5]);
             continue;
         }
 
         if (a == b && c == d) {
-            draw_polygon(a, [0, 2, 3, 7]);
-            draw_polygon(c, [7, 3, 4, 6]);
+            draw_polygon(a, 0, [0, 2, 3, 7]);
+            draw_polygon(c, 2, [7, 3, 4, 6]);
             continue;
         }
         if (b == c && a == d) {
-            draw_polygon(b, [1, 2, 4, 5]);
-            draw_polygon(a, [0, 1, 5, 6]);
+            draw_polygon(b, 1, [1, 2, 4, 5]);
+            draw_polygon(a, 0, [0, 1, 5, 6]);
             continue;
         }
 
         if (a == b) {
-            draw_polygon(a, [0, 2, 3, 7]);
-            draw_polygon(c, [8, 3, 4, 5]);
-            draw_polygon(d, [7, 8, 5, 6]);
+            draw_polygon(a, 0, [0, 2, 3, 7]);
+            draw_polygon(c, 2, [8, 3, 4, 5]);
+            draw_polygon(d, 3, [7, 8, 5, 6]);
             continue;
         }
         if (c == b) {
-            draw_polygon(b, [1, 2, 4, 6, 7]);
-            draw_polygon(a, [0, 1, 8, 7]);
-            draw_polygon(d, [7, 8, 5, 6]);
+            draw_polygon(b, 1, [1, 2, 4, 6, 7]);
+            draw_polygon(a, 0, [0, 1, 8, 7]);
+            draw_polygon(d, 3, [7, 8, 5, 6]);
             continue;
         }
         if (c == d) {
-            draw_polygon(c, [7, 3, 4, 6]);
-            draw_polygon(a, [0, 1, 8, 7]);
-            draw_polygon(b, [1, 2, 3, 8]);
+            draw_polygon(c, 2, [7, 3, 4, 6]);
+            draw_polygon(a, 0, [0, 1, 8, 7]);
+            draw_polygon(b, 1, [1, 2, 3, 8]);
             continue;
         }
         if (d == a) {
-            draw_polygon(b, [1, 2, 3, 8]);
-            draw_polygon(c, [8, 3, 4, 5]);
-            draw_polygon(a, [0, 1, 5, 6]);
+            draw_polygon(b, 1, [1, 2, 3, 8]);
+            draw_polygon(c, 2, [8, 3, 4, 5]);
+            draw_polygon(a, 0, [0, 1, 5, 6]);
             continue;
         }
 
         if (a == c && b != d) {
-            draw_polygon(a, [0, 1, 3, 4, 5, 7]);
-            draw_polygon(b, [1, 2, 3]);
-            draw_polygon(d, [7, 5, 6]);
+            draw_polygon(a, 0, [0, 1, 3, 4, 5, 7]);
+            draw_polygon(b, 1, [1, 2, 3]);
+            draw_polygon(d, 3, [7, 5, 6]);
             continue;
         }
         if (b == d && a != c) {
-            draw_polygon(b, [6, 7, 1, 2, 3, 5]);
-            draw_polygon(a, [7, 0, 1]);
-            draw_polygon(c, [3, 4, 5]);
+            draw_polygon(b, 1, [6, 7, 1, 2, 3, 5]);
+            draw_polygon(a, 0, [7, 0, 1]);
+            draw_polygon(c, 2, [3, 4, 5]);
             continue;
         }
     }
