@@ -143,29 +143,43 @@ function main()
 
         if (a == b && c == d) {
             draw_polygon(a, 0, [0, 2, 3, 7]);
+            // draw_polygon(a, 0, [0, 1, 8, 7]);
+            // draw_polygon(a, 0, [1, 2, 3, 8]);
             draw_polygon(c, 2, [7, 3, 4, 6]);
+            // draw_polygon(c, 2, [7, 8, 5, 6]);
+            // draw_polygon(c, 2, [8, 3, 4, 5]);
             continue;
         }
         if (b == c && a == d) {
             draw_polygon(b, 1, [1, 2, 4, 5]);
+            // draw_polygon(b, 1, [1, 2, 3, 8])
+            // draw_polygon(b, 1, [8, 3, 4, 5])
             draw_polygon(a, 0, [0, 1, 5, 6]);
+            // draw_polygon(a, 0, [0, 1, 8, 7]);
+            // draw_polygon(a, 0, [7, 8, 5, 6]);
             continue;
         }
 
         if (a == b) {
-            draw_polygon(a, 0, [0, 2, 3, 7]);
+            // draw_polygon(a, 0, [0, 2, 3, 7]);
+            draw_polygon(a, 0, [0, 1, 8, 7]);
+            draw_polygon(a, 0, [1, 2, 3, 8]);
             draw_polygon(c, 2, [8, 3, 4, 5]);
             draw_polygon(d, 3, [7, 8, 5, 6]);
             continue;
         }
         if (c == b) {
-            draw_polygon(b, 1, [1, 2, 4, 5]);
+            // draw_polygon(b, 1, [1, 2, 4, 5]);
+            draw_polygon(b, 1, [1, 2, 3, 8])
+            draw_polygon(b, 1, [8, 3, 4, 5])
             draw_polygon(a, 0, [0, 1, 8, 7]);
             draw_polygon(d, 3, [7, 8, 5, 6]);
             continue;
         }
         if (c == d) {
-            draw_polygon(c, 2, [7, 3, 4, 6]);
+            // draw_polygon(c, 2, [7, 3, 4, 6]);
+            draw_polygon(c, 2, [7, 8, 5, 6]);
+            draw_polygon(c, 2, [8, 3, 4, 5]);
             draw_polygon(a, 0, [0, 1, 8, 7]);
             draw_polygon(b, 1, [1, 2, 3, 8]);
             continue;
@@ -173,7 +187,9 @@ function main()
         if (d == a) {
             draw_polygon(b, 1, [1, 2, 3, 8]);
             draw_polygon(c, 2, [8, 3, 4, 5]);
-            draw_polygon(a, 0, [0, 1, 5, 6]);
+            // draw_polygon(a, 0, [0, 1, 5, 6]);
+            draw_polygon(a, 0, [0, 1, 8, 7]);
+            draw_polygon(a, 0, [7, 8, 5, 6]);
             continue;
         }
 
