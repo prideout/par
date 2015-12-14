@@ -1108,24 +1108,24 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
             }
             if (in_run) {
                 in_run = 0;
-                    int nw_cell = ncols * row + start_run;
-                    int ne_cell = ncols * row + ncols - 1;
-                    int sw_cell = nw_cell + ncols;
-                    int se_cell = ne_cell + ncols;
-                    int nw_tri = simplification_tris[nw_cell];
-                    int ne_tri = simplification_tris[ne_cell];
-                    int sw_tri = simplification_tris[sw_cell];
-                    int se_tri = simplification_tris[se_cell];
-                    int nw_corner = nw_tri * 3 + 4;
-                    int ne_corner = ne_tri * 3 + 0;
-                    int sw_corner = sw_tri * 3 + 2;
-                    int se_corner = se_tri * 3 + 1;
-                    *pnewtris++ = tris[se_corner];
-                    *pnewtris++ = tris[sw_corner];
-                    *pnewtris++ = tris[nw_corner];
-                    *pnewtris++ = tris[nw_corner];
-                    *pnewtris++ = tris[ne_corner];
-                    *pnewtris++ = tris[se_corner];
+                int nw_cell = ncols * row + start_run;
+                int ne_cell = ncols * row + ncols - 1;
+                int sw_cell = nw_cell + ncols;
+                int se_cell = ne_cell + ncols;
+                int nw_tri = simplification_tris[nw_cell];
+                int ne_tri = simplification_tris[ne_cell];
+                int sw_tri = simplification_tris[sw_cell];
+                int se_tri = simplification_tris[se_cell];
+                int nw_corner = nw_tri * 3 + 4;
+                int ne_corner = ne_tri * 3 + 0;
+                int sw_corner = sw_tri * 3 + 2;
+                int se_corner = se_tri * 3 + 1;
+                *pnewtris++ = tris[se_corner];
+                *pnewtris++ = tris[sw_corner];
+                *pnewtris++ = tris[nw_corner];
+                *pnewtris++ = tris[nw_corner];
+                *pnewtris++ = tris[ne_corner];
+                *pnewtris++ = tris[se_corner];
             }
         }
         ptris = pnewtris;
@@ -1347,6 +1347,10 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     uint16_t* currrowinds = rowindsb;
     uint8_t* prevrowcells = rowcellsa;
     uint8_t* currrowcells = rowcellsb;
+    uint32_t* simplification_words = 0;
+    if (flags & PAR_MSQUARES_SIMPLIFY) {
+        simplification_words = PAR_ALLOC(uint32_t, 2 * nrows * ncols);
+    }
 
     // Do the march!
     for (int row = 0; row < nrows; row++) {
@@ -1392,8 +1396,12 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
             for (int m = 0; m < ncolors; m++) {
                 currcell[m] = 0;
             }
+            uint32_t colors = 0;
+            uint32_t counts = 0;
             for (int c = 0; c < 4; c++) {
                 int color = vals[c];
+                colors |= color << (8 * c);
+                counts |= ntris[c] << (8 * c);
                 par_msquares_mesh* mesh = mlist->meshes[color];
                 int usedpts[9] = {0};
                 uint16_t* pcurrinds = currinds + 9 * color;
@@ -1410,7 +1418,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                     }
                     usedpts[index] = 1;
                     if (index < 8) {
-                        currcell[vals[c]] |= 1 << index;
+                        currcell[color] |= 1 << index;
                     }
 
                     // Vertical welding.
@@ -1460,6 +1468,13 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 pcurrinds += 9;
             }
 
+            // Stash some information later used by simplification.
+            if (flags & PAR_MSQUARES_SIMPLIFY) {
+                int cell = col + row * ncols;
+                simplification_words[cell * 2] = colors;
+                simplification_words[cell * 2 + 1] = counts;
+            }
+
             // Advance the cursor.
             nwval = neval;
             swval = seval;
@@ -1472,12 +1487,176 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         PAR_SWAP(uint8_t*, prevrowcells, currrowcells);
         PAR_SWAP(uint16_t*, prevrowinds, currrowinds);
     }
-
     assert(mesh->npoints <= ncells * MAXPTS_PER_CELL);
     assert(mesh->ntriangles <= ncells * MAXTRIS_PER_CELL);
     free(prevrowinds);
     free(prevrowcells);
     free(pixels);
+    if (!(flags & PAR_MSQUARES_SIMPLIFY)) {
+        return mlist;
+    }
+
+    uint8_t* simplification_blocks = PAR_ALLOC(uint8_t, nrows * ncols);
+    uint32_t* simplification_tris = PAR_ALLOC(uint32_t, nrows * ncols);
+    uint8_t* simplification_ntris = PAR_ALLOC(uint8_t, nrows * ncols);
+
+    // Perform quick-n-dirty simplification by iterating two rows at a time.
+    // In no way does this create the simplest possible mesh, but at least it's
+    // fast and easy.
+    for (int color = 0; color < ncolors; color++) {
+        par_msquares_mesh* mesh = mlist->meshes[color];
+
+        // Populate the per-mesh info grids.
+        int ntris = 0;
+        for (int row = 0; row < nrows; row++) {
+            for (int col = 0; col < ncols; col++) {
+                int cell = ncols * row + col;
+                uint32_t colors = simplification_words[cell * 2];
+                uint32_t counts = simplification_words[cell * 2 + 1];
+                int ncelltris = 0;
+                int ncorners = 0;
+                if ((colors & 0xff) == color) {
+                    ncelltris = counts & 0xff;
+                    ncorners++;
+                }
+                if (((colors >> 8) & 0xff) == color) {
+                    ncelltris += (counts >> 8) & 0xff;
+                    ncorners++;
+                }
+                if (((colors >> 16) & 0xff) == color) {
+                    ncelltris += (counts >> 16) & 0xff;
+                    ncorners++;
+                }
+                if (((colors >> 24) & 0xff) == color) {
+                    ncelltris += (counts >> 24) & 0xff;
+                    ncorners++;
+                }
+                simplification_ntris[cell] = ncelltris;
+                simplification_tris[cell] = ntris;
+                simplification_blocks[cell] = ncorners == 4;
+                ntris += ncelltris;
+            }
+        }
+
+        // First figure out how many triangles we can eliminate.
+        int in_run = 0, start_run;
+        int neliminated_triangles = 0;
+        for (int row = 0; row < nrows - 1; row += 2) {
+            for (int col = 0; col < ncols; col++) {
+                int cell = ncols * row + col;
+                int a = simplification_blocks[cell];
+                int b = simplification_blocks[cell + ncols];
+                if (a && b) {
+                    if (!in_run) {
+                        in_run = 1;
+                        start_run = col;
+                    }
+                    continue;
+                }
+                if (in_run) {
+                    in_run = 0;
+                    int run_width = col - start_run;
+                    neliminated_triangles += run_width * 4 - 2;
+                }
+            }
+            if (in_run) {
+                in_run = 0;
+                int run_width = ncols - start_run;
+                neliminated_triangles += run_width * 4 - 2;
+            }
+        }
+        if (neliminated_triangles == 0) {
+            continue;
+        }
+
+        // Build a new index array cell-by-cell.  If any given cell is 'F' and
+        // its neighbor to the south is also 'F', then it's part of a run.
+        int nnewtris = mesh->ntriangles - neliminated_triangles;
+        uint16_t* newtris = PAR_ALLOC(uint16_t, nnewtris * 3);
+        uint16_t* pnewtris = newtris;
+        in_run = 0;
+        uint16_t* tris = mesh->triangles;
+        for (int row = 0; row < nrows - 1; row += 2) {
+            for (int col = 0; col < ncols; col++) {
+                int cell = ncols * row + col;
+                int south = cell + ncols;
+                int a = simplification_blocks[cell];
+                int b = simplification_blocks[south];
+                if (a && b) {
+                    if (!in_run) {
+                        in_run = 1;
+                        start_run = col;
+                    }
+                    continue;
+                }
+                if (in_run) {
+                    in_run = 0;
+                    int nw_cell = ncols * row + start_run;
+                    int ne_cell = ncols * row + col - 1;
+                    int sw_cell = nw_cell + ncols;
+                    int se_cell = ne_cell + ncols;
+                    int nw_tri = simplification_tris[nw_cell];
+                    int ne_tri = simplification_tris[ne_cell];
+                    int sw_tri = simplification_tris[sw_cell];
+                    int se_tri = simplification_tris[se_cell];
+                    int nw_corner = nw_tri * 3 + 5;
+                    int ne_corner = ne_tri * 3 + 2;
+                    int sw_corner = sw_tri * 3 + 0;
+                    int se_corner = se_tri * 3 + 1;
+                    *pnewtris++ = tris[nw_corner];
+                    *pnewtris++ = tris[sw_corner];
+                    *pnewtris++ = tris[se_corner];
+                    *pnewtris++ = tris[se_corner];
+                    *pnewtris++ = tris[ne_corner];
+                    *pnewtris++ = tris[nw_corner];
+                }
+                int ncelltris = simplification_ntris[cell];
+                int celltri = simplification_tris[cell];
+                for (int t = 0; t < ncelltris; t++, celltri++) {
+                    *pnewtris++ = tris[celltri * 3];
+                    *pnewtris++ = tris[celltri * 3 + 1];
+                    *pnewtris++ = tris[celltri * 3 + 2];
+                }
+                ncelltris = simplification_ntris[south];
+                celltri = simplification_tris[south];
+                for (int t = 0; t < ncelltris; t++, celltri++) {
+                    *pnewtris++ = tris[celltri * 3];
+                    *pnewtris++ = tris[celltri * 3 + 1];
+                    *pnewtris++ = tris[celltri * 3 + 2];
+                }
+            }
+            if (in_run) {
+                in_run = 0;
+                int nw_cell = ncols * row + start_run;
+                int ne_cell = ncols * row + ncols - 1;
+                int sw_cell = nw_cell + ncols;
+                int se_cell = ne_cell + ncols;
+                int nw_tri = simplification_tris[nw_cell];
+                int ne_tri = simplification_tris[ne_cell];
+                int sw_tri = simplification_tris[sw_cell];
+                int se_tri = simplification_tris[se_cell];
+                int nw_corner = nw_tri * 3 + 5;
+                int ne_corner = ne_tri * 3 + 2;
+                int sw_corner = sw_tri * 3 + 0;
+                int se_corner = se_tri * 3 + 1;
+                *pnewtris++ = tris[nw_corner];
+                *pnewtris++ = tris[sw_corner];
+                *pnewtris++ = tris[se_corner];
+                *pnewtris++ = tris[se_corner];
+                *pnewtris++ = tris[ne_corner];
+                *pnewtris++ = tris[nw_corner];
+            }
+        }
+        mesh->ntriangles -= neliminated_triangles;
+        free(mesh->triangles);
+        mesh->triangles = newtris;
+    }
+
+    free(simplification_blocks);
+    free(simplification_ntris);
+    free(simplification_tris);
+    free(simplification_words);
+
     return mlist;
 }
 
