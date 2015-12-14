@@ -26,7 +26,7 @@ static void test_multi()
 
     mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE / 2, 3,
         0);
-    objfile = fopen("build/msquares_multi.obj", "wt");
+    objfile = fopen("build/msquares_multi_rgb.obj", "wt");
     int offset = 1;
     for (int m = 0; m < par_msquares_get_count(mlist); m++) {
         mesh = par_msquares_get_mesh(mlist, m);
@@ -47,7 +47,37 @@ static void test_multi()
     }
     fclose(objfile);
     par_msquares_free(mlist);
+    free(pixels);
 
+    int nbytes;
+    par_byte* data;
+    asset_get("msquares_color.png", &data, &nbytes);
+    lodepng_decode_memory(&pixels, &dims[0], &dims[1], data, nbytes, LCT_RGBA,
+        8);
+    free(data);
+    mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE, 4,
+        PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_CONNECT);
+    objfile = fopen("build/msquares_multi_diagram.obj", "wt");
+    offset = 1;
+    for (int m = 0; m < par_msquares_get_count(mlist); m++) {
+        mesh = par_msquares_get_mesh(mlist, m);
+        pt = mesh->points;
+        for (int i = 0; i < mesh->npoints; i++) {
+            float z = mesh->dim > 2 ? pt[2] : 0;
+            fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+            pt += mesh->dim;
+        }
+        index = mesh->triangles;
+        for (int i = 0; i < mesh->ntriangles; i++) {
+            int a = offset + *index++;
+            int b = offset + *index++;
+            int c = offset + *index++;
+            fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+        }
+        offset += mesh->npoints;
+    }
+    fclose(objfile);
+    par_msquares_free(mlist);
     free(pixels);
 }
 

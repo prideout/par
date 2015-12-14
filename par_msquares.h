@@ -30,6 +30,7 @@ typedef struct {
     int dim;              // number of floats per point (either 2 or 3)
     uint32_t color;       // used only with par_msquares_color_multi
     int nconntriangles;   // internal use only
+    uint16_t* conntri;    // internal use only
 } par_msquares_mesh;
 
 // Reverses the "insideness" test.
@@ -105,6 +106,7 @@ struct par_msquares_meshlist_s {
 static int** par_msquares_binary_point_table = 0;
 static int** par_msquares_binary_triangle_table = 0;
 static int* par_msquares_quaternary_triangle_table[64][4];
+static int* par_msquares_quaternary_boundary_table[64][4];
 
 static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     int count, int snap);
@@ -217,7 +219,6 @@ static void par_init_tables()
         "2018087212313847857568348450"
         "2018087212313847857568348450"
         "1701312414616700";
-
     char const* quaternary_token = QUATERNARY_TABLE;
 
     int* quaternary_values = PAR_ALLOC(int, strlen(QUATERNARY_TABLE));
@@ -256,7 +257,65 @@ static void par_init_tables()
             *vals++ = pt;
         }
     }
-    assert(vals = quaternary_values + strlen(QUATERNARY_TABLE));
+    assert(vals == quaternary_values + strlen(QUATERNARY_TABLE));
+
+    char const* QUATERNARY_EDGES =
+        "0000"
+        "21323100213231002132310023502530"
+        "215251003185338135830318533813583023502530"
+        "318533813583021525100318533813583023502530"
+        "318533813583031853381358302152510025700275"
+        "318733813583378541357231027541357231027523702730"
+        "21727100318733813783031873381378303387035833785"
+        "217471352530318735810378531873381358337853387035833785"
+        "2174713525303187338135833785318735810378525700275"
+        "41357231027531873381358337854135723102753387035833785"
+        "3187358103785217471352530318733813583378523702730"
+        "31873381378302172710031873381378303387035833785"
+        "3187338135833785217471352530318735810378525700275"
+        "41357231027541357231027531873381358337853387035833785"
+        "318735810378531873381358337852174713525303387035833785"
+        "3187338135833785318735810378521747135253023702730"
+        "3187338137830318733813783021727100";
+    quaternary_token = QUATERNARY_EDGES;
+
+    quaternary_values = PAR_ALLOC(int, strlen(QUATERNARY_EDGES));
+    vals = quaternary_values;
+    for (int i = 0; i < 64; i++) {
+        int nedges = *quaternary_token++ - '0';
+        *vals = nedges;
+        par_msquares_quaternary_boundary_table[i][0] = vals++;
+        for (int j = 0; j < nedges; j++) {
+            int pt = *quaternary_token++ - '0';
+            assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
+        }
+        nedges = *quaternary_token++ - '0';
+        *vals = nedges;
+        par_msquares_quaternary_boundary_table[i][1] = vals++;
+        for (int j = 0; j < nedges; j++) {
+            int pt = *quaternary_token++ - '0';
+            assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
+        }
+        nedges = *quaternary_token++ - '0';
+        *vals = nedges;
+        par_msquares_quaternary_boundary_table[i][2] = vals++;
+        for (int j = 0; j < nedges; j++) {
+            int pt = *quaternary_token++ - '0';
+            assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
+        }
+        nedges = *quaternary_token++ - '0';
+        *vals = nedges;
+        par_msquares_quaternary_boundary_table[i][3] = vals++;
+        for (int j = 0; j < nedges; j++) {
+            int pt = *quaternary_token++ - '0';
+            assert(pt >= 0 && pt < 9);
+            *vals++ = pt;
+        }
+    }
+    assert(vals == quaternary_values + strlen(QUATERNARY_EDGES));
 }
 
 typedef struct {
@@ -1080,14 +1139,43 @@ static uint32_t par_msquares_argb(par_byte const* pdata, int bpp)
     return color;
 }
 
+static void par_msquares_internal_finalize(par_msquares_meshlist* mlist)
+{
+    if (mlist->nmeshes < 2 || mlist->meshes[1]->nconntriangles == 0) {
+        return;
+    }
+    for (int m = 1; m < mlist->nmeshes; m++) {
+        par_msquares_mesh* mesh = mlist->meshes[m];
+        int ntris = mesh->ntriangles + mesh->nconntriangles;
+        uint16_t* triangles = PAR_ALLOC(uint16_t, ntris * 3);
+        uint16_t* dst = triangles;
+        uint16_t const* src = mesh->triangles;
+        for (int t = 0; t < mesh->ntriangles; t++) {
+            *dst++ = *src++;
+            *dst++ = *src++;
+            *dst++ = *src++;
+        }
+        src = mesh->conntri;
+        for (int t = 0; t < mesh->nconntriangles; t++) {
+            *dst++ = *src++;
+            *dst++ = *src++;
+            *dst++ = *src++;
+        }
+        free(mesh->triangles);
+        free(mesh->conntri);
+        mesh->triangles = triangles;
+        mesh->ntriangles = ntris;
+        mesh->conntri = 0;
+        mesh->nconntriangles = 0;
+    }
+}
+
 par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     int height, int cellsize, int bpp, int flags)
 {
     if (!par_msquares_binary_point_table) {
         par_init_tables();
     }
-    const int MAXTRIS_PER_CELL = 6;
-    const int MAXPTS_PER_CELL = 9;
     const int ncols = width / cellsize;
     const int nrows = height / cellsize;
     const int maxrow = (height - 1) * width;
@@ -1131,12 +1219,20 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     mlist->nmeshes = ncolors;
     mlist->meshes = PAR_ALLOC(par_msquares_mesh*, ncolors);
     par_msquares_mesh* mesh;
+    int maxtris_per_cell = 6;
+    int maxpts_per_cell = 9;
+    if (flags & PAR_MSQUARES_CONNECT) {
+        maxpts_per_cell += 6;
+    }
     for (int i = 0; i < ncolors; i++) {
         mesh = mlist->meshes[i] = PAR_ALLOC(par_msquares_mesh, 1);
         mesh->color = colors[i];
-        mesh->points = PAR_ALLOC(float, ncells * MAXPTS_PER_CELL * dim);
-        mesh->triangles = PAR_ALLOC(uint16_t, ncells * MAXTRIS_PER_CELL * 3);
+        mesh->points = PAR_ALLOC(float, ncells * maxpts_per_cell * dim);
+        mesh->triangles = PAR_ALLOC(uint16_t, ncells * maxtris_per_cell * 3);
         mesh->dim = dim;
+        if (flags & PAR_MSQUARES_CONNECT) {
+            mesh->conntri = PAR_ALLOC(uint16_t, ncells * 8 * 3);
+        }
     }
 
     // The "verts" x/y/z arrays are the 4 corners and 4 midpoints around the
@@ -1193,20 +1289,32 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
             int neval = pixels[northi];
             int seval = pixels[southi];
             int code = par_msquares_multi_code(swval, seval, neval, nwval) >> 2;
-            int const* swspec = par_msquares_quaternary_triangle_table[code][0];
-            int const* sespec = par_msquares_quaternary_triangle_table[code][1];
-            int const* nespec = par_msquares_quaternary_triangle_table[code][2];
-            int const* nwspec = par_msquares_quaternary_triangle_table[code][3];
-
-            // Count the number of triangles to insert.
-            int ntris[4];
-            ntris[0] = *swspec++;
-            ntris[1] = *sespec++;
-            ntris[2] = *nespec++;
-            ntris[3] = *nwspec++;
+            int const* trispecs[4] = {
+                par_msquares_quaternary_triangle_table[code][0],
+                par_msquares_quaternary_triangle_table[code][1],
+                par_msquares_quaternary_triangle_table[code][2],
+                par_msquares_quaternary_triangle_table[code][3]
+            };
+            int ntris[4] = {
+                *trispecs[0]++,
+                *trispecs[1]++,
+                *trispecs[2]++,
+                *trispecs[3]++
+            };
+            int const* edgespecs[4] = {
+                par_msquares_quaternary_boundary_table[code][0],
+                par_msquares_quaternary_boundary_table[code][1],
+                par_msquares_quaternary_boundary_table[code][2],
+                par_msquares_quaternary_boundary_table[code][3]
+            };
+            int nedges[4] = {
+                *edgespecs[0]++,
+                *edgespecs[1]++,
+                *edgespecs[2]++,
+                *edgespecs[3]++
+            };
 
             // Push triangles and points into the four affected meshes.
-            int const* specs[4] = { swspec, sespec, nespec, nwspec };
             int vals[4] = { swval, seval, neval, nwval };
             for (int m = 0; m < ncolors; m++) {
                 currcell[m] = 0;
@@ -1227,7 +1335,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 float* pdst = mesh->points + mesh->npoints * mesh->dim;
                 int previndex, prevflag;
                 for (int t = 0; t < ntris[c] * 3; t++) {
-                    uint16_t index = specs[c][t];
+                    uint16_t index = trispecs[c][t];
                     if (usedpts[index]) {
                         continue;
                     }
@@ -1288,8 +1396,8 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                         for (int i = 1; i < cellsize - 1; i++) {
                             int val = pixels[begin + i * width];
                             if (val != pixels[begin]) {
-                                vertex[1] = (1 - vertsy[6]) - normalized_cellsize *
-                                    (float) i / cellsize;
+                                vertex[1] = (1 - vertsy[6]) -
+                                    normalized_cellsize * (float) i / cellsize;
                                 break;
                             }
                         }
@@ -1298,8 +1406,8 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                         for (int i = 1; i < cellsize - 1; i++) {
                             int val = pixels[begin + i * width];
                             if (val != pixels[begin]) {
-                                vertex[1] = (1 - vertsy[4]) - normalized_cellsize *
-                                    (float) i / cellsize;
+                                vertex[1] = (1 - vertsy[4]) -
+                                    normalized_cellsize * (float) i / cellsize;
                                 break;
                             }
                         }
@@ -1310,8 +1418,39 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 uint16_t* tdst = mesh->triangles + mesh->ntriangles * 3;
                 mesh->ntriangles += ntris[c];
                 for (int t = 0; t < ntris[c] * 3; t++) {
-                    uint16_t index = specs[c][t];
+                    uint16_t index = trispecs[c][t];
                     *tdst++ = pcurrinds[index];
+                }
+
+                // Add extrusion points and connective triangles if requested.
+                if (!(flags & PAR_MSQUARES_CONNECT) || color == 0) {
+                    continue;
+                }
+                int minalpha = mesh->color >> 24;
+                for (int idx = 0; idx < color - 1; idx++) {
+                    par_msquares_mesh* lowest_mesh = mlist->meshes[idx];
+                    minalpha = PAR_MIN(minalpha, lowest_mesh->color >> 24);
+                }
+                for (int e = 0; e < nedges[c]; e++) {
+                    uint16_t index = edgespecs[c][e];
+                    *pdst++ = vertsx[index];
+                    *pdst++ = 1 - vertsy[index];
+                    if (mesh->dim == 3) {
+                        float height = minalpha / 255.0;
+                        *pdst++ = height;
+                    }
+                    mesh->npoints++;
+                    if (e > 0) {
+                        uint16_t i0 = mesh->npoints - 1;
+                        uint16_t i1 = mesh->npoints - 2;
+                        uint16_t i2 = pcurrinds[edgespecs[c][e - 1]];
+                        uint16_t i3 = pcurrinds[edgespecs[c][e]];
+                        uint16_t* ptr = mesh->conntri +
+                            mesh->nconntriangles * 3;
+                        *ptr++ = i2; *ptr++ = i1; *ptr++ = i0;
+                        *ptr++ = i0; *ptr++ = i3; *ptr++ = i2;
+                        mesh->nconntriangles += 2;
+                    }
                 }
             }
 
@@ -1349,12 +1488,13 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         PAR_SWAP(uint8_t*, prevrowcells, currrowcells);
         PAR_SWAP(uint16_t*, prevrowinds, currrowinds);
     }
-    assert(mesh->npoints <= ncells * MAXPTS_PER_CELL);
-    assert(mesh->ntriangles <= ncells * MAXTRIS_PER_CELL);
+    assert(mesh->npoints <= ncells * maxpts_per_cell);
+    assert(mesh->ntriangles <= ncells * maxtris_per_cell);
     free(prevrowinds);
     free(prevrowcells);
     free(pixels);
     if (!(flags & PAR_MSQUARES_SIMPLIFY)) {
+        par_msquares_internal_finalize(mlist);
         return mlist;
     }
 
@@ -1518,7 +1658,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     free(simplification_ntris);
     free(simplification_tris);
     free(simplification_words);
-
+    par_msquares_internal_finalize(mlist);
     return mlist;
 }
 
