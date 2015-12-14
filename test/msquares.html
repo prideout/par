@@ -209,6 +209,9 @@ function main()
 
     msg = ''
     for (var t = 0; t < tab.length; t++) {
+        if ((t & 3) > 0) {
+            continue;
+        }
         msg += '"';
         for (var c = 0; c < 4; c++) {
             msg += tab[t][c].length / 3;
