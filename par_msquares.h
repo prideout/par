@@ -1280,13 +1280,21 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     }
     const int MAXTRIS_PER_CELL = 6;
     const int MAXPTS_PER_CELL = 9;
-    int ncols = width / cellsize;
-    int nrows = height / cellsize;
-    int maxrow = (height - 1) * width;
-    int ncells = ncols * nrows;
-    int dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
-    int west_to_east[9] =   {  2, -1, -1, -1, -1, -1,  4,  3, -1 };
-    int north_to_south[9] = { -1, -1, -1, -1,  2,  1,  0, -1, -1 };
+    const int ncols = width / cellsize;
+    const int nrows = height / cellsize;
+    const int maxrow = (height - 1) * width;
+    const int ncells = ncols * nrows;
+    const int dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
+    const int west_to_east[9] =   {  2, -1, -1, -1, -1, -1,  4,  3, -1 };
+    const int north_to_south[9] = { -1, -1, -1, -1,  2,  1,  0, -1, -1 };
+    assert(!(flags & PAR_MSQUARES_HEIGHTS) || bpp == 4);
+    assert(bpp > 0 && bpp <= 4 && "Bytes per pixel must be 1, 2, 3, or 4.");
+    assert(!(flags & PAR_MSQUARES_SNAP) &&
+        "SNAP is not supported with color_multi");
+    assert(!(flags & PAR_MSQUARES_INVERT) &&
+        "INVERT is not supported with color_multi");
+    assert(!(flags & PAR_MSQUARES_DUAL) &&
+        "DUAL is not supported with color_multi");
 
     // Find all unique colors and ensure there are no more than 256 colors.
     uint32_t colors[256];
@@ -1320,7 +1328,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         mesh->color = colors[i];
         mesh->points = PAR_ALLOC(float, ncells * MAXPTS_PER_CELL * dim);
         mesh->triangles = PAR_ALLOC(uint16_t, ncells * MAXTRIS_PER_CELL * 3);
-        mesh->dim = 2;
+        mesh->dim = dim;
     }
 
     // The "verts" x/y/z arrays are the 4 corners and 4 midpoints around the
@@ -1441,7 +1449,8 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                     *pdst++ = vertsx[index];
                     *pdst++ = 1 - vertsy[index];
                     if (mesh->dim == 3) {
-                        *pdst++ = 0;
+                        float height = (mesh->color >> 24) / 255.0;
+                        *pdst++ = height;
                     }
                     pcurrinds[index] = mesh->npoints++;
 
