@@ -261,22 +261,22 @@ static void par_init_tables()
 
     char const* QUATERNARY_EDGES =
         "0000"
-        "21323100213231002132310023502530"
-        "215251003185338135830318533813583023502530"
-        "318533813583021525100318533813583023502530"
-        "318533813583031853381358302152510025700275"
-        "318733813583378541357231027541357231027523702730"
-        "21727100318733813783031873381378303387035833785"
-        "217471352530318735810378531873381358337853387035833785"
-        "2174713525303187338135833785318735810378525700275"
-        "41357231027531873381358337854135723102753387035833785"
-        "3187358103785217471352530318733813583378523702730"
-        "31873381378302172710031873381378303387035833785"
-        "3187338135833785217471352530318735810378525700275"
-        "41357231027541357231027531873381358337853387035833785"
-        "318735810378531873381358337852174713525303387035833785"
-        "3187338135833785318735810378521747135253023702730"
-        "3187338137830318733813783021727100";
+        "11313100113131001131310013501530"
+        "115151002188523881258830218852388125883013501530"
+        "218852388125883011515100218852388125883013501530"
+        "218852388125883021885238812588301151510015700175"
+        "2188723881258832788521357131017521357131017513701730"
+        "11717100218872388127883021887238812788302388702588327885"
+        "1172713515302188725881027885218872388125883278852388702588327885"
+        "11727135153021887238812588327885218872588102788515700175"
+        "213571310175218872388125883278852135713101752388702588327885"
+        "21887258810278851172713515302188723881258832788513701730"
+        "21887238812788301171710021887238812788302388702588327885"
+        "21887238812588327885117271351530218872588102788515700175"
+        "213571310175213571310175218872388125883278852388702588327885"
+        "2188725881027885218872388125883278851172713515302388702588327885"
+        "21887238812588327885218872588102788511727135153013701730"
+        "2188723881278830218872388127883011717100";
     quaternary_token = QUATERNARY_EDGES;
 
     quaternary_values = PAR_ALLOC(int, strlen(QUATERNARY_EDGES));
@@ -285,7 +285,7 @@ static void par_init_tables()
         int nedges = *quaternary_token++ - '0';
         *vals = nedges;
         par_msquares_quaternary_boundary_table[i][0] = vals++;
-        for (int j = 0; j < nedges; j++) {
+        for (int j = 0; j < nedges * 2; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
             *vals++ = pt;
@@ -293,7 +293,7 @@ static void par_init_tables()
         nedges = *quaternary_token++ - '0';
         *vals = nedges;
         par_msquares_quaternary_boundary_table[i][1] = vals++;
-        for (int j = 0; j < nedges; j++) {
+        for (int j = 0; j < nedges * 2; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
             *vals++ = pt;
@@ -301,7 +301,7 @@ static void par_init_tables()
         nedges = *quaternary_token++ - '0';
         *vals = nedges;
         par_msquares_quaternary_boundary_table[i][2] = vals++;
-        for (int j = 0; j < nedges; j++) {
+        for (int j = 0; j < nedges * 2; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
             *vals++ = pt;
@@ -309,7 +309,7 @@ static void par_init_tables()
         nedges = *quaternary_token++ - '0';
         *vals = nedges;
         par_msquares_quaternary_boundary_table[i][3] = vals++;
-        for (int j = 0; j < nedges; j++) {
+        for (int j = 0; j < nedges * 2; j++) {
             int pt = *quaternary_token++ - '0';
             assert(pt >= 0 && pt < 9);
             *vals++ = pt;
@@ -1077,6 +1077,28 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     return mlist;
 }
 
+typedef struct {
+    uint16_t outera;
+    uint16_t outerb;
+    uint16_t innera;
+    uint16_t innerb;
+    char i;
+    char j;
+    par_msquares_mesh* mesh;
+    int mesh_index;
+} par_connector;
+
+static par_connector* par_conn_find(par_connector* conns, int nconns,
+    char i, char j)
+{
+    for (int c = 0; c < nconns; c++) {
+        if (conns[c].i == i && conns[c].j == j) {
+            return conns + c;
+        }
+    }
+    return 0;
+}
+
 static int par_msquares_cmp(const void *a, const void *b)
 {
     uint32_t arg1 = *((uint32_t const*) a);
@@ -1285,7 +1307,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 southi--;
             }
 
-            // Obtain 8-bit code and grab the four corresopnding triangle lists.
+            // Obtain 8-bit code and grab the four corresponding triangle lists.
             int neval = pixels[northi];
             int seval = pixels[southi];
             int code = par_msquares_multi_code(swval, seval, neval, nwval) >> 2;
@@ -1313,19 +1335,41 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 *edgespecs[2]++,
                 *edgespecs[3]++
             };
+            int vals[4] = { swval, seval, neval, nwval };
+
+            // Gather topology information.
+            par_connector edges[16];
+            int ncedges = 0;
+            for (int c = 0; c < 4; c++) {
+                int color = vals[c];
+                par_msquares_mesh* mesh = mlist->meshes[color];
+                par_connector edge;
+                for (int e = 0; e < nedges[c]; e++) {
+                    char previndex = edgespecs[c][e * 2];
+                    char currindex = edgespecs[c][e * 2 + 1];
+                    edge.i = previndex;
+                    edge.j = currindex;
+                    edge.mesh_index = color;
+                    edge.mesh = mesh;
+                    edges[ncedges++] = edge;
+                }
+            }
+            assert(ncedges < 16);
 
             // Push triangles and points into the four affected meshes.
-            int vals[4] = { swval, seval, neval, nwval };
             for (int m = 0; m < ncolors; m++) {
                 currcell[m] = 0;
             }
             uint32_t colors = 0;
             uint32_t counts = 0;
+            uint16_t* conntris_start[4];
             for (int c = 0; c < 4; c++) {
                 int color = vals[c];
                 colors |= color << (8 * c);
                 counts |= ntris[c] << (8 * c);
                 par_msquares_mesh* mesh = mlist->meshes[color];
+                float height = (mesh->color >> 24) / 255.0;
+                conntris_start[c] = mesh->conntri + mesh->nconntriangles * 3;
                 int usedpts[9] = {0};
                 uint16_t* pcurrinds = currinds + 9 * color;
                 uint16_t const* pprevinds = previnds + 9 * color;
@@ -1365,7 +1409,6 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                     *pdst++ = vertsx[index];
                     *pdst++ = 1 - vertsy[index];
                     if (mesh->dim == 3) {
-                        float height = (mesh->color >> 24) / 255.0;
                         *pdst++ = height;
                     }
                     pcurrinds[index] = mesh->npoints++;
@@ -1403,33 +1446,71 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 }
 
                 // Add extrusion points and connective triangles if requested.
-                if (!(flags & PAR_MSQUARES_CONNECT) || color == 0) {
+                if (!(flags & PAR_MSQUARES_CONNECT)) {
                     continue;
                 }
-                int minalpha = mesh->color >> 24;
-                for (int idx = 0; idx < color - 1; idx++) {
-                    par_msquares_mesh* lowest_mesh = mlist->meshes[idx];
-                    minalpha = PAR_MIN(minalpha, lowest_mesh->color >> 24);
-                }
                 for (int e = 0; e < nedges[c]; e++) {
-                    uint16_t index = edgespecs[c][e];
-                    *pdst++ = vertsx[index];
-                    *pdst++ = 1 - vertsy[index];
+                    int previndex = edgespecs[c][e * 2];
+                    int currindex = edgespecs[c][e * 2 + 1];
+                    par_connector* thisedge = par_conn_find(edges,
+                        ncedges, previndex, currindex);
+                    thisedge->innera = pcurrinds[previndex];
+                    thisedge->innerb = pcurrinds[currindex];
+                    thisedge->outera = mesh->npoints;
+                    thisedge->outerb = mesh->npoints + 1;
+                    par_connector* oppedge = par_conn_find(edges,
+                        ncedges, currindex, previndex);
+                    if (oppedge->mesh_index > color) continue;
+                    *pdst++ = vertsx[previndex];
+                    *pdst++ = 1 - vertsy[previndex];
                     if (mesh->dim == 3) {
-                        float height = minalpha / 255.0;
                         *pdst++ = height;
                     }
                     mesh->npoints++;
-                    if (e > 0) {
-                        uint16_t i0 = mesh->npoints - 1;
-                        uint16_t i1 = mesh->npoints - 2;
-                        uint16_t i2 = pcurrinds[edgespecs[c][e - 1]];
-                        uint16_t i3 = pcurrinds[edgespecs[c][e]];
-                        uint16_t* ptr = mesh->conntri +
-                            mesh->nconntriangles * 3;
-                        *ptr++ = i2; *ptr++ = i1; *ptr++ = i0;
-                        *ptr++ = i0; *ptr++ = i3; *ptr++ = i2;
-                        mesh->nconntriangles += 2;
+                    *pdst++ = vertsx[currindex];
+                    *pdst++ = 1 - vertsy[currindex];
+                    if (mesh->dim == 3) {
+                        *pdst++ = height;
+                    }
+                    mesh->npoints++;
+                    uint16_t i0 = mesh->npoints - 1;
+                    uint16_t i1 = mesh->npoints - 2;
+                    uint16_t i2 = pcurrinds[previndex];
+                    uint16_t i3 = pcurrinds[currindex];
+                    uint16_t* ptr = mesh->conntri +
+                        mesh->nconntriangles * 3;
+                    *ptr++ = i2; *ptr++ = i1; *ptr++ = i0;
+                    *ptr++ = i0; *ptr++ = i3; *ptr++ = i2;
+                    mesh->nconntriangles += 2;
+                }
+            }
+
+            // Adjust the positions of the extrusion verts.
+            if (flags & PAR_MSQUARES_CONNECT) {
+                for (int c = 0; c < 4; c++) {
+                    int color = vals[c];
+                    uint16_t* pconninds = conntris_start[c];
+                    par_msquares_mesh* mesh = mlist->meshes[color];
+                    for (int e = 0; e < nedges[c]; e++) {
+                        int previndex = edgespecs[c][e * 2];
+                        int currindex = edgespecs[c][e * 2 + 1];
+                        uint16_t i1 = pconninds[1];
+                        uint16_t i0 = pconninds[2];
+                        par_connector const* oppedge = par_conn_find(edges,
+                            ncedges, currindex, previndex);
+                        if (oppedge->mesh_index > color) continue;
+                        int d = mesh->dim;
+                        float* dst = mesh->points;
+                        float const* src = oppedge->mesh->points;
+                        dst[i0 * d + 0] = src[oppedge->innera * d + 0];
+                        dst[i0 * d + 1] = src[oppedge->innera * d + 1];
+                        dst[i1 * d + 0] = src[oppedge->innerb * d + 0];
+                        dst[i1 * d + 1] = src[oppedge->innerb * d + 1];
+                        if (d == 3) {
+                            dst[i0 * d + 2] = src[oppedge->innera * d + 2];
+                            dst[i1 * d + 2] = src[oppedge->innerb * d + 2];
+                        }
+                        pconninds += 6;
                     }
                 }
             }

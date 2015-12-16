@@ -119,8 +119,8 @@ function main()
             x0 -= (x1 - x0) * isqrt;
             y0 -= (y1 - y0) * isqrt;
             var lin0 = new Path().moveTo(x0, y0);
-            edge[corner_index].push(indices[0]);
             for (var j = 1; j < ppts.length; j++) {
+                edge[corner_index].push(indices[j - 1]);
                 edge[corner_index].push(indices[j]);
                 lin0.lineTo(ppts[j][0], ppts[j][1]);
             }
@@ -292,7 +292,7 @@ function main()
             continue;
         }
         for (var c = 0; c < 4; c++) {
-            msg += edgetab[t][c].length;
+            msg += edgetab[t][c].length / 2;
             for (var p = 0; p < edgetab[t][c].length; p++) {
                 msg += edgetab[t][c][p];
             }
