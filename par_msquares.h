@@ -1373,37 +1373,17 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                     // If this is a midpoint, nudge it to the intersection.
                     if (index == 1) {
                         int begin = southi - cellsize;
-                        for (int i = 1; i < cellsize; i++) {
+                        for (int i = 1; i < cellsize + 1; i++) {
                             int val = pixels[begin + i];
                             if (val != pixels[begin]) {
                                 vertex[0] = vertsx[0] + normalized_cellsize *
                                     (float) i / cellsize;
-                                break;
-                            }
-                        }
-                    } else if (index == 5) {
-                        int begin = northi - cellsize;
-                        for (int i = 1; i < cellsize; i++) {
-                            int val = pixels[begin + i];
-                            if (val != pixels[begin]) {
-                                vertex[0] = vertsx[0] + normalized_cellsize *
-                                    (float) i / cellsize;
-                                break;
-                           }
-                        }
-                    } else if (index == 7) {
-                        int begin = northi - cellsize;
-                        for (int i = 1; i < cellsize; i++) {
-                            int val = pixels[begin + i * width];
-                            if (val != pixels[begin]) {
-                                vertex[1] = (1 - vertsy[6]) -
-                                    normalized_cellsize * (float) i / cellsize;
                                 break;
                             }
                         }
                     } else if (index == 3) {
                         int begin = northi;
-                        for (int i = 1; i < cellsize; i++) {
+                        for (int i = 1; i < cellsize + 1; i++) {
                             int val = pixels[begin + i * width];
                             if (val != pixels[begin]) {
                                 vertex[1] = (1 - vertsy[4]) -
