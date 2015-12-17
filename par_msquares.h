@@ -39,10 +39,9 @@ typedef struct {
 // Returns a meshlist with two meshes: one for the inside, one for the outside.
 #define PAR_MSQUARES_DUAL (1 << 1)
 
-// Returned meshes have 3-tuple coordinates instead of 2-tuples. When using
-// from_color, the Z coordinate represents the alpha value of the color.  With
-// from_grayscale, the Z coordinate represents the value of the nearest pixel in
-// the source image.
+// Requests that returned meshes have 3-tuple coordinates instead of 2-tuples.
+// When using a color-based function, the Z coordinate represents the alpha
+// value of the nearest pixel.
 #define PAR_MSQUARES_HEIGHTS (1 << 2)
 
 // Applies a step function to the Z coordinates.  Requires HEIGHTS and DUAL.
