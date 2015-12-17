@@ -1020,7 +1020,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
             }
         }
         float* newpts = PAR_ALLOC(float, newnpts * mesh->dim);
-        uint16_t* mapping = PAR_ALLOC(uint16_t, (ntris + nconntris) * 3);
+        uint16_t* mapping = PAR_ALLOC(uint16_t, npts);
         ppts = pts;
         float* pnewpts = newpts;
         int j = 0;
