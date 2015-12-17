@@ -547,6 +547,54 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     return merged;
 }
 
+
+static void par_remove_unreferenced_verts(par_msquares_mesh* mesh)
+{
+    if (mesh->npoints == 0) {
+        return;
+    }
+    char* markers = PAR_ALLOC(char, mesh->npoints);
+    uint16_t const* ptris = mesh->triangles;
+    int newnpts = 0;
+    for (int i = 0; i < mesh->ntriangles * 3; i++, ptris++) {
+        if (!markers[*ptris]) {
+            newnpts++;
+            markers[*ptris] = 1;
+        }
+    }
+    float* newpts = PAR_ALLOC(float, newnpts * mesh->dim);
+    uint16_t* mapping = PAR_ALLOC(uint16_t, mesh->npoints);
+    float const* ppts = mesh->points;
+    float* pnewpts = newpts;
+    int j = 0;
+    if (mesh->dim == 3) {
+        for (int i = 0; i < mesh->npoints; i++, ppts += 3) {
+            if (markers[i]) {
+                *pnewpts++ = ppts[0];
+                *pnewpts++ = ppts[1];
+                *pnewpts++ = ppts[2];
+                mapping[i] = j++;
+            }
+        }
+    } else {
+        for (int i = 0; i < mesh->npoints; i++, ppts += 2) {
+            if (markers[i]) {
+                *pnewpts++ = ppts[0];
+                *pnewpts++ = ppts[1];
+                mapping[i] = j++;
+            }
+        }
+    }
+    free(mesh->points);
+    free(markers);
+    mesh->points = newpts;
+    mesh->npoints = newnpts;
+    for (int i = 0; i < mesh->ntriangles * 3; i++) {
+        mesh->triangles[i] = mapping[mesh->triangles[i]];
+    }
+    free(mapping);
+}
+
 par_msquares_meshlist* par_msquares_function(int width, int height,
     int cellsize, int flags, void* context, par_msquares_inside_fn insidefn,
     par_msquares_height_fn heightfn)
@@ -1161,6 +1209,7 @@ static uint32_t par_msquares_argb(par_byte const* pdata, int bpp)
     return color;
 }
 
+// Merge connective triangles into the primary triangle list.
 static void par_msquares_internal_finalize(par_msquares_meshlist* mlist)
 {
     if (mlist->nmeshes < 2 || mlist->meshes[1]->nconntriangles == 0) {
@@ -1719,7 +1768,11 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     free(simplification_ntris);
     free(simplification_tris);
     free(simplification_words);
+
     par_msquares_internal_finalize(mlist);
+    for (int i = 0; i < mlist->nmeshes; i++) {
+        par_remove_unreferenced_verts(mlist->meshes[i]);
+    }
     return mlist;
 }
 

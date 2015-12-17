@@ -82,7 +82,7 @@ static void test_multi()
         8);
     free(data);
     mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE, 4,
-        PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_CONNECT);
+        PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_CONNECT | PAR_MSQUARES_SIMPLIFY);
     objfile = fopen("build/msquares_multi_diagram.obj", "wt");
     offset = 1;
     for (int m = 0; m < par_msquares_get_count(mlist); m++) {
