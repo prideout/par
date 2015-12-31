@@ -39,4 +39,4 @@ add_executable(
     test_shapes
     test_shapes.c
     console-colors.c)
-target_link_libraries(test_shapes)
+target_link_libraries(test_shapes m)
