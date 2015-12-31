@@ -189,8 +189,12 @@ int main()
             assert_null(a->tcoords);
             flags |= PAR_SHAPES_TEXTURE_COORDS;
             b = par_shapes_create_parametric("klein", 10, 20, flags);
+            par_shapes_translate(b, 0, 0, 10);
+            par_shapes_scale(b, 0.08, 0.08, 0.08);
             par_shapes_merge(a, b);
             assert_ok(a->normals && a->tcoords);
+            float axis[3] = {1, 0, 0};
+            par_shapes_rotate(a, -3.14 * 0.5, axis);
             par_shapes_export(a, "test_shapes_heterogeneous.obj");
             par_shapes_free(a);
             par_shapes_free(b);

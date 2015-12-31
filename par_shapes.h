@@ -357,6 +357,30 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     free(dst->points);
     dst->points = points;
     dst->npoints = npoints;
+    if (src->normals || dst->normals) {
+        float* norms = calloc(vecsize * npoints, 1);
+        if (dst->normals) {
+            memcpy(norms, dst->normals, vecsize * dst->npoints);
+        }
+        if (src->normals) {
+            memcpy(norms + 3 * dst->npoints, src->normals,
+                vecsize * src->npoints);
+        }
+        free(dst->normals);
+        dst->normals = norms;
+    }
+    if (src->tcoords || dst->tcoords) {
+        int uvsize = sizeof(float) * 2;
+        float* uvs = calloc(uvsize * npoints, 1);
+        if (dst->tcoords) {
+            memcpy(uvs, dst->tcoords, uvsize * dst->npoints);
+        }
+        if (src->tcoords) {
+            memcpy(uvs + 2 * dst->npoints, src->tcoords, uvsize * src->npoints);
+        }
+        free(dst->tcoords);
+        dst->tcoords = uvs;
+    }
     int ntriangles = dst->ntriangles + src->ntriangles;
     int trisize = sizeof(uint16_t) * 3;
     uint16_t* triangles = malloc(trisize * ntriangles);
