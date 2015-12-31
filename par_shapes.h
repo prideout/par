@@ -210,9 +210,9 @@ static void par_shapes_private_sphere(float* const uv, float* xyz)
 {
     float phi = uv[0] * PAR_PI;
     float theta = uv[1] * 2 * PAR_PI;
-    xyz[0] = cos(theta) * sin(phi);
-    xyz[1] = sin(theta) * sin(phi);
-    xyz[2] = cos(phi);
+    xyz[0] = cosf(theta) * sinf(phi);
+    xyz[1] = sinf(theta) * sinf(phi);
+    xyz[2] = cosf(phi);
 }
 
 static void par_shapes_private_plane(float* const uv, float* xyz)
@@ -228,22 +228,22 @@ static void par_shapes_private_klein(float* const uv, float* xyz)
     float v = uv[1] * 2 * PAR_PI;
     u = u * 2;
     if (u < PAR_PI) {
-        xyz[0] = 3 * cos(u) * (1 + sin(u)) + (2 * (1 - cos(u) / 2)) *
-            cos(u) * cos(v);
-        xyz[2] = -8 * sin(u) - 2 * (1 - cos(u) / 2) * sin(u) * cos(v);
+        xyz[0] = 3 * cosf(u) * (1 + sinf(u)) + (2 * (1 - cosf(u) / 2)) *
+            cosf(u) * cosf(v);
+        xyz[2] = -8 * sinf(u) - 2 * (1 - cosf(u) / 2) * sinf(u) * cosf(v);
     } else {
-        xyz[0] = 3 * cos(u) * (1 + sin(u)) + (2 * (1 - cos(u) / 2)) *
-            cos(v + PAR_PI);
-        xyz[2] = -8 * sin(u);
+        xyz[0] = 3 * cosf(u) * (1 + sinf(u)) + (2 * (1 - cosf(u) / 2)) *
+            cosf(v + PAR_PI);
+        xyz[2] = -8 * sinf(u);
     }
-    xyz[1] = -2 * (1 - cos(u) / 2) * sin(v);
+    xyz[1] = -2 * (1 - cosf(u) / 2) * sinf(v);
 }
 
 static void par_shapes_private_cylinder(float* const uv, float* xyz)
 {
     float theta = uv[1] * 2 * PAR_PI;
-    xyz[0] = sin(theta);
-    xyz[1] = cos(theta);
+    xyz[0] = sinf(theta);
+    xyz[1] = cosf(theta);
     xyz[2] = uv[0];
 }
 
@@ -253,10 +253,10 @@ static void par_shapes_private_torus(float* const uv, float* xyz)
     float phi = uv[1] * 2 * PAR_PI;
     const float major = 1;
     const float minor = 0.2;
-    float beta = major + minor * cos(phi);
-    xyz[0] = cos(theta) * beta;
-    xyz[1] = sin(theta) * beta;
-    xyz[2] = sin(phi) * minor;
+    float beta = major + minor * cosf(phi);
+    xyz[0] = cosf(theta) * beta;
+    xyz[1] = sinf(theta) * beta;
+    xyz[2] = sinf(phi) * minor;
 }
 
 #undef PAR_MIN
