@@ -26,9 +26,9 @@ typedef struct {
 #define PAR_shapes_TEXTURE_COORDS (1 << 2)
 
 char const * const * par_shapes_list_parametric();
-par_shapes_mesh const* par_shapes_create_parametric(char const*, int slices,
+par_shapes_mesh* par_shapes_create_parametric(char const*, int slices,
     int stacks, int flags);
-void par_shapes_free(par_shapes_mesh const*);
+void par_shapes_free(par_shapes_mesh*);
 void par_shapes_export(par_shapes_mesh const*, char const* objfile);
 
 // Misc
@@ -103,7 +103,7 @@ char const * const * par_shapes_list_parametric()
     return par_shapes_names;
 }
 
-par_shapes_mesh const* par_shapes_create_parametric(char const* name,
+par_shapes_mesh* par_shapes_create_parametric(char const* name,
     int slices, int stacks, int flags)
 {
     if (slices < 3 || stacks < 3) {
@@ -162,9 +162,8 @@ par_shapes_mesh const* par_shapes_create_parametric(char const* name,
     return mesh;
 }
 
-void par_shapes_free(par_shapes_mesh const* public_mesh)
+void par_shapes_free(par_shapes_mesh* mesh)
 {
-    par_shapes_mesh* mesh = (par_shapes_mesh*) public_mesh;
     free(mesh->points);
     free(mesh->triangles);
     free(mesh->normals);
@@ -257,6 +256,34 @@ static void par_shapes_private_torus(float* const uv, float* xyz)
     xyz[0] = cosf(theta) * beta;
     xyz[1] = sinf(theta) * beta;
     xyz[2] = sinf(phi) * minor;
+}
+
+void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
+{
+    uint16_t offset = dst->npoints;
+    int npoints = dst->npoints + src->npoints;
+    int vecsize = sizeof(float) * 3;
+    float* points = malloc(vecsize * npoints);
+    memcpy(points, dst->points, vecsize * dst->npoints);
+    memcpy(points + 3 * dst->npoints, src->points, vecsize * src->npoints);
+    free(dst->points);
+    dst->points = points;
+    dst->npoints = npoints;
+
+    int ntriangles = dst->ntriangles + src->ntriangles;
+    int trisize = sizeof(uint16_t) * 3;
+    uint16_t* triangles = malloc(trisize * ntriangles);
+    memcpy(triangles, dst->triangles, trisize * dst->ntriangles);
+    uint16_t* ptriangles = triangles + 3 * dst->ntriangles;
+    uint16_t const* striangles = src->triangles;
+    for (int i = 0; i < src->ntriangles; i++) {
+        *ptriangles++ = offset + *striangles++;
+        *ptriangles++ = offset + *striangles++;
+        *ptriangles++ = offset + *striangles++;
+    }
+    free(dst->triangles);
+    dst->triangles = triangles;
+    dst->ntriangles = ntriangles;
 }
 
 #undef PAR_MIN

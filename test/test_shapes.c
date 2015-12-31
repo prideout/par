@@ -29,11 +29,11 @@ int main()
 
     describe("par_shapes_create_parametric") {
         it("should fail when stacks or slices are less than 3") {
-            par_shapes_mesh const* bad1 = par_shapes_create_parametric(
+            par_shapes_mesh* bad1 = par_shapes_create_parametric(
                 "sphere", 2, 3, 0);
-            par_shapes_mesh const* bad2 = par_shapes_create_parametric(
+            par_shapes_mesh* bad2 = par_shapes_create_parametric(
                 "sphere", 3, 2, 0);
-            par_shapes_mesh const* good = par_shapes_create_parametric(
+            par_shapes_mesh* good = par_shapes_create_parametric(
                 "sphere", 3, 3, 0);
             assert_null(bad1);
             assert_null(bad2);
@@ -46,7 +46,7 @@ int main()
             assert_null(bad);
         }
         it("should generate correct number of faces and vertices") {
-            par_shapes_mesh const* m = par_shapes_create_parametric(
+            par_shapes_mesh* m = par_shapes_create_parametric(
                 "sphere", 5, 6, 0);
             assert_equal(m->npoints, 42);
             assert_equal(m->ntriangles, 60);
@@ -56,7 +56,7 @@ int main()
 
     describe("par_shapes_export") {
         it("should generate an OBJ file") {
-            par_shapes_mesh const* m;
+            par_shapes_mesh* m;
             m = par_shapes_create_parametric("sphere", 5, 6, 0);
             par_shapes_export(m, "test_shapes_sphere.obj");
             assert_ok(fileexists("test_shapes_sphere.obj"));
@@ -77,6 +77,22 @@ int main()
             par_shapes_export(m, "test_shapes_klein.obj");
             assert_ok(fileexists("test_shapes_klein.obj"));
             par_shapes_free(m);
+        }
+    }
+
+    describe("par_shapes_merge") {
+        it("concatenate two meshes") {
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_parametric("klein", 10, 20, 0);
+            int npts = a->npoints;
+            int ntris = a->ntriangles;
+            b = par_shapes_create_parametric("plane", 3, 3, 0);
+            par_shapes_merge(a, b);
+            assert_equal(a->npoints, npts + b->npoints);
+            assert_equal(a->ntriangles, ntris + b->ntriangles);
+            par_shapes_export(a, "test_shapes_merged.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
         }
     }
 
