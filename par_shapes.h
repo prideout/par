@@ -1,5 +1,5 @@
-// SHAPES :: https://github.com/prideout/par
-// Simple generation and transformation of indexed triangles.
+// SHAPES :: https:github.com/prideout/par
+// Mesh generator for parametric surfaces and other simple geometry.
 //
 //     http://github.prideout.net/c-shapes/
 //
@@ -21,9 +21,8 @@ typedef struct {
     float* tcoords;
 } par_shapes_mesh;
 
-#define PAR_shapes_SMOOTH_NORMALS (1 << 0)
-#define PAR_shapes_FACET_NORMALS  (1 << 1)
-#define PAR_shapes_TEXTURE_COORDS (1 << 2)
+#define PAR_SHAPES_SMOOTH_NORMALS (1 << 0)
+#define PAR_SHAPES_TEXTURE_COORDS (1 << 2)
 
 char const * const * par_shapes_list_parametric();
 par_shapes_mesh* par_shapes_create_parametric(char const*, int slices,
@@ -37,18 +36,18 @@ void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
 void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
 void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 
-// TBD, Long term.
-// http://prideout.net/blog/?p=44
-// http://prideout.net/blog/?p=72
-void par_shapes_compute_normals(par_shapes_mesh*, int faceted);
+// TBD, http://prideout.net/blog/?p=44
+typedef void (*par_shapes_fn)(float* const, float*);
+par_shapes_mesh* par_shapes_create_custom_parametric(par_shapes_fn, int slices,
+    int stacks, int flags);
+void par_shapes_compute_normals(par_shapes_mesh*);
 par_shapes_mesh const* par_shapes_create_tree(int seed, int flags);
 par_shapes_mesh const* par_shapes_create_rock(int seed, int flags);
 par_shapes_mesh const* par_shapes_create_icosahedron();
 par_shapes_mesh const* par_shapes_create_octohedron();
-par_shapes_mesh const* par_shapes_create_cube();
+par_shapes_mesh const* par_shapes_create_cube(int inward); // for Cornell boxes
 par_shapes_mesh const* par_shapes_create_sphere(int nsubdivisions);
 par_shapes_mesh const* par_shapes_subdivide(par_shapes_mesh const*);
-par_shapes_mesh const* par_shapes_create_lsystem(char const* program);
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -68,8 +67,6 @@ par_shapes_mesh const* par_shapes_create_lsystem(char const* program);
 #define PAR_ALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
 #define PAR_PI (3.14159265359)
-
-typedef void (*par_shapes_fn)(float* const, float*);
 
 static void par_shapes_private_sphere(float* const uv, float* xyz);
 static void par_shapes_private_plane(float* const uv, float* xyz);
@@ -92,6 +89,31 @@ static const char* par_shapes_names[] = {
     "cylinder",
     "torus",
 };
+
+static void par_shapes_cross(float* result, float const* a, float const* b)
+{
+    result[0] = (a[1] * b[2]) - (a[2] * b[1]);
+    result[1] = (a[2] * b[0]) - (a[0] * b[2]);
+    result[2] = (a[0] * b[1]) - (a[1] * b[0]);
+}
+
+static void par_shapes_normalize(float* v)
+{
+    float lsqr = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    if (lsqr > 0) {
+        float scale = 1.0f / lsqr;
+        v[0] *= scale;
+        v[1] *= scale;
+        v[2] *= scale;
+    }
+}
+
+static void par_shapes_subtract(float* result, float const* a)
+{
+    result[0] -= a[0];
+    result[1] -= a[1];
+    result[2] -= a[2];
+}
 
 char const * const * par_shapes_list_parametric()
 {
@@ -136,6 +158,47 @@ par_shapes_mesh* par_shapes_create_parametric(char const* name,
         }
     }
 
+    // Generate smooth normals.
+    if (flags & PAR_SHAPES_SMOOTH_NORMALS) {
+        mesh->normals = calloc(sizeof(float) * 3 * mesh->npoints, 1);
+        float* normals = mesh->normals;
+        float du[2];
+        float dv[2];
+        float du_xyz[3];
+        float dv_xyz[3];
+        float epsilon = 0.25 / PAR_MAX(slices, stacks);
+        for (int slice = 0; slice < slices + 1; slice++) {
+            du[1] = dv[1] = uv[1] = (float) slice / slices;
+            for (int stack = 0; stack < stacks + 1; stack++) {
+                du[0] = dv[0] = uv[0] = (float) stack / stacks;
+                du[0] += epsilon;
+                dv[1] += epsilon;
+                fn(uv, xyz);
+                fn(du, du_xyz);
+                fn(dv, dv_xyz);
+                par_shapes_subtract(du_xyz, xyz);
+                par_shapes_subtract(dv_xyz, xyz);
+                par_shapes_cross(normals, du_xyz, dv_xyz);
+                par_shapes_normalize(normals);
+                normals += 3;
+            }
+        }
+    }
+
+    // Generate texture coordinates.
+    if (flags & PAR_SHAPES_TEXTURE_COORDS) {
+        mesh->tcoords = calloc(sizeof(float) * 2 * mesh->npoints, 1);
+        float* uvs = mesh->tcoords;
+        for (int slice = 0; slice < slices + 1; slice++) {
+            uv[1] = (float) slice / slices;
+            for (int stack = 0; stack < stacks + 1; stack++) {
+                uv[0] = (float) stack / stacks;
+                *uvs++ = uv[0];
+                *uvs++ = uv[1];
+            }
+        }
+    }
+
     // Generate faces.
     mesh->ntriangles = 2 * slices * stacks;
     mesh->triangles = calloc(sizeof(uint16_t) * 3 * mesh->ntriangles, 1);
@@ -171,8 +234,38 @@ void par_shapes_export(par_shapes_mesh const* mesh, char const* filename)
     FILE* objfile = fopen(filename, "wt");
     float const* points = mesh->points;
     float const* tcoords = mesh->tcoords;
+    float const* norms = mesh->normals;
     uint16_t const* indices = mesh->triangles;
-    if (tcoords) {
+    if (tcoords && norms) {
+        for (int nvert = 0; nvert < mesh->npoints; nvert++) {
+            fprintf(objfile, "v %f %f %f\n", points[0], points[1], points[2]);
+            fprintf(objfile, "vt %f %f\n", tcoords[0], tcoords[1]);
+            fprintf(objfile, "vn %f %f %f\n", norms[0], norms[1], norms[2]);
+            points += 3;
+            norms += 3;
+            tcoords += 2;
+        }
+        for (int nface = 0; nface < mesh->ntriangles; nface++) {
+            int a = 1 + *indices++;
+            int b = 1 + *indices++;
+            int c = 1 + *indices++;
+            fprintf(objfile, "f %d/%d/%d %d/%d/%d %d/%d/%d\n",
+                a, a, a, b, b, b, c, c, c);
+        }
+    } else if (norms) {
+        for (int nvert = 0; nvert < mesh->npoints; nvert++) {
+            fprintf(objfile, "v %f %f %f\n", points[0], points[1], points[2]);
+            fprintf(objfile, "vn %f %f %f\n", norms[0], norms[1], norms[2]);
+            points += 3;
+            norms += 3;
+        }
+        for (int nface = 0; nface < mesh->ntriangles; nface++) {
+            int a = 1 + *indices++;
+            int b = 1 + *indices++;
+            int c = 1 + *indices++;
+            fprintf(objfile, "f %d//%d %d//%d %d//%d\n", a, a, b, b, c, c);
+        }
+    } else if (tcoords) {
         for (int nvert = 0; nvert < mesh->npoints; nvert++) {
             fprintf(objfile, "v %f %f %f\n", points[0], points[1], points[2]);
             fprintf(objfile, "vt %f %f\n", tcoords[0], tcoords[1]);
@@ -280,27 +373,13 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     dst->ntriangles = ntriangles;
 }
 
-static void par_shapes_cross(float* result, float const* a, float const* b)
-{
-    result[0] = (a[1] * b[2]) - (a[2] * b[1]);
-    result[1] = (a[2] * b[0]) - (a[0] * b[2]);
-    result[2] = (a[0] * b[1]) - (a[1] * b[0]);
-}
-
-static void par_shapes_normalize(float* v)
-{
-    float lsqr = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-    if (lsqr > 0) {
-        float scale = 1.0f / lsqr;
-        v[0] *= scale;
-        v[1] *= scale;
-        v[2] *= scale;
-    }
-}
-
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     float const* center, float const* normal, int flags)
 {
+    if (flags & PAR_SHAPES_TEXTURE_COORDS) {
+        // No texture coordinates since this doesn't have a 2D domain.
+        return 0;
+    }
     par_shapes_mesh* mesh = calloc(sizeof(par_shapes_mesh), 1);
     mesh->npoints = slices + 1;
     mesh->points = malloc(sizeof(float) * 3 * mesh->npoints);
@@ -314,6 +393,17 @@ par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
         *points++ = radius * sin(theta);
         *points++ = 0;
     }
+    float nnormal[3] = {normal[0], normal[1], normal[2]};
+    par_shapes_normalize(nnormal);
+    if (flags & PAR_SHAPES_SMOOTH_NORMALS) {
+        mesh->normals = malloc(sizeof(float) * 3 * mesh->npoints);
+        float* norms = mesh->normals;
+        for (int i = 0; i < mesh->npoints; i++) {
+            *norms++ = nnormal[0];
+            *norms++ = nnormal[1];
+            *norms++ = nnormal[2];
+        }
+    }
     mesh->ntriangles = slices;
     mesh->triangles = malloc(sizeof(uint16_t) * 3 * mesh->ntriangles);
     uint16_t* triangles = mesh->triangles;
@@ -322,8 +412,6 @@ par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
         *triangles++ = 1 + i;
         *triangles++ = 1 + (i + 1) % slices;
     }
-    float nnormal[3] = {normal[0], normal[1], normal[2]};
-    par_shapes_normalize(nnormal);
     float k[3] = {0, 0, -1};
     float axis[3];
     par_shapes_cross(axis, nnormal, k);

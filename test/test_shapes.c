@@ -148,5 +148,54 @@ int main()
         }
     }
 
+    describe("flags") {
+        it("parametric surfaces should support normals and/or uvs") {
+            par_shapes_mesh* m;
+            int flags = PAR_SHAPES_SMOOTH_NORMALS;
+            m = par_shapes_create_parametric("sphere", 5, 6, flags);
+            par_shapes_export(m, "test_shapes_n.obj");
+            assert_ok(m->normals);
+            par_shapes_free(m);
+            flags = PAR_SHAPES_TEXTURE_COORDS;
+            m = par_shapes_create_parametric("sphere", 5, 6, flags);
+            par_shapes_export(m, "test_shapes_tc.obj");
+            assert_ok(m->tcoords);
+            par_shapes_free(m);
+            flags |= PAR_SHAPES_SMOOTH_NORMALS;
+            m = par_shapes_create_parametric("sphere", 5, 6, flags);
+            assert_ok(m->tcoords && m->normals);
+            par_shapes_export(m, "test_shapes_tcn.obj");
+            par_shapes_free(m);
+        }
+        it("disk should support normals but not uvs") {
+            float normal[3] = {0, 0, 1};
+            float center[3] = {0, 0, 0};
+            int flags = PAR_SHAPES_SMOOTH_NORMALS;
+            par_shapes_mesh* m;
+            m = par_shapes_create_disk(1, 32, center, normal, flags);
+            assert_ok(m->normals);
+            par_shapes_export(m, "test_shapes_diskn.obj");
+            par_shapes_free(m);
+            flags |= PAR_SHAPES_TEXTURE_COORDS;
+            m = par_shapes_create_disk(1, 32, center, normal, flags);
+            assert_null(m);
+        }
+        it("meshes with heterogeneous flags should be mergeable") {
+            float normal[3] = {0, 0, 1};
+            float center[3] = {0, 0, 0};
+            int flags = PAR_SHAPES_SMOOTH_NORMALS;
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_disk(1, 32, center, normal, flags);
+            assert_null(a->tcoords);
+            flags |= PAR_SHAPES_TEXTURE_COORDS;
+            b = par_shapes_create_parametric("klein", 10, 20, flags);
+            par_shapes_merge(a, b);
+            assert_ok(a->normals && a->tcoords);
+            par_shapes_export(a, "test_shapes_heterogeneous.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
+        }
+    }
+
     return assert_failures();
 }
