@@ -6,6 +6,8 @@ pkg_search_module(CURL REQUIRED libcurl)
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-std=c11 -Wall")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-Wall")
 
+include_directories(.. ${CURL_INCLUDE_DIRS})
+
 add_executable(
     test_msquares
     test_msquares.c
@@ -13,7 +15,6 @@ add_executable(
     lodepng.c
     sds.c
     whereami.c)
-target_include_directories(test_msquares PRIVATE .. ${CURL_INCLUDE_DIRS})
 target_link_libraries(test_msquares ${CURL_LIBRARIES})
 
 add_executable(
@@ -23,7 +24,6 @@ add_executable(
     lodepng.c
     sds.c
     whereami.c)
-target_include_directories(test_bluenoise PRIVATE .. ${CURL_INCLUDE_DIRS})
 target_link_libraries(test_bluenoise ${CURL_LIBRARIES})
 
 add_executable(
@@ -33,12 +33,10 @@ add_executable(
     lodepng.c
     sds.c
     whereami.c)
-target_include_directories(test_cpp PRIVATE .. ${CURL_INCLUDE_DIRS})
 target_link_libraries(test_cpp ${CURL_LIBRARIES})
 
 add_executable(
     test_shapes
     test_shapes.c
     console-colors.c)
-target_include_directories(test_shapes PRIVATE ..)
 target_link_libraries(test_shapes)

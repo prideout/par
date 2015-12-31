@@ -10,7 +10,7 @@ addons:
             - gcc-5
 script:
     - export CC=gcc-5 CXX=g++-5
-    - cmake -Htest -Bbuild
+    - cmake test -Bbuild
     - cmake --build build
     - build/test_msquares
     - build/test_bluenoise
@@ -19,3 +19,4 @@ script:
     - export CC=clang CXX=clang++
     - cmake -Htest -Bbuild
     - cmake --build build
+    - build/test_shapes
