@@ -3,13 +3,8 @@ project(par)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(CURL REQUIRED libcurl)
 
-set(CMAKE_C_FLAGS "-std=c11 -O3 -Wall")
-set(CMAKE_CXX_FLAGS "-O3 -Wall")
-
-include_directories(
-    .
-    ..
-    ${CURL_INCLUDE_DIRS})
+set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-std=c11 -Wall")
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-Wall")
 
 add_executable(
     test_msquares
@@ -18,6 +13,8 @@ add_executable(
     lodepng.c
     sds.c
     whereami.c)
+target_include_directories(test_msquares PRIVATE .. ${CURL_INCLUDE_DIRS})
+target_link_libraries(test_msquares ${CURL_LIBRARIES})
 
 add_executable(
     test_bluenoise
@@ -26,6 +23,8 @@ add_executable(
     lodepng.c
     sds.c
     whereami.c)
+target_include_directories(test_bluenoise PRIVATE .. ${CURL_INCLUDE_DIRS})
+target_link_libraries(test_bluenoise ${CURL_LIBRARIES})
 
 add_executable(
     test_cpp
@@ -34,15 +33,12 @@ add_executable(
     lodepng.c
     sds.c
     whereami.c)
+target_include_directories(test_cpp PRIVATE .. ${CURL_INCLUDE_DIRS})
+target_link_libraries(test_cpp ${CURL_LIBRARIES})
 
-target_link_libraries(
-    test_msquares
-    ${CURL_LIBRARIES})
-
-target_link_libraries(
-    test_bluenoise
-    ${CURL_LIBRARIES})
-
-target_link_libraries(
-    test_cpp
-    ${CURL_LIBRARIES})
+add_executable(
+    test_shapes
+    test_shapes.c
+    console-colors.c)
+target_include_directories(test_shapes PRIVATE ..)
+target_link_libraries(test_shapes)

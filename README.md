@@ -22,7 +22,7 @@ $ brew install cmake pkg-config curl
 Here's how you can tell CMake to use the CMakeLists in the `test` folder, placing all the messy stuff in a new folder called `build`.
 
 ```bash
-$ cmake -Htest -Bbuild # Create makefiles
+$ cmake test -Bbuild   # Create makefiles
 $ cmake --build build  # Invoke the build
 ```
 
