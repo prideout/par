@@ -188,7 +188,7 @@ int main()
             a = par_shapes_create_disk(1, 32, center, normal, flags);
             assert_null(a->tcoords);
             flags |= PAR_SHAPES_TEXTURE_COORDS;
-            b = par_shapes_create_parametric("klein", 10, 20, flags);
+            b = par_shapes_create_parametric("klein", 30, 40, flags);
             par_shapes_translate(b, 0, 0, 10);
             par_shapes_scale(b, 0.08, 0.08, 0.08);
             par_shapes_merge(a, b);

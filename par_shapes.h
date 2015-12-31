@@ -35,6 +35,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
 void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
 void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
 void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
+void par_shapes_invert(par_shapes_mesh*, int face, int nfaces);
 
 // TBD, http://prideout.net/blog/?p=44
 typedef void (*par_shapes_fn)(float* const, float*);
@@ -215,6 +216,18 @@ par_shapes_mesh* par_shapes_create_parametric(char const* name,
             *face++ = v + stack + stacks + 1;
         }
         v += stacks + 1;
+    }
+
+    // Hacks for single-sided surfaces go here.  :)
+    if (!strcmp(name, "klein")) {
+        int face = 0;
+        for (int slice = 0; slice < slices; slice++) {
+            for (int stack = 0; stack < stacks; stack++, face += 2) {
+                if (stack < 27 * stacks / 32) {
+                    par_shapes_invert(mesh, face, 2);
+                }
+            }
+        }
     }
 
     return mesh;
@@ -489,6 +502,15 @@ void par_shapes_scale(par_shapes_mesh* m, float x, float y, float z)
         *points++ *= x;
         *points++ *= y;
         *points++ *= z;
+    }
+}
+
+void par_shapes_invert(par_shapes_mesh* m, int face, int nfaces)
+{
+    uint16_t* tri = m->triangles + face * 3;
+    for (int i = 0; i < nfaces; i++) {
+        PAR_SWAP(uint16_t, tri[0], tri[2]);
+        tri += 3;
     }
 }
 
