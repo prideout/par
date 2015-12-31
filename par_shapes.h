@@ -57,6 +57,7 @@ par_shapes_mesh const* par_shapes_subdivide(par_shapes_mesh const*);
 #ifdef PAR_SHAPES_IMPLEMENTATION
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include <float.h>
 #include <string.h>
