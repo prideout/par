@@ -81,7 +81,7 @@ int main()
     }
 
     describe("par_shapes_merge") {
-        it("concatenate two meshes") {
+        it("should concatenate two meshes") {
             par_shapes_mesh* a, *b;
             a = par_shapes_create_parametric("klein", 10, 20, 0);
             int npts = a->npoints;
@@ -91,6 +91,38 @@ int main()
             assert_equal(a->npoints, npts + b->npoints);
             assert_equal(a->ntriangles, ntris + b->ntriangles);
             par_shapes_export(a, "test_shapes_merged.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
+        }
+    }
+
+    describe("transforms") {
+        it("should support translation") {
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_parametric("cylinder", 20, 3, 0);
+            b = par_shapes_create_parametric("cylinder", 4, 3, 0);
+            par_shapes_translate(a, 0.5, 0.5, 0.25);
+            par_shapes_merge(a, b);
+            par_shapes_export(a, "test_shapes_cylinder.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
+        }
+    }
+
+    describe("par_shapes_create_disk") {
+        it("create an orientable disk in 3-space") {
+            int slices = 32;
+            float aradius = 1;
+            float anormal[3] = {0, 0, 1};
+            float acenter[3] = {0, 0, 0};
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_disk(aradius, slices, acenter, anormal, 0);
+            float bradius = 0.2;
+            float bcenter[3] = {0, 0, 0.2};
+            float bnormal[3] = {1, 0, 1};
+            b = par_shapes_create_disk(bradius, slices, bcenter, bnormal, 0);
+            par_shapes_merge(a, b);
+            par_shapes_export(a, "test_shapes_disks.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }

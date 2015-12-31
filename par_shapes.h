@@ -28,31 +28,28 @@ typedef struct {
 char const * const * par_shapes_list_parametric();
 par_shapes_mesh* par_shapes_create_parametric(char const*, int slices,
     int stacks, int flags);
+par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
+    float const* center, float const* normal, int flags);
 void par_shapes_free(par_shapes_mesh*);
 void par_shapes_export(par_shapes_mesh const*, char const* objfile);
+void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
+void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
 
-// Misc
+// TBD, Short term.
+void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
+void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
+
+// TBD, Long term.
+// http://prideout.net/blog/?p=44
+// http://prideout.net/blog/?p=72
+void par_shapes_compute_normals(par_shapes_mesh*, int faceted);
 par_shapes_mesh const* par_shapes_create_tree(int seed, int flags);
 par_shapes_mesh const* par_shapes_create_rock(int seed, int flags);
-
-// Transforms
-void par_shapes_compute_normals(par_shapes_mesh*, int faceted);
-void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
-void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
-void par_shapes_rotate(par_shapes_mesh*, float radians,
-    float x, float y, float z);
-void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
-
-// http://prideout.net/blog/?p=44
 par_shapes_mesh const* par_shapes_create_icosahedron();
 par_shapes_mesh const* par_shapes_create_octohedron();
 par_shapes_mesh const* par_shapes_create_cube();
 par_shapes_mesh const* par_shapes_create_sphere(int nsubdivisions);
 par_shapes_mesh const* par_shapes_subdivide(par_shapes_mesh const*);
-// par_shapes_mesh const* par_shapes_create_tube_from_callback(...);
-// par_shapes_mesh const* par_shapes_create_surf_from_callback(...);
-
-// http://prideout.net/blog/?p=72
 par_shapes_mesh const* par_shapes_create_lsystem(char const* program);
 
 // -----------------------------------------------------------------------------
@@ -269,7 +266,6 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     free(dst->points);
     dst->points = points;
     dst->npoints = npoints;
-
     int ntriangles = dst->ntriangles + src->ntriangles;
     int trisize = sizeof(uint16_t) * 3;
     uint16_t* triangles = malloc(trisize * ntriangles);
@@ -284,6 +280,65 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     free(dst->triangles);
     dst->triangles = triangles;
     dst->ntriangles = ntriangles;
+}
+
+void par_shapes_translate(par_shapes_mesh* m, float x, float y, float z)
+{
+    float* points = m->points;
+    for (int i = 0; i < m->npoints; i++) {
+        *points++ += x;
+        *points++ += y;
+        *points++ += z;
+    }
+}
+
+void par_shapes_cross(float* result, float const* a, float const* b)
+{
+    result[0] = (a[1] * b[2]) - (a[2] * b[1]);
+    result[1] = (a[2] * b[0]) - (a[0] * b[2]);
+    result[2] = (a[0] * b[1]) - (a[1] * b[0]);
+}
+
+par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
+    float const* center, float const* normal, int flags)
+{
+    par_shapes_mesh* mesh = calloc(sizeof(par_shapes_mesh), 1);
+    mesh->npoints = slices + 1;
+    mesh->points = malloc(sizeof(float) * 3 * mesh->npoints);
+    float* points = mesh->points;
+    *points++ = 0;
+    *points++ = 0;
+    *points++ = 0;
+    for (int i = 0; i < slices; i++) {
+        float theta = i * PAR_PI * 2 / slices;
+        *points++ = radius * cos(theta);
+        *points++ = radius * sin(theta);
+        *points++ = 0;
+    }
+    mesh->ntriangles = slices;
+    mesh->triangles = malloc(sizeof(uint16_t) * 3 * mesh->ntriangles);
+    uint16_t* triangles = mesh->triangles;
+    for (int i = 0; i < slices; i++) {
+        *triangles++ = 0;
+        *triangles++ = 1 + i;
+        *triangles++ = 1 + (i + 1) % slices;
+    }
+    float nx = normal[0];
+    float ny = normal[1];
+    float nz = normal[2];
+    float isq = 1.0f / sqrt(nx*nx + ny*ny + nz*nz);
+    float nnormal[3] = {nx * isq, ny * isq, nz * isq};
+    float k[3] = {0, 0, 1};
+    float axis[3];
+    par_shapes_cross(axis, nnormal, k);
+    par_shapes_rotate(mesh, acos(nz), axis);
+    par_shapes_translate(mesh, center[0], center[1], center[2]);
+    return mesh;
+}
+
+void par_shapes_rotate(par_shapes_mesh* mesh, float radians, float const* axis)
+{
+    // vmathM3MakeRotationAxis
 }
 
 #undef PAR_MIN
