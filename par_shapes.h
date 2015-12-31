@@ -360,11 +360,10 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     if (src->normals || dst->normals) {
         float* norms = calloc(vecsize * npoints, 1);
         if (dst->normals) {
-            memcpy(norms, dst->normals, vecsize * dst->npoints);
+            memcpy(norms, dst->normals, vecsize * offset);
         }
         if (src->normals) {
-            memcpy(norms + 3 * dst->npoints, src->normals,
-                vecsize * src->npoints);
+            memcpy(norms + 3 * offset, src->normals, vecsize * src->npoints);
         }
         free(dst->normals);
         dst->normals = norms;
@@ -373,10 +372,10 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
         int uvsize = sizeof(float) * 2;
         float* uvs = calloc(uvsize * npoints, 1);
         if (dst->tcoords) {
-            memcpy(uvs, dst->tcoords, uvsize * dst->npoints);
+            memcpy(uvs, dst->tcoords, uvsize * offset);
         }
         if (src->tcoords) {
-            memcpy(uvs + 2 * dst->npoints, src->tcoords, uvsize * src->npoints);
+            memcpy(uvs + 2 * offset, src->tcoords, uvsize * src->npoints);
         }
         free(dst->tcoords);
         dst->tcoords = uvs;
