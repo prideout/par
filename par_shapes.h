@@ -72,6 +72,7 @@ par_shapes_mesh const* par_shapes_create_lsystem(char const* program);
 #define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
 #define PAR_ALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
+#define PAR_PI (3.14159265359)
 
 typedef void (*par_shapes_fn)(float* const, float*);
 
@@ -207,8 +208,8 @@ void par_shapes_export(par_shapes_mesh const* mesh, char const* filename)
 
 static void par_shapes_private_sphere(float* const uv, float* xyz)
 {
-    float phi = uv[0] * M_PI;
-    float theta = uv[1] * 2 * M_PI;
+    float phi = uv[0] * PAR_PI;
+    float theta = uv[1] * 2 * PAR_PI;
     xyz[0] = cos(theta) * sin(phi);
     xyz[1] = sin(theta) * sin(phi);
     xyz[2] = cos(phi);
@@ -223,16 +224,16 @@ static void par_shapes_private_plane(float* const uv, float* xyz)
 
 static void par_shapes_private_klein(float* const uv, float* xyz)
 {
-    float u = uv[0] * M_PI;
-    float v = uv[1] * 2 * M_PI;
+    float u = uv[0] * PAR_PI;
+    float v = uv[1] * 2 * PAR_PI;
     u = u * 2;
-    if (u < M_PI) {
+    if (u < PAR_PI) {
         xyz[0] = 3 * cos(u) * (1 + sin(u)) + (2 * (1 - cos(u) / 2)) *
             cos(u) * cos(v);
         xyz[2] = -8 * sin(u) - 2 * (1 - cos(u) / 2) * sin(u) * cos(v);
     } else {
         xyz[0] = 3 * cos(u) * (1 + sin(u)) + (2 * (1 - cos(u) / 2)) *
-            cos(v + M_PI);
+            cos(v + PAR_PI);
         xyz[2] = -8 * sin(u);
     }
     xyz[1] = -2 * (1 - cos(u) / 2) * sin(v);
@@ -240,7 +241,7 @@ static void par_shapes_private_klein(float* const uv, float* xyz)
 
 static void par_shapes_private_cylinder(float* const uv, float* xyz)
 {
-    float theta = uv[1] * 2 * M_PI;
+    float theta = uv[1] * 2 * PAR_PI;
     xyz[0] = sin(theta);
     xyz[1] = cos(theta);
     xyz[2] = uv[0];
@@ -248,8 +249,8 @@ static void par_shapes_private_cylinder(float* const uv, float* xyz)
 
 static void par_shapes_private_torus(float* const uv, float* xyz)
 {
-    float theta = uv[0] * 2 * M_PI;
-    float phi = uv[1] * 2 * M_PI;
+    float theta = uv[0] * 2 * PAR_PI;
+    float phi = uv[1] * 2 * PAR_PI;
     const float major = 1;
     const float minor = 0.2;
     float beta = major + minor * cos(phi);
@@ -263,4 +264,5 @@ static void par_shapes_private_torus(float* const uv, float* xyz)
 #undef PAR_CLAMP
 #undef PAR_ALLOC
 #undef PAR_SWAP
+#undef PAR_PI
 #endif
