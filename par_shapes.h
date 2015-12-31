@@ -12,7 +12,7 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
-typedef struct {
+typedef struct par_shapes_mesh_s {
     float* points;
     int npoints;
     uint16_t* triangles;
