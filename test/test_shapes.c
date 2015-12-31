@@ -103,7 +103,20 @@ int main()
             b = par_shapes_create_parametric("cylinder", 4, 3, 0);
             par_shapes_translate(a, 0.5, 0.5, 0.25);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "test_shapes_cylinder.obj");
+            par_shapes_export(a, "test_shapes_translation.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
+        }
+        it("should support rotation") {
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_parametric("cylinder", 20, 3, 0);
+            b = par_shapes_create_parametric("cylinder", 4, 3, 0);
+            float axis1[3] = {0, 1, 0};
+            float axis2[3] = {0, 0, 1};
+            par_shapes_rotate(a, 3.14 * 0.5, axis1);
+            par_shapes_rotate(a, 3.14 * 0.25, axis2);
+            par_shapes_merge(a, b);
+            par_shapes_export(a, "test_shapes_rotation.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -119,7 +132,7 @@ int main()
             a = par_shapes_create_disk(aradius, slices, acenter, anormal, 0);
             float bradius = 0.2;
             float bcenter[3] = {0, 0, 0.2};
-            float bnormal[3] = {1, 0, 1};
+            float bnormal[3] = {0, 1, 0};
             b = par_shapes_create_disk(bradius, slices, bcenter, bnormal, 0);
             par_shapes_merge(a, b);
             par_shapes_export(a, "test_shapes_disks.obj");

@@ -282,21 +282,22 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     dst->ntriangles = ntriangles;
 }
 
-void par_shapes_translate(par_shapes_mesh* m, float x, float y, float z)
-{
-    float* points = m->points;
-    for (int i = 0; i < m->npoints; i++) {
-        *points++ += x;
-        *points++ += y;
-        *points++ += z;
-    }
-}
-
-void par_shapes_cross(float* result, float const* a, float const* b)
+static void par_shapes_cross(float* result, float const* a, float const* b)
 {
     result[0] = (a[1] * b[2]) - (a[2] * b[1]);
     result[1] = (a[2] * b[0]) - (a[0] * b[2]);
     result[2] = (a[0] * b[1]) - (a[1] * b[0]);
+}
+
+static void par_shapes_normalize(float* v)
+{
+    float lsqr = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    if (lsqr > 0) {
+        float scale = 1.0f / lsqr;
+        v[0] *= scale;
+        v[1] *= scale;
+        v[2] *= scale;
+    }
 }
 
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
@@ -323,22 +324,53 @@ par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
         *triangles++ = 1 + i;
         *triangles++ = 1 + (i + 1) % slices;
     }
-    float nx = normal[0];
-    float ny = normal[1];
-    float nz = normal[2];
-    float isq = 1.0f / sqrt(nx*nx + ny*ny + nz*nz);
-    float nnormal[3] = {nx * isq, ny * isq, nz * isq};
-    float k[3] = {0, 0, 1};
+    float nnormal[3] = {normal[0], normal[1], normal[2]};
+    par_shapes_normalize(nnormal);
+    float k[3] = {0, 0, -1};
     float axis[3];
     par_shapes_cross(axis, nnormal, k);
-    par_shapes_rotate(mesh, acos(nz), axis);
+    par_shapes_normalize(axis);
+    par_shapes_rotate(mesh, acos(nnormal[2]), axis);
     par_shapes_translate(mesh, center[0], center[1], center[2]);
     return mesh;
 }
 
+void par_shapes_translate(par_shapes_mesh* m, float x, float y, float z)
+{
+    float* points = m->points;
+    for (int i = 0; i < m->npoints; i++) {
+        *points++ += x;
+        *points++ += y;
+        *points++ += z;
+    }
+}
+
 void par_shapes_rotate(par_shapes_mesh* mesh, float radians, float const* axis)
 {
-    // vmathM3MakeRotationAxis
+    float s = sinf(radians);
+    float c = cosf(radians);
+    float x = axis[0];
+    float y = axis[1];
+    float z = axis[2];
+    float xy = x * y;
+    float yz = y * z;
+    float zx = z * x;
+    float oneMinusC = 1.0f - c;
+    float col0[3] = {(((x * x) * oneMinusC) + c),
+        ((xy * oneMinusC) + (z * s)), ((zx * oneMinusC) - (y * s))};
+    float col1[3] = {((xy * oneMinusC) - (z * s)),
+        (((y * y) * oneMinusC) + c), ((yz * oneMinusC) + (x * s))};
+    float col2[3] = {((zx * oneMinusC) + (y * s)),
+        ((yz * oneMinusC) - (x * s)), (((z * z) * oneMinusC) + c)};
+    float* p = mesh->points;
+    for (int i = 0; i < mesh->npoints; i++) {
+        float x = col0[0] * p[0] + col1[0] * p[1] + col2[0] * p[2];
+        float y = col0[1] * p[0] + col1[1] * p[1] + col2[1] * p[2];
+        float z = col0[2] * p[0] + col1[2] * p[1] + col2[2] * p[2];
+        *p++ = x;
+        *p++ = y;
+        *p++ = z;
+    }
 }
 
 #undef PAR_MIN
