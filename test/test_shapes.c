@@ -120,6 +120,13 @@ int main()
             par_shapes_free(a);
             par_shapes_free(b);
         }
+        it("should support non-uniform scale") {
+            par_shapes_mesh* a;
+            a = par_shapes_create_parametric("cylinder", 15, 3, 0);
+            par_shapes_scale(a, 1, 1, 5);
+            par_shapes_export(a, "test_shapes_scale.obj");
+            par_shapes_free(a);
+        }
     }
 
     describe("par_shapes_create_disk") {

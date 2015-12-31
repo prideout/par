@@ -34,8 +34,6 @@ void par_shapes_free(par_shapes_mesh*);
 void par_shapes_export(par_shapes_mesh const*, char const* objfile);
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
 void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
-
-// TBD, Short term.
 void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
 void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 
@@ -370,6 +368,16 @@ void par_shapes_rotate(par_shapes_mesh* mesh, float radians, float const* axis)
         *p++ = x;
         *p++ = y;
         *p++ = z;
+    }
+}
+
+void par_shapes_scale(par_shapes_mesh* m, float x, float y, float z)
+{
+    float* points = m->points;
+    for (int i = 0; i < m->npoints; i++) {
+        *points++ *= x;
+        *points++ *= y;
+        *points++ *= z;
     }
 }
 
