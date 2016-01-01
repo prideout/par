@@ -1,6 +1,9 @@
 #define PAR_MSQUARES_IMPLEMENTATION
 #include "par_msquares.h"
 
+#define PAR_SHAPES_IMPLEMENTATION
+#include "par_shapes.h"
+
 // #define PAR_BLUENOISE_IMPLEMENTATION
 // #include "par_bluenoise.h"
 //
