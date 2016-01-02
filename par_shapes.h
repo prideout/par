@@ -13,6 +13,8 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
+#define PAR_SHAPES_VERSION 0.0.0
+
 typedef struct par_shapes_mesh_s {
     float* points;
     int npoints;
@@ -54,8 +56,11 @@ par_shapes_mesh* par_shapes_create_icosahedron();
 // Create a sphere from a subdivided icosahedron without normals or uvs.
 par_shapes_mesh* par_shapes_create_sphere(int nsubdivisions);
 
-// Create a rock shape that sits on the Y plane by displacing a sphere.
+// Create a rock shape that sits on the Y=0 plane, and sinks into it a bit.
 par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
+
+// Create a crappy cloud shape that floats in the Y=0 plane.
+par_shapes_mesh* par_shapes_create_cloud(int seed, int nsubdivisions);
 
 // TBD, http://prideout.net/blog/?p=44
 typedef void (*par_shapes_fn)(float* const, float*);
@@ -736,6 +741,44 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
         if (pt[1] < 0) {
             pt[1] = -pow(-pt[1], 0.5) / 2;
         }
+    }
+    par_simplex_noise_free(ctx);
+    return mesh;
+}
+
+// This is crap.  It should probably use Worley noise or something.  Want to
+// improve it? Make a pull request!  For inspiration, see "The Real Time
+// Volumetric Cloudscapes of Horizon Zero Dawn".
+par_shapes_mesh* par_shapes_create_cloud(int seed, int nsubd)
+{
+    par_shapes_mesh* mesh = par_shapes_create_icosahedron();
+    par_shapes_unweld(mesh, false);
+    free(mesh->triangles);
+    mesh->triangles = 0;
+    while (nsubd--) {
+        par_shapes_subdivide(mesh);
+    }
+    for (int i = 0; i < mesh->npoints; i++) {
+        float* v = mesh->points + i * 3;
+        float lsqr = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+        if (lsqr > 0) {
+            par_shapes_scale3(v, 1.0f / lsqr);
+        }
+    }
+    mesh->triangles = PAR_MALLOC(uint16_t, 3 * mesh->ntriangles);
+    for (int i = 0; i < mesh->ntriangles * 3; i++) {
+        mesh->triangles[i] = i;
+    }
+    struct osn_context* ctx;
+    par_simplex_noise(seed, &ctx);
+    for (int p = 0; p < mesh->npoints; p++) {
+        float* pt = mesh->points + p * 3;
+        float a = 0.25, f = 1.0;
+        double n = a * par_simplex_noise2(ctx, f * pt[0], f * pt[2] + pt[1]);
+        a *= 0.5; f *= 2;
+        n += a * par_simplex_noise2(ctx, f * pt[0], f * pt[2] + pt[1]);
+        pt[1] /= 3.0;
+        par_shapes_scale3(pt, 1.0 + n);
     }
     par_simplex_noise_free(ctx);
     return mesh;
