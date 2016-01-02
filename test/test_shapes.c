@@ -129,7 +129,7 @@ int main()
         }
     }
 
-    describe("par_shapes_create_disk") {
+    describe("misc shapes") {
         it("create an orientable disk in 3-space") {
             int slices = 32;
             float aradius = 1;
@@ -143,6 +143,33 @@ int main()
             b = par_shapes_create_disk(bradius, slices, bcenter, bnormal, 0);
             par_shapes_merge(a, b);
             par_shapes_export(a, "test_shapes_disks.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
+        }
+        it("create a rock on the Y plane") {
+            int slices = 32;
+            float radius = 2;
+            float normal[3] = {0, 1, 0};
+            float center[3] = {0, 0, 0};
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_disk(radius, slices, center, normal, 0);
+            b = par_shapes_create_rock(1, 2);
+            par_shapes_merge(a, b);
+            par_shapes_export(a, "test_shapes_rock.obj");
+            par_shapes_free(a);
+            par_shapes_free(b);
+        }
+        it("create a polyhedron on the Y plane") {
+            int slices = 32;
+            float radius = 2;
+            float normal[3] = {0, 1, 0};
+            float center[3] = {0, 0, 0};
+            par_shapes_mesh* a, *b;
+            a = par_shapes_create_disk(radius, slices, center, normal, 0);
+            b = par_shapes_create_dodecahedron();
+            par_shapes_translate(b, 0, 0.934, 0);
+            par_shapes_merge(a, b);
+            par_shapes_export(a, "test_shapes_dodecahedron.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }

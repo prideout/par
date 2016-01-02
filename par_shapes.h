@@ -53,6 +53,9 @@ void par_shapes_compute_facet_normals(par_shapes_mesh* m);
 // Generate points for a 20-sided polyhedron that fits in the unit sphere.
 par_shapes_mesh* par_shapes_create_icosahedron();
 
+// Generate points for a 12-sided polyhedron that fits in the unit sphere.
+par_shapes_mesh* par_shapes_create_dodecahedron();
+
 // Create a sphere from a subdivided icosahedron without normals or uvs.
 par_shapes_mesh* par_shapes_create_sphere(int nsubdivisions);
 
@@ -617,6 +620,68 @@ par_shapes_mesh* par_shapes_create_icosahedron()
     mesh->ntriangles = sizeof(faces) / sizeof(faces[0]) / 3;
     mesh->triangles = PAR_MALLOC(uint16_t, sizeof(faces) / 2);
     memcpy(mesh->triangles, faces, sizeof(faces));
+    return mesh;
+}
+
+par_shapes_mesh* par_shapes_create_dodecahedron()
+{
+    static float verts[20 * 3] = {
+        0.607, 0.000, 0.795,
+        0.188, 0.577, 0.795,
+        -0.491, 0.357, 0.795,
+        -0.491, -0.357, 0.795,
+        0.188, -0.577, 0.795,
+        0.982, 0.000, 0.188,
+        0.304, 0.934, 0.188,
+        -0.795, 0.577, 0.188,
+        -0.795, -0.577, 0.188,
+        0.304, -0.934, 0.188,
+        0.795, 0.577, -0.188,
+        -0.304, 0.934, -0.188,
+        -0.982, 0.000, -0.188,
+        -0.304, -0.934, -0.188,
+        0.795, -0.577, -0.188,
+        0.491, 0.357, -0.795,
+        -0.188, 0.577, -0.795,
+        -0.607, 0.000, -0.795,
+        -0.188, -0.577, -0.795,
+        0.491, -0.357, -0.795,
+    };
+    static uint16_t pentagons[12 * 5] = {
+        0,1,2,3,4,
+        5,10,6,1,0,
+        6,11,7,2,1,
+        7,12,8,3,2,
+        8,13,9,4,3,
+        9,14,5,0,4,
+        15,16,11,6,10,
+        16,17,12,7,11,
+        17,18,13,8,12,
+        18,19,14,9,13,
+        19,15,10,5,14,
+        19,18,17,16,15
+    };
+    int npentagons = sizeof(pentagons) / sizeof(pentagons[0]) / 5;
+    par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
+    int ncorners = sizeof(verts) / sizeof(verts[0]) / 3;
+    mesh->npoints = ncorners;
+    mesh->points = PAR_MALLOC(float, mesh->npoints * 3);
+    memcpy(mesh->points, verts, sizeof(verts));
+    uint16_t const* pentagon = pentagons;
+    mesh->ntriangles = npentagons * 3;
+    mesh->triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
+    uint16_t* tris = mesh->triangles;
+    for (int p = 0; p < npentagons; p++, pentagon += 5) {
+        *tris++ = pentagon[0];
+        *tris++ = pentagon[1];
+        *tris++ = pentagon[2];
+        *tris++ = pentagon[0];
+        *tris++ = pentagon[2];
+        *tris++ = pentagon[3];
+        *tris++ = pentagon[0];
+        *tris++ = pentagon[3];
+        *tris++ = pentagon[4];
+    }
     return mesh;
 }
 
