@@ -1159,15 +1159,12 @@ typedef int (*par_msquares_code_fn)(int, int, int, int, void*);
 
 static int par_msquares_multi_code(int sw, int se, int ne, int nw)
 {
-    int colors[4];
     int code[4];
     int ncols = 0;
-    colors[ncols] = sw;
     code[0] = ncols++;
     if (se == sw) {
         code[1] = code[0];
     } else {
-        colors[ncols] = se;
         code[1] = ncols++;
     }
     if (ne == se) {
@@ -1175,7 +1172,6 @@ static int par_msquares_multi_code(int sw, int se, int ne, int nw)
     } else if (ne == sw) {
         code[2] = code[0];
     } else {
-        colors[ncols] = ne;
         code[2] = ncols++;
     }
     if (nw == ne) {
@@ -1185,7 +1181,6 @@ static int par_msquares_multi_code(int sw, int se, int ne, int nw)
     } else if (nw == sw) {
         code[3] = code[0];
     } else {
-        colors[ncols] = nw;
         code[3] = ncols++;
     }
     return code[0] | (code[1] << 2) | (code[2] << 4) | (code[3] << 6);
@@ -1614,7 +1609,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     // Perform quick-n-dirty simplification by iterating two rows at a time.
     // In no way does this create the simplest possible mesh, but at least it's
     // fast and easy.
-    for (int color = 0; color < ncolors; color++) {
+    for (uint32_t color = 0; color < ncolors; color++) {
         par_msquares_mesh* mesh = mlist->meshes[color];
 
         // Populate the per-mesh info grids.

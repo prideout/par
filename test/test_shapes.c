@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define PAR_PI (3.14159265359)
+
 static int fileexists(const char* filename)
 {
     return access(filename, F_OK) != -1;
@@ -113,8 +115,8 @@ int main()
             b = par_shapes_create_parametric("cylinder", 4, 3, 0);
             float axis1[3] = {0, 1, 0};
             float axis2[3] = {0, 0, 1};
-            par_shapes_rotate(a, M_PI * 0.5, axis1);
-            par_shapes_rotate(a, M_PI * 0.25, axis2);
+            par_shapes_rotate(a, PAR_PI * 0.5, axis1);
+            par_shapes_rotate(a, PAR_PI * 0.25, axis2);
             par_shapes_merge(a, b);
             par_shapes_export(a, "test_shapes_rotation.obj");
             par_shapes_free(a);
@@ -188,11 +190,11 @@ int main()
             b = par_shapes_create_parametric("cylinder", tess, 3, 0);
             c = par_shapes_create_parametric("torus", 15, tess, 0);
             d = par_shapes_create_disk(1, tess, top_center, J, 0);
-            par_shapes_rotate(c, M_PI / tess, K);
+            par_shapes_rotate(c, PAR_PI / tess, K);
             par_shapes_translate(c, 0, 0, 1);
             par_shapes_scale(b, 1.2, 1.2, 1);
             par_shapes_merge(b, c);
-            par_shapes_rotate(b, -M_PI * 0.5, I);
+            par_shapes_rotate(b, -PAR_PI * 0.5, I);
             par_shapes_merge(b, d);
             par_shapes_merge(b, a);
             par_shapes_scale(b, 1, 2, 1);
@@ -250,7 +252,7 @@ int main()
             par_shapes_merge(a, b);
             assert_ok(a->normals && a->tcoords);
             float axis[3] = {1, 0, 0};
-            par_shapes_rotate(a, -M_PI * 0.5, axis);
+            par_shapes_rotate(a, -PAR_PI * 0.5, axis);
             par_shapes_export(a, "test_shapes_heterogeneous.obj");
             par_shapes_free(a);
             par_shapes_free(b);
