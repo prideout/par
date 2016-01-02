@@ -39,6 +39,9 @@ void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
 void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
 void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 
+// Take a pointer to 6 floats and set them to min xyz, max xyz.
+void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
+
 // Reverse the winding of a run of faces.  Useful when drawing the inside of
 // a Cornell Box.  Pass 0 for nfaces to reverse every face in the mesh.
 void par_shapes_invert(par_shapes_mesh*, int startface, int nfaces);
@@ -564,6 +567,23 @@ void par_shapes_scale(par_shapes_mesh* m, float x, float y, float z)
     }
 }
 
+void par_shapes_compute_aabb(par_shapes_mesh const* m, float* aabb)
+{
+    float* points = m->points;
+    aabb[0] = aabb[3] = points[0];
+    aabb[1] = aabb[4] = points[1];
+    aabb[2] = aabb[5] = points[2];
+    points += 3;
+    for (int i = 1; i < m->npoints; i++, points += 3) {
+        aabb[0] = PAR_MIN(points[0], aabb[0]);
+        aabb[1] = PAR_MIN(points[1], aabb[1]);
+        aabb[2] = PAR_MIN(points[2], aabb[2]);
+        aabb[3] = PAR_MAX(points[0], aabb[3]);
+        aabb[4] = PAR_MAX(points[1], aabb[4]);
+        aabb[5] = PAR_MAX(points[2], aabb[5]);
+    }
+}
+
 void par_shapes_invert(par_shapes_mesh* m, int face, int nfaces)
 {
     nfaces = nfaces ? nfaces : m->ntriangles;
@@ -802,7 +822,9 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
         double n = a * par_simplex_noise2(ctx, f * pt[0], f * pt[2]);
         a *= 0.5; f *= 2;
         n += a * par_simplex_noise2(ctx, f * pt[0], f * pt[2]);
-        par_shapes_scale3(pt, 1.0 + n);
+        pt[0] *= 1 + 2 * n;
+        pt[1] *= 1 + n;
+        pt[2] *= 1 + 2 * n;
         if (pt[1] < 0) {
             pt[1] = -pow(-pt[1], 0.5) / 2;
         }

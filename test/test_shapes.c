@@ -154,6 +154,9 @@ int main()
             par_shapes_mesh* a, *b;
             a = par_shapes_create_disk(radius, slices, center, normal, 0);
             b = par_shapes_create_rock(1, 2);
+            float aabb[6];
+            par_shapes_compute_aabb(b, aabb);
+            par_shapes_translate(b, 0, -aabb[1] / 2, 0);
             par_shapes_merge(a, b);
             par_shapes_export(a, "test_shapes_rock.obj");
             par_shapes_free(a);
