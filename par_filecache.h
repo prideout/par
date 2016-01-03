@@ -165,21 +165,21 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     long fsize = ftell(cachefile);
     fseek(cachefile, 0, SEEK_SET);
     if (headersize > 0) {
-        size_t consumed = fread(header, headersize, 1, cachefile);
+        int consumed = (int) fread(header, headersize, 1, cachefile);
         assert(consumed == headersize);
     }
     int32_t dnbytes;
-    size_t consumed;
+    int consumed;
 #if ENABLE_LZ4
     long cnbytes = fsize - headersize - sizeof(dnbytes);
-    consumed = fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
+    consumed = (int) fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
     assert(consumed == sizeof(dnbytes));
 #else
     long cnbytes = fsize - headersize;
     dnbytes = (int32_t) cnbytes;
 #endif
     char* cbuff = (char*) malloc(cnbytes);
-    consumed = fread(cbuff, 1, cnbytes, cachefile);
+    consumed = (int) fread(cbuff, 1, cnbytes, cachefile);
     assert(consumed == cnbytes);
 #if ENABLE_LZ4
     char* dbuff = malloc(dnbytes);
@@ -225,7 +225,7 @@ void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
         free(dst);
 #else
         csize = payloadsize;
-        size_t actual = fwrite(payload, 1, csize, cachefile);
+        int actual = (int) fwrite(payload, 1, csize, cachefile);
         if (actual < csize) {
             fclose(cachefile);
             remove(qualified);
@@ -265,7 +265,7 @@ static void _append_table(char const* item_name, int item_size)
     if (!_table) {
         _read_or_create_tablefile();
     }
-    int64_t hashed_name = _hash(item_name);
+    uint64_t hashed_name = _hash(item_name);
     int total = _table->totalbytes + item_size;
     while (_table->nentries >= PAR_MAX_ENTRIES || total > _maxtotalbytes) {
         assert(_table->nentries > 0 && "Cache size is too small.");
