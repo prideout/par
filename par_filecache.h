@@ -288,7 +288,7 @@ static void _update_table(char const* item_name, int item_size)
     if (!_table) {
         _read_or_create_tablefile();
     }
-    int64_t hashed_name = _hash(item_name);
+    uint64_t hashed_name = _hash(item_name);
     filecache_entry_t* entry = _table->entries;
     int i;
     for (i = 0; i < _table->nentries; i++, entry++) {
@@ -347,7 +347,7 @@ static void _save_tablefile()
 
 static void _evict_lru()
 {
-    const int64_t never_evict = _hash("version");
+    const uint64_t never_evict = _hash("version");
     int oldest_index = -1;
     time_t oldest_time = LONG_MAX;
     filecache_entry_t* entry = _table->entries;
