@@ -60,24 +60,24 @@ int main()
         it("should generate an OBJ file") {
             par_shapes_mesh* m;
             m = par_shapes_create_parametric("sphere", 5, 6, 0);
-            par_shapes_export(m, "test_shapes_sphere.obj");
-            assert_ok(fileexists("test_shapes_sphere.obj"));
+            par_shapes_export(m, "build/test_shapes_sphere.obj");
+            assert_ok(fileexists("build/test_shapes_sphere.obj"));
             par_shapes_free(m);
             m = par_shapes_create_parametric("plane", 5, 6, 0);
-            par_shapes_export(m, "test_shapes_plane.obj");
-            assert_ok(fileexists("test_shapes_plane.obj"));
+            par_shapes_export(m, "build/test_shapes_plane.obj");
+            assert_ok(fileexists("build/test_shapes_plane.obj"));
             par_shapes_free(m);
             m = par_shapes_create_parametric("cylinder", 5, 20, 0);
-            par_shapes_export(m, "test_shapes_cylinder.obj");
-            assert_ok(fileexists("test_shapes_cylinder.obj"));
+            par_shapes_export(m, "build/test_shapes_cylinder.obj");
+            assert_ok(fileexists("build/test_shapes_cylinder.obj"));
             par_shapes_free(m);
             m = par_shapes_create_parametric("torus", 7, 10, 0);
-            par_shapes_export(m, "test_shapes_torus.obj");
-            assert_ok(fileexists("test_shapes_torus.obj"));
+            par_shapes_export(m, "build/test_shapes_torus.obj");
+            assert_ok(fileexists("build/test_shapes_torus.obj"));
             par_shapes_free(m);
             m = par_shapes_create_parametric("klein", 10, 20, 0);
-            par_shapes_export(m, "test_shapes_klein.obj");
-            assert_ok(fileexists("test_shapes_klein.obj"));
+            par_shapes_export(m, "build/test_shapes_klein.obj");
+            assert_ok(fileexists("build/test_shapes_klein.obj"));
             par_shapes_free(m);
         }
     }
@@ -92,7 +92,7 @@ int main()
             par_shapes_merge(a, b);
             assert_equal(a->npoints, npts + b->npoints);
             assert_equal(a->ntriangles, ntris + b->ntriangles);
-            par_shapes_export(a, "test_shapes_merged.obj");
+            par_shapes_export(a, "build/test_shapes_merged.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -105,7 +105,7 @@ int main()
             b = par_shapes_create_parametric("cylinder", 4, 3, 0);
             par_shapes_translate(a, 0.5, 0.5, 0.25);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "test_shapes_translation.obj");
+            par_shapes_export(a, "build/test_shapes_translation.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -118,7 +118,7 @@ int main()
             par_shapes_rotate(a, PAR_PI * 0.5, axis1);
             par_shapes_rotate(a, PAR_PI * 0.25, axis2);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "test_shapes_rotation.obj");
+            par_shapes_export(a, "build/test_shapes_rotation.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -126,7 +126,7 @@ int main()
             par_shapes_mesh* a;
             a = par_shapes_create_parametric("cylinder", 15, 3, 0);
             par_shapes_scale(a, 1, 1, 5);
-            par_shapes_export(a, "test_shapes_scale.obj");
+            par_shapes_export(a, "build/test_shapes_scale.obj");
             par_shapes_free(a);
         }
     }
@@ -144,7 +144,7 @@ int main()
             float bnormal[3] = {0, 1, 0};
             b = par_shapes_create_disk(bradius, slices, bcenter, bnormal, 0);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "test_shapes_disks.obj");
+            par_shapes_export(a, "build/test_shapes_disks.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -160,7 +160,7 @@ int main()
             par_shapes_compute_aabb(b, aabb);
             par_shapes_translate(b, 0, -aabb[1] / 2, 0);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "test_shapes_rock.obj");
+            par_shapes_export(a, "build/test_shapes_rock.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -174,7 +174,7 @@ int main()
             b = par_shapes_create_dodecahedron();
             par_shapes_translate(b, 0, 0.934, 0);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "test_shapes_dodecahedron.obj");
+            par_shapes_export(a, "build/test_shapes_dodecahedron.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -198,7 +198,7 @@ int main()
             par_shapes_merge(b, d);
             par_shapes_merge(b, a);
             par_shapes_scale(b, 1, 2, 1);
-            par_shapes_export(b, "test_shapes_rounded_cylinder.obj");
+            par_shapes_export(b, "build/test_shapes_rounded_cylinder.obj");
             par_shapes_free(a);
             par_shapes_free(b);
             par_shapes_free(c);
@@ -211,18 +211,18 @@ int main()
             par_shapes_mesh* m;
             int flags = PAR_SHAPES_SMOOTH_NORMALS;
             m = par_shapes_create_parametric("sphere", 5, 6, flags);
-            par_shapes_export(m, "test_shapes_n.obj");
+            par_shapes_export(m, "build/test_shapes_n.obj");
             assert_ok(m->normals);
             par_shapes_free(m);
             flags = PAR_SHAPES_TEXTURE_COORDS;
             m = par_shapes_create_parametric("sphere", 5, 6, flags);
-            par_shapes_export(m, "test_shapes_tc.obj");
+            par_shapes_export(m, "build/test_shapes_tc.obj");
             assert_ok(m->tcoords);
             par_shapes_free(m);
             flags |= PAR_SHAPES_SMOOTH_NORMALS;
             m = par_shapes_create_parametric("sphere", 5, 6, flags);
             assert_ok(m->tcoords && m->normals);
-            par_shapes_export(m, "test_shapes_tcn.obj");
+            par_shapes_export(m, "build/test_shapes_tcn.obj");
             par_shapes_free(m);
         }
         it("disk should support normals but not uvs") {
@@ -232,7 +232,7 @@ int main()
             par_shapes_mesh* m;
             m = par_shapes_create_disk(1, 32, center, normal, flags);
             assert_ok(m->normals);
-            par_shapes_export(m, "test_shapes_diskn.obj");
+            par_shapes_export(m, "build/test_shapes_diskn.obj");
             par_shapes_free(m);
             flags |= PAR_SHAPES_TEXTURE_COORDS;
             m = par_shapes_create_disk(1, 32, center, normal, flags);
@@ -253,7 +253,7 @@ int main()
             assert_ok(a->normals && a->tcoords);
             float axis[3] = {1, 0, 0};
             par_shapes_rotate(a, -PAR_PI * 0.5, axis);
-            par_shapes_export(a, "test_shapes_heterogeneous.obj");
+            par_shapes_export(a, "build/test_shapes_heterogeneous.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }

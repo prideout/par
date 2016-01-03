@@ -294,9 +294,9 @@ float* par_bluenoise_generate(
 static par_bluenoise_context* par_bluenoise_create(
     char const* filepath, int nbytes, int maxpts)
 {
-    par_bluenoise_context* ctx = malloc(sizeof(par_bluenoise_context));
+    par_bluenoise_context* ctx = PAR_ALLOC(par_bluenoise_context, 1);
     ctx->maxpoints = maxpts;
-    ctx->points = malloc(maxpts * sizeof(par_vec3));
+    ctx->points = PAR_ALLOC(par_vec3, maxpts);
     ctx->density = 0;
     ctx->abridged = 0;
     par_bluenoise_set_window(ctx, 1024, 768);
@@ -309,7 +309,7 @@ static par_bluenoise_context* par_bluenoise_create(
         fseek(fin, 0, SEEK_END);
         nbytes = (int) ftell(fin);
         fseek(fin, 0, SEEK_SET);
-        buf = malloc(nbytes);
+        buf = PAR_ALLOC(char, nbytes);
         size_t consumed = fread(buf, nbytes, 1, fin);
         assert(consumed == nbytes);
         fclose(fin);
@@ -319,28 +319,28 @@ static par_bluenoise_context* par_bluenoise_create(
     int ntiles = ctx->ntiles = freadi();
     int nsubtiles = ctx->nsubtiles = freadi();
     int nsubdivs = ctx->nsubdivs = freadi();
-    par_tile* tiles = ctx->tiles = malloc(sizeof(par_tile) * ntiles);
+    par_tile* tiles = ctx->tiles = PAR_ALLOC(par_tile, ntiles);
     for (int i = 0; i < ntiles; i++) {
         tiles[i].n = freadi();
         tiles[i].e = freadi();
         tiles[i].s = freadi();
         tiles[i].w = freadi();
-        tiles[i].subdivs = malloc(sizeof(int*) * nsubdivs);
+        tiles[i].subdivs = PAR_ALLOC(int*, nsubdivs);
         for (int j = 0; j < nsubdivs; j++) {
-            int* subdiv = malloc(sizeof(int) * PAR_SQR(nsubtiles));
+            int* subdiv = PAR_ALLOC(int, PAR_SQR(nsubtiles));
             for (int k = 0; k < PAR_SQR(nsubtiles); k++) {
                 subdiv[k] = freadi();
             }
             tiles[i].subdivs[j] = subdiv;
         }
         tiles[i].npoints = freadi();
-        tiles[i].points = malloc(sizeof(par_vec2) * tiles[i].npoints);
+        tiles[i].points = PAR_ALLOC(par_vec2, tiles[i].npoints);
         for (int j = 0; j < tiles[i].npoints; j++) {
             tiles[i].points[j].x = freadf();
             tiles[i].points[j].y = freadf();
         }
         tiles[i].nsubpts = freadi();
-        tiles[i].subpts = malloc(sizeof(par_vec2) * tiles[i].nsubpts);
+        tiles[i].subpts = PAR_ALLOC(par_vec2, tiles[i].nsubpts);
         for (int j = 0; j < tiles[i].nsubpts; j++) {
             tiles[i].subpts[j].x = freadf();
             tiles[i].subpts[j].y = freadf();
@@ -380,7 +380,7 @@ void par_bluenoise_density_from_gray(par_bluenoise_context* ctx,
 {
     ctx->density_width = width;
     ctx->density_height = height;
-    ctx->density = malloc(width * height);
+    ctx->density = PAR_ALLOC(unsigned char, width * height);
     unsigned char* dst = ctx->density;
     for (int j = 0; j < height; j++) {
         for (int i = 0; i < width; i++) {
@@ -397,7 +397,7 @@ void par_bluenoise_density_from_color(par_bluenoise_context* ctx,
     unsigned int bkgd = background_color;
     ctx->density_width = width;
     ctx->density_height = height;
-    ctx->density = malloc(width * height);
+    ctx->density = PAR_ALLOC(unsigned char, width * height);
     unsigned char* dst = ctx->density;
     unsigned int mask = 0x000000ffu;
     if (bpp > 1) {
@@ -439,8 +439,8 @@ void par_bluenoise_free(par_bluenoise_context* ctx)
 
 int cmp(const void* a, const void* b)
 {
-    const par_vec3* v1 = a;
-    const par_vec3* v2 = b;
+    const par_vec3* v1 = (const par_vec3*) a;
+    const par_vec3* v2 = (const par_vec3*) b;
     if (v1->rank < v2->rank) {
         return -1;
     }
@@ -467,7 +467,7 @@ float* par_bluenoise_generate_exact(
     if (ctx->maxpoints < maxpoints) {
         free(ctx->points);
         ctx->maxpoints = maxpoints;
-        ctx->points = malloc(maxpoints * sizeof(par_vec3));
+        ctx->points = PAR_ALLOC(par_vec3, maxpoints);
     }
     int ngenerated = 0;
     int nprevious = 0;
@@ -493,7 +493,7 @@ float* par_bluenoise_generate_exact(
     par_bluenoise_sort_by_rank(&ctx->points->x, ngenerated);
     if (stride != 3) {
         int nbytes = sizeof(float) * stride * ndesired;
-        float* pts = malloc(nbytes);
+        float* pts = PAR_ALLOC(float, stride * ndesired);
         float* dst = pts;
         const float* src = &ctx->points->x;
         for (int i = 0; i < ndesired; i++, src++) {

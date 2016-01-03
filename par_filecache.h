@@ -79,7 +79,7 @@ static char * _par_strdup(char const* s)
 {
     if (s) {
         size_t l = strlen(s);
-        char *s2 = malloc(l + 1);
+        char *s2 = (char*) malloc(l + 1);
         if (s2) {
             strcpy(s2, s);
         }
@@ -178,7 +178,7 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     long cnbytes = fsize - headersize;
     dnbytes = (int32_t) cnbytes;
 #endif
-    char* cbuff = malloc(cnbytes);
+    char* cbuff = (char*) malloc(cnbytes);
     consumed = fread(cbuff, 1, cnbytes, cachefile);
     assert(consumed == cnbytes);
 #if ENABLE_LZ4
@@ -306,7 +306,7 @@ static void _update_table(char const* item_name, int item_size)
 
 static void _read_or_create_tablefile()
 {
-    _table = calloc(sizeof(filecache_table_t), 1);
+    _table = (filecache_table_t*) calloc(sizeof(filecache_table_t), 1);
     FILE* fhandle = fopen(_tablepath, "r");
     if (!fhandle) {
         fhandle = fopen(_tablepath, "w");

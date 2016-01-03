@@ -56,7 +56,7 @@ void par_easycurl_shutdown()
 static size_t onheader(void* v, size_t size, size_t nmemb)
 {
     size_t n = size * nmemb;
-    char* h = v;
+    char* h = (char*) v;
     if (n > 14 && !strncasecmp("Last-Modified:", h, 14)) {
         char const* s = h + 14;
         time_t r = curl_getdate(s, 0);
@@ -78,7 +78,7 @@ static size_t onwrite(char* contents, size_t size, size_t nmemb, void* udata)
 {
     size_t realsize = size * nmemb;
     par_easycurl_buffer* mem = (par_easycurl_buffer*) udata;
-    mem->data = realloc(mem->data, mem->nbytes + realsize + 1);
+    mem->data = (par_byte*) realloc(mem->data, mem->nbytes + realsize + 1);
     if (!mem->data) {
         return 0;
     }
@@ -117,7 +117,7 @@ bool curlToMemory(char const* url, uint8_t** data, int* nbytes)
 int par_easycurl_to_memory(char const* url, par_byte** data, int* nbytes)
 {
     char errbuf[CURL_ERROR_SIZE] = {0};
-    par_easycurl_buffer buffer = {malloc(1), 0};
+    par_easycurl_buffer buffer = {(par_byte*) malloc(1), 0};
     long code = 0;
     long status = 0;
     CURL* handle = curl_easy_init();
