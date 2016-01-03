@@ -136,8 +136,8 @@ static void par_init_tables()
     for (int i = 0; i < 16; i++) {
         int ntris = *binary_token - '0';
         binary_token++;
-        int* sqrtris = par_msquares_binary_triangle_table[i] =
-            PAR_ALLOC(int, (ntris + 1) * 3);
+        par_msquares_binary_triangle_table[i] = PAR_ALLOC(int, (ntris + 1) * 3);
+        int* sqrtris = par_msquares_binary_triangle_table[i];
         sqrtris[0] = ntris;
         int mask = 0;
         int* sqrpts = par_msquares_binary_point_table[i] = PAR_ALLOC(int, 7);
@@ -545,7 +545,6 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     }
     return merged;
 }
-
 
 static void par_remove_unreferenced_verts(par_msquares_mesh* mesh)
 {
@@ -1609,7 +1608,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     // Perform quick-n-dirty simplification by iterating two rows at a time.
     // In no way does this create the simplest possible mesh, but at least it's
     // fast and easy.
-    for (uint32_t color = 0; color < ncolors; color++) {
+    for (uint32_t color = 0; color < (uint32_t) ncolors; color++) {
         par_msquares_mesh* mesh = mlist->meshes[color];
 
         // Populate the per-mesh info grids.

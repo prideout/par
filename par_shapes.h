@@ -13,7 +13,8 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
-#define PAR_SHAPES_VERSION 0.0.0
+// If the version ends in -DEV, then its antecedent is tentative and pending.
+#define PAR_SHAPES_VERSION "0.0.0-DEV"
 
 typedef struct par_shapes_mesh_s {
     float* points;
@@ -540,12 +541,18 @@ void par_shapes_rotate(par_shapes_mesh* mesh, float radians, float const* axis)
     float yz = y * z;
     float zx = z * x;
     float oneMinusC = 1.0f - c;
-    float col0[3] = {(((x * x) * oneMinusC) + c),
-        ((xy * oneMinusC) + (z * s)), ((zx * oneMinusC) - (y * s))};
-    float col1[3] = {((xy * oneMinusC) - (z * s)),
-        (((y * y) * oneMinusC) + c), ((yz * oneMinusC) + (x * s))};
-    float col2[3] = {((zx * oneMinusC) + (y * s)),
-        ((yz * oneMinusC) - (x * s)), (((z * z) * oneMinusC) + c)};
+    float col0[3] = {
+        (((x * x) * oneMinusC) + c),
+        ((xy * oneMinusC) + (z * s)), ((zx * oneMinusC) - (y * s))
+    };
+    float col1[3] = {
+        ((xy * oneMinusC) - (z * s)),
+        (((y * y) * oneMinusC) + c), ((yz * oneMinusC) + (x * s))
+    };
+    float col2[3] = {
+        ((zx * oneMinusC) + (y * s)),
+        ((yz * oneMinusC) - (x * s)), (((z * z) * oneMinusC) + c)
+    };
     float* p = mesh->points;
     for (int i = 0; i < mesh->npoints; i++) {
         float x = col0[0] * p[0] + col1[0] * p[1] + col2[0] * p[2];
@@ -597,18 +604,18 @@ void par_shapes_invert(par_shapes_mesh* m, int face, int nfaces)
 par_shapes_mesh* par_shapes_create_icosahedron()
 {
     static float verts[] = {
-         0.000,  0.000,  1.000,
-         0.894,  0.000,  0.447,
-         0.276,  0.851,  0.447,
+        0.000,  0.000,  1.000,
+        0.894,  0.000,  0.447,
+        0.276,  0.851,  0.447,
         -0.724,  0.526,  0.447,
         -0.724, -0.526,  0.447,
-         0.276, -0.851,  0.447,
-         0.724,  0.526, -0.447,
+        0.276, -0.851,  0.447,
+        0.724,  0.526, -0.447,
         -0.276,  0.851, -0.447,
         -0.894,  0.000, -0.447,
         -0.276, -0.851, -0.447,
-         0.724, -0.526, -0.447,
-         0.000,  0.000, -1.000
+        0.724, -0.526, -0.447,
+        0.000,  0.000, -1.000
     };
     static uint16_t faces[] = {
         0,1,2,
@@ -1080,9 +1087,7 @@ static double par_simplex_noise2(struct osn_context* ctx, double x, double y)
 
     if (inSum <= 1) {  // We're inside the triangle (2-Simplex) at (0,0)
         double zins = 1 - inSum;
-        if (zins > xins ||
-            zins >
-                yins) {  //(0,0) is one of the closest two triangular vertices
+        if (zins > xins || zins > yins) {
             if (xins > yins) {
                 xsv_ext = xsb + 1;
                 ysv_ext = ysb - 1;
@@ -1102,9 +1107,7 @@ static double par_simplex_noise2(struct osn_context* ctx, double x, double y)
         }
     } else {  // We're inside the triangle (2-Simplex) at (1,1)
         double zins = 2 - inSum;
-        if (zins < xins ||
-            zins <
-                yins) {  //(0,0) is one of the closest two triangular vertices
+        if (zins < xins || zins < yins) {
             if (xins > yins) {
                 xsv_ext = xsb + 2;
                 ysv_ext = ysb + 0;
@@ -1140,7 +1143,7 @@ static double par_simplex_noise2(struct osn_context* ctx, double x, double y)
     if (attn_ext > 0) {
         attn_ext *= attn_ext;
         value += attn_ext * attn_ext *
-                 extrapolate2(ctx, xsv_ext, ysv_ext, dx_ext, dy_ext);
+            extrapolate2(ctx, xsv_ext, ysv_ext, dx_ext, dy_ext);
     }
 
     return value / NORM_CONSTANT_2D;

@@ -131,7 +131,7 @@ void par_filecache_init(char const* prefix, int maxsize)
 NSString* getPrefix()
 {
     NSString* cachesFolder = [NSSearchPathForDirectoriesInDomains(
-        NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+    NSCachesDirectory, NSUserDomainMask, YES) firstObject];
     NSError* error = nil;
     if (![[NSFileManager defaultManager] createDirectoryAtPath : cachesFolder
         withIntermediateDirectories : YES
@@ -320,7 +320,7 @@ static void _read_or_create_tablefile()
         char name[PATH_MAX];
         while (1) {
             int nargs = fscanf(fhandle, "%ld %d %s", &entry.last_used_timestamp,
-                    &entry.nbytes, name);
+                &entry.nbytes, name);
             if (nargs != 3) {
                 break;
             }

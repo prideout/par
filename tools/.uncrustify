@@ -1,0 +1,21 @@
+indent_columns = 4
+indent_with_tabs = 0
+indent_continue = 4
+indent_func_call_param = true
+indent_func_def_param = true
+indent_func_proto_param = true
+
+nl_func_leave_one_liners = true
+nl_collapse_empty_body = true
+nl_after_return = False
+nl_max = 2
+nl_after_func_proto = 0
+nl_after_func_proto_group = 1
+nl_after_func_body = 2
+nl_after_func_body_one_liner = 2
+nl_before_block_comment = 1
+nl_before_cpp_comment = 1
+nl_after_multiline_comment = False
+nl_after_struct = 1
+nl_end_of_file = add
+nl_end_of_file_min = 1

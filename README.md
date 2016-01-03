@@ -29,6 +29,24 @@ $ cmake --build build  # Invoke the build
 
 The tests are executed by simply running the programs:
 ```bash
-$ build/test_msquares
-$ build/test_bluenoise
+$ cd build
+$ ./test_msquares
+$ ./test_bluenoise
+$ ./test_shapes
 ```
+
+## code formatting
+
+This library's code style is strictly enforced to be vertically dense (no consecutive newlines) and horizontally narrow (80 columns or less).
+
+The `tools/format.py` script invokes a two-step code formatting process:
+
+1. Runs `uncrustify` with our custom configuration.  This auto-formats all code in the root folder, up to a point.  For example, it does not enforce the 80-character line constraint because line breaking is best done by a human.
+1. Checks for violations that are not otherwise enforced with uncrustify.
+
+The aforementioned Python script is also invoked from Travis, but using the `--check` option, which checks for conformance without editing the code.
+
+Beyond what our uncrustify configuration enforces, the Python script does the following:
+
+- Checks that no lines are more than 80 chars.
+- Checks for extra newlines before an end brace.

@@ -359,7 +359,6 @@ static par_bluenoise_context* par_bluenoise_create(
             tiles[i].nsubpts = tiles[0].nsubpts;
             tiles[i].subpts = tiles[0].subpts;
         }
-
     }
     free(buf);
     return ctx;
