@@ -1,5 +1,5 @@
 // SHAPES :: https://github.com/prideout/par
-// Mesh generator for parametric surfaces and other simple geometry.
+// Simple C library for creation and manipulation of triangle meshes.
 //
 // For our purposes, a "mesh" is a list of points and a list of triangles; the
 // former is a flattened list of three-tuples (32-bit floats) and the latter is
@@ -43,31 +43,29 @@ typedef struct par_shapes_mesh_s {
     float* tcoords;
 } par_shapes_mesh;
 
-#define PAR_SHAPES_SMOOTH_NORMALS (1 << 0)
-#define PAR_SHAPES_TEXTURE_COORDS (1 << 2)
-
 void par_shapes_free(par_shapes_mesh*);
 
 // Generators ------------------------------------------------------------------
 
-// Instance one of the pre-packaged parametric surfaces using the given
-// tessellation levels across the U and V domains.  For example, when
-// tessellating a cylinder, the "slices" control the number of pizza slices,
-// ad the "stacks" control the number of stacked rings.
-par_shapes_mesh* par_shapes_create_parametric(char const*, int slices,
-    int stacks, int flags);
+// Instance a cylinder using the given tessellation levels across the U and V
+// domains.  Think of "slices" like a number of pizza slices, and "stacks" like
+// a number of stacked rings.  Height and radius are both 1.0, but they can
+// easily be changed with par_shapes_scale.
+par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks);
 
-// List all pre-packaged parametric surfaces.
-char const * const * par_shapes_list_parametric();
+// Create a sphere with valid texture coordinates and normals, but with
+// small triangles near the poles.
+par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks);
 
-// Create a parametric function from a callback function that consumes a 2D
+// Generate a sphere from a subdivided icosahedron, which produces a nice
+// distribution of triangles, but no texture coordinates.
+par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubdivisions);
+
+// Create a parametric surface from a callback function that consumes a 2D
 // point in [0,1] and produces a 3D point.
 typedef void (*par_shapes_fn)(float* const, float*);
 par_shapes_mesh* par_shapes_create_custom_parametric(par_shapes_fn, int slices,
-    int stacks, int flags);
-
-// Create a sphere from a subdivided icosahedron; it doesn't have uvs.
-par_shapes_mesh* par_shapes_create_sphere(int nsubdivisions);
+    int stacks);
 
 // Generate points for a 20-sided polyhedron that fits in the unit sphere.
 // Texture coordinates and normals are not provided.
@@ -90,7 +88,7 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
 // Generate an orientable disk shape in 3-space.  Does not include normals or
 // texture coordinates.
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
-    float const* center, float const* normal, int flags);
+    float const* center, float const* normal);
 
 // Teaser for a TBD function.  Oooo!  Aaaa!
 par_shapes_mesh* par_shapes_create_lsystem(const char* program);
@@ -151,6 +149,8 @@ void par_shapes_compute_smooth_normals(par_shapes_mesh* m);
 #define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
 #define PAR_PI (3.14159265359)
+#define PAR_SHAPES_SMOOTH_NORMALS (1 << 0)
+#define PAR_SHAPES_TEXTURE_COORDS (1 << 2)
 
 static void par_shapes_private_sphere(float* const uv, float* xyz);
 static void par_shapes_private_plane(float* const uv, float* xyz);
@@ -162,6 +162,9 @@ struct osn_context;
 static int par_simplex_noise(int64_t seed, struct osn_context** ctx);
 static void par_simplex_noise_free(struct osn_context* ctx);
 static double par_simplex_noise2(struct osn_context* ctx, double x, double y);
+
+static par_shapes_mesh* par_shapes_create_parametric(char const* name,
+    int slices, int stacks, int flags);
 
 static par_shapes_fn par_shapes_functions[] = {
     par_shapes_private_sphere,
@@ -228,17 +231,25 @@ static void par_shapes_add3(float* result, float const* a)
     result[2] += a[2];
 }
 
-char const * const * par_shapes_list_parametric()
+par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks)
 {
-    return par_shapes_names;
+    if (slices < 3 || stacks < 1) {
+        return 0;
+    }
+    return par_shapes_create_parametric("cylinder", slices, stacks, 0);
 }
 
-par_shapes_mesh* par_shapes_create_parametric(char const* name,
-    int slices, int stacks, int flags)
+par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks)
 {
     if (slices < 3 || stacks < 3) {
         return 0;
     }
+    return par_shapes_create_parametric("sphere", slices, stacks, 0);
+}
+
+static par_shapes_mesh* par_shapes_create_parametric(char const* name,
+    int slices, int stacks, int flags)
+{
     char const * const * list = par_shapes_names;
     int shape_index = 0;
     while (*list) {
@@ -524,12 +535,8 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
 }
 
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
-    float const* center, float const* normal, int flags)
+    float const* center, float const* normal)
 {
-    if (flags & PAR_SHAPES_TEXTURE_COORDS) {
-        // No texture coordinates since this doesn't have a 2D domain.
-        return 0;
-    }
     par_shapes_mesh* mesh = (par_shapes_mesh*)
         calloc(sizeof(par_shapes_mesh), 1);
     mesh->npoints = slices + 1;
@@ -546,14 +553,12 @@ par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     }
     float nnormal[3] = {normal[0], normal[1], normal[2]};
     par_shapes_normalize3(nnormal);
-    if (flags & PAR_SHAPES_SMOOTH_NORMALS) {
-        mesh->normals = PAR_MALLOC(float, 3 * mesh->npoints);
-        float* norms = mesh->normals;
-        for (int i = 0; i < mesh->npoints; i++) {
-            *norms++ = nnormal[0];
-            *norms++ = nnormal[1];
-            *norms++ = nnormal[2];
-        }
+    mesh->normals = PAR_MALLOC(float, 3 * mesh->npoints);
+    float* norms = mesh->normals;
+    for (int i = 0; i < mesh->npoints; i++) {
+        *norms++ = nnormal[0];
+        *norms++ = nnormal[1];
+        *norms++ = nnormal[2];
     }
     mesh->ntriangles = slices;
     mesh->triangles = (uint16_t*)
@@ -852,7 +857,7 @@ static void par_shapes_subdivide(par_shapes_mesh* mesh)
     mesh->ntriangles = ntriangles;
 }
 
-par_shapes_mesh* par_shapes_create_sphere(int nsubd)
+par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubd)
 {
     par_shapes_mesh* mesh = par_shapes_create_icosahedron();
     par_shapes_unweld(mesh, false);
@@ -873,7 +878,7 @@ par_shapes_mesh* par_shapes_create_sphere(int nsubd)
 
 par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
 {
-    par_shapes_mesh* mesh = par_shapes_create_sphere(subd);
+    par_shapes_mesh* mesh = par_shapes_create_subdivided_sphere(subd);
     struct osn_context* ctx;
     par_simplex_noise(seed, &ctx);
     for (int p = 0; p < mesh->npoints; p++) {
