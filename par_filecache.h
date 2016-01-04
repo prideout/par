@@ -182,7 +182,7 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     consumed = (int) fread(cbuff, 1, cnbytes, cachefile);
     assert(consumed == cnbytes);
 #if ENABLE_LZ4
-    char* dbuff = malloc(dnbytes);
+    char* dbuff = (char*) malloc(dnbytes);
     LZ4_decompress_safe(cbuff, dbuff, (int) cnbytes, dnbytes);
     free(cbuff);
 #else
@@ -217,7 +217,7 @@ void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
         int32_t nbytes = payloadsize;
         fwrite(&nbytes, 1, sizeof(nbytes), cachefile);
         int maxsize = LZ4_compressBound(nbytes);
-        char* dst = malloc(maxsize);
+        char* dst = (char*) malloc(maxsize);
         char const* src = (char const*) payload;
         assert(nbytes < LZ4_MAX_INPUT_SIZE);
         csize = LZ4_compress_default(src, dst, nbytes, maxsize);
