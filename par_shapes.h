@@ -1,7 +1,25 @@
-// SHAPES :: https:github.com/prideout/par
+// SHAPES :: https://github.com/prideout/par
 // Mesh generator for parametric surfaces and other simple geometry.
 //
-//     http://github.prideout.net/c-shapes/
+// For our purposes, a "mesh" is a list of points and a list of triangles; the
+// former is a flattened list of three-tuples (32-bit floats) and the latter is
+// also a flattened list of three-tuples (16-bit uints).  Triangles are always
+// oriented such that their "front" winds counter-clockwise.
+//
+// Optionally, meshes can contain 3D normals (one per vertex), and 2D texture
+// coordinates (one per vertex).  That's it!  If you need something fancier,
+// look elsewhere.
+//
+// The API is divided into three sections:
+//
+//   - Generators.  Create parametric surfaces, platonic solids, etc.
+//   - Queries.     Ask a mesh for its axis-aligned bounding box, etc.
+//   - Transforms.  Rotate it, merge it with another, add normals to it, etc.
+//
+// In addition to the comment block above every function declaration, the API
+// has informal documentation here:
+//
+//     http://github.prideout.net/shapes/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
@@ -13,7 +31,7 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
-// If the version ends in -DEV, then its antecedent is tentative and pending.
+// If the version ends in -DEV, then it is tentative and pending.
 #define PAR_SHAPES_VERSION "0.0.0-DEV"
 
 typedef struct par_shapes_mesh_s {
@@ -28,54 +46,89 @@ typedef struct par_shapes_mesh_s {
 #define PAR_SHAPES_SMOOTH_NORMALS (1 << 0)
 #define PAR_SHAPES_TEXTURE_COORDS (1 << 2)
 
-char const * const * par_shapes_list_parametric();
+void par_shapes_free(par_shapes_mesh*);
+
+// Generators ------------------------------------------------------------------
+
+// Instance one of the pre-packaged parametric surfaces using the given
+// tessellation levels across the U and V domains.  For example, when
+// tessellating a cylinder, the "slices" control the number of pizza slices,
+// ad the "stacks" control the number of stacked rings.
 par_shapes_mesh* par_shapes_create_parametric(char const*, int slices,
     int stacks, int flags);
+
+// List all pre-packaged parametric surfaces.
+char const * const * par_shapes_list_parametric();
+
+// Create a parametric function from a callback function that consumes a 2D
+// point in [0,1] and produces a 3D point.
+typedef void (*par_shapes_fn)(float* const, float*);
+par_shapes_mesh* par_shapes_create_custom_parametric(par_shapes_fn, int slices,
+    int stacks, int flags);
+
+// Create a sphere from a subdivided icosahedron; it doesn't have uvs.
+par_shapes_mesh* par_shapes_create_sphere(int nsubdivisions);
+
+// Generate points for a 20-sided polyhedron that fits in the unit sphere.
+// Texture coordinates and normals are not provided.
+par_shapes_mesh* par_shapes_create_icosahedron();
+
+// Generate points for a 12-sided polyhedron that fits in the unit sphere.
+// Again, texture coordinates and normals are not provided.
+par_shapes_mesh* par_shapes_create_dodecahedron();
+
+// Guess what this does.
+par_shapes_mesh* par_shapes_create_octohedron();
+
+// Generate a cube with outward faces -- see also "par_shapes_invert".
+par_shapes_mesh* par_shapes_create_cube();
+
+// Generate a rock shape that sits on the Y=0 plane, and sinks into it a bit.
+// This includes smooth UVs but no texture coordinates.
+par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
+
+// Generate an orientable disk shape in 3-space.  Does not include normals or
+// texture coordinates.
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     float const* center, float const* normal, int flags);
-void par_shapes_free(par_shapes_mesh*);
+
+// Teaser for a TBD function.  Oooo!  Aaaa!
+par_shapes_mesh* par_shapes_create_lsystem(const char* program);
+
+// Queries ---------------------------------------------------------------------
+
+// Dump out a text file conforming to the venerable OBJ format.
 void par_shapes_export(par_shapes_mesh const*, char const* objfile);
+
+// Take a pointer to 6 floats and set them to min xyz, max xyz.
+void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
+
+// Transformations -------------------------------------------------------------
+
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
 void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
 void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
 void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 
-// Take a pointer to 6 floats and set them to min xyz, max xyz.
-void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
-
 // Reverse the winding of a run of faces.  Useful when drawing the inside of
 // a Cornell Box.  Pass 0 for nfaces to reverse every face in the mesh.
 void par_shapes_invert(par_shapes_mesh*, int startface, int nfaces);
+
+// Remove zero-area triangles or close-to-zero-area triangles.
+void par_shapes_remove_degenerate(par_shapes_mesh*, float epsilon);
 
 // Dereference the entire index buffer and replace the point list.
 // This creates an inefficient structure, but is useful for drawing facets.
 void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices);
 
+// Merge colocated verts and build a new index buffer.
+void par_shapes_weld(par_shapes_mesh* mesh, float epsilon);
+
 // Consume an unwelded mesh and insert facet normals into the mesh.
 void par_shapes_compute_facet_normals(par_shapes_mesh* m);
 
-// Generate points for a 20-sided polyhedron that fits in the unit sphere.
-par_shapes_mesh* par_shapes_create_icosahedron();
-
-// Generate points for a 12-sided polyhedron that fits in the unit sphere.
-par_shapes_mesh* par_shapes_create_dodecahedron();
-
-// Create a sphere from a subdivided icosahedron without normals or uvs.
-par_shapes_mesh* par_shapes_create_sphere(int nsubdivisions);
-
-// Create a rock shape that sits on the Y=0 plane, and sinks into it a bit.
-par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
-
-// Create a crappy cloud shape that floats in the Y=0 plane.
-par_shapes_mesh* par_shapes_create_cloud(int seed, int nsubdivisions);
-
-// TBD, http://prideout.net/blog/?p=44
-typedef void (*par_shapes_fn)(float* const, float*);
-par_shapes_mesh* par_shapes_create_custom_parametric(par_shapes_fn, int slices,
-    int stacks, int flags);
-par_shapes_mesh* par_shapes_create_tree(int seed, int flags);
-par_shapes_mesh* par_shapes_create_octohedron();
-par_shapes_mesh* par_shapes_create_cube(); // for Cornell boxes
+// Consume an welded mesh and insert smoothed normals into the mesh.
+void par_shapes_compute_smooth_normals(par_shapes_mesh* m);
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
