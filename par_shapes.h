@@ -117,15 +117,21 @@ void par_shapes_remove_degenerate(par_shapes_mesh*, float epsilon);
 
 // Dereference the entire index buffer and replace the point list.
 // This creates an inefficient structure, but is useful for drawing facets.
+// If create_indices is true, a trivial "0 1 2 3..." index buffer is generated.
 void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices);
 
-// Merge colocated verts and build a new index buffer.
-void par_shapes_weld(par_shapes_mesh* mesh, float epsilon);
+// Merge colocated verts, build a new index buffer, and return the
+// optimized mesh.  Epsilon is the maximum distance to consider when
+// welding vertices. The mapping argument can be null, or a pointer to
+// (3 * ntriangles) integers, which gets filled with the mapping from old
+// indices to new indices.
+par_shapes_mesh* par_shapes_weld(par_shapes_mesh const*, float epsilon,
+    uint16_t* mapping);
 
 // Consume an unwelded mesh and insert facet normals into the mesh.
 void par_shapes_compute_facet_normals(par_shapes_mesh* m);
 
-// Consume an welded mesh and insert smoothed normals into the mesh.
+// Consume a welded mesh and insert smoothed normals into the mesh.
 void par_shapes_compute_smooth_normals(par_shapes_mesh* m);
 
 // -----------------------------------------------------------------------------
