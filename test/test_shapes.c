@@ -8,36 +8,74 @@
 
 #define PAR_PI (3.14159265359)
 
-static int fileexists(const char* filename)
-{
-    return access(filename, F_OK) != -1;
-}
-
 int main()
 {
     describe("par_shapes_export") {
         it("should generate an OBJ file") {
             par_shapes_mesh* m;
+
             m = par_shapes_create_cylinder(50, 20);
             par_shapes_export(m, "build/test_shapes_cylinder.obj");
-            assert_ok(fileexists("build/test_shapes_cylinder.obj"));
             par_shapes_free(m);
-            m = par_shapes_create_parametric_sphere(5, 6);
-            par_shapes_export(m, "build/test_shapes_sphere.obj");
-            assert_ok(fileexists("build/test_shapes_sphere.obj"));
-            par_shapes_free(m);
-            m = par_shapes_create_plane(5, 6);
-            par_shapes_export(m, "build/test_shapes_plane.obj");
-            assert_ok(fileexists("build/test_shapes_plane.obj"));
-            par_shapes_free(m);
+
             m = par_shapes_create_torus(7, 10, 0.1);
             par_shapes_export(m, "build/test_shapes_torus.obj");
-            assert_ok(fileexists("build/test_shapes_torus.obj"));
             par_shapes_free(m);
+
+            m = par_shapes_create_parametric_sphere(5, 6);
+            par_shapes_export(m, "build/test_shapes_psphere.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_subdivided_sphere(2);
+            par_shapes_export(m, "build/test_shapes_ssphere.obj");
+            par_shapes_free(m);
+
             m = par_shapes_create_klein_bottle(10, 20);
             par_shapes_export(m, "build/test_shapes_klein.obj");
-            assert_ok(fileexists("build/test_shapes_klein.obj"));
             par_shapes_free(m);
+
+            m = par_shapes_create_trefoil_knot(20, 100, 0.2);
+            par_shapes_export(m, "build/test_shapes_trefoil.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_hemisphere(5, 6);
+            par_shapes_export(m, "build/test_shapes_hemisphere.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_plane(5, 6);
+            par_shapes_export(m, "build/test_shapes_plane.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_icosahedron();
+            par_shapes_export(m, "build/test_shapes_icosahedron.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_dodecahedron();
+            par_shapes_export(m, "build/test_shapes_dodecahedron.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_octohedron();
+            par_shapes_export(m, "build/test_shapes_octohedron.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_tetrahedron();
+            par_shapes_export(m, "build/test_shapes_tetrahedron.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_cube();
+            par_shapes_export(m, "build/test_shapes_cube.obj");
+            par_shapes_free(m);
+
+            m = par_shapes_create_rock(1, 3);
+            par_shapes_export(m, "build/test_shapes_rock.obj");
+            par_shapes_free(m);
+
+            float center[3] = {0, 0, 0};
+            float normal[3] = {0, 0, 1};
+            m = par_shapes_create_disk(1, 5, center, normal);
+            par_shapes_export(m, "build/test_shapes_disk.obj");
+            par_shapes_free(m);
+
         }
     }
 

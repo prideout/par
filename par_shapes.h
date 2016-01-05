@@ -60,7 +60,7 @@ par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubdivisions);
 
 // More parametric surfaces.
 par_shapes_mesh* par_shapes_create_klein_bottle(int slices, int stacks);
-par_shapes_mesh* par_shapes_create_trefoil(int slices, int stacks,
+par_shapes_mesh* par_shapes_create_trefoil_knot(int slices, int stacks,
     float radius);
 par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks);
 par_shapes_mesh* par_shapes_create_plane(int slices, int stacks);
@@ -151,10 +151,12 @@ void par_shapes_compute_smooth_normals(par_shapes_mesh* m);
 #define PAR_PI (3.14159265359)
 
 static void par_shapes__sphere(float const* uv, float* xyz, void*);
+static void par_shapes__hemisphere(float const* uv, float* xyz, void*);
 static void par_shapes__plane(float const* uv, float* xyz, void*);
 static void par_shapes__klein(float const* uv, float* xyz, void*);
 static void par_shapes__cylinder(float const* uv, float* xyz, void*);
 static void par_shapes__torus(float const* uv, float* xyz, void*);
+static void par_shapes__trefoil(float const* uv, float* xyz, void*);
 
 struct osn_context;
 static int par__simplex_noise(int64_t seed, struct osn_context** ctx);
@@ -228,6 +230,15 @@ par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks)
         stacks, 0);
 }
 
+par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks)
+{
+    if (slices < 3 || stacks < 3) {
+        return 0;
+    }
+    return par_shapes_create_parametric(par_shapes__hemisphere, slices,
+        stacks, 0);
+}
+
 par_shapes_mesh* par_shapes_create_torus(int slices, int stacks, float radius)
 {
     if (slices < 3 || stacks < 3) {
@@ -254,6 +265,16 @@ par_shapes_mesh* par_shapes_create_klein_bottle(int slices, int stacks)
         }
     }
     return mesh;
+}
+
+par_shapes_mesh* par_shapes_create_trefoil_knot(int slices, int stacks,
+    float radius)
+{
+    if (slices < 3 || stacks < 3) {
+        return 0;
+    }
+    return par_shapes_create_parametric(
+        par_shapes__trefoil, slices, stacks, 0);
 }
 
 par_shapes_mesh* par_shapes_create_plane(int slices, int stacks)
@@ -403,6 +424,15 @@ static void par_shapes__sphere(float const* uv, float* xyz, void* userdata)
     xyz[2] = cosf(phi);
 }
 
+static void par_shapes__hemisphere(float const* uv, float* xyz, void* userdata)
+{
+    float phi = uv[0] * PAR_PI;
+    float theta = uv[1] * PAR_PI;
+    xyz[0] = cosf(theta) * sinf(phi);
+    xyz[1] = sinf(theta) * sinf(phi);
+    xyz[2] = cosf(phi);
+}
+
 static void par_shapes__plane(float const* uv, float* xyz, void* userdata)
 {
     xyz[0] = uv[0];
@@ -445,6 +475,34 @@ static void par_shapes__torus(float const* uv, float* xyz, void* userdata)
     xyz[0] = cosf(theta) * beta;
     xyz[1] = sinf(theta) * beta;
     xyz[2] = sinf(phi) * minor;
+}
+
+static void par_shapes__trefoil(float const* uv, float* xyz, void* userdata)
+{
+    const float a = 0.5f;
+    const float b = 0.3f;
+    const float c = 0.5f;
+    const float d = 0.1f;
+    const float u = (1 - uv[0]) * 4 * PAR_PI;
+    const float v = uv[1] * 2 * PAR_PI;
+    const float r = a + b * cos(1.5f * u);
+    const float x = r * cos(u);
+    const float y = r * sin(u);
+    const float z = c * sin(1.5f * u);
+    float q[3];
+    q[0] =
+        -1.5f * b * sin(1.5f * u) * cos(u) - (a + b * cos(1.5f * u)) * sin(u);
+    q[1] =
+        -1.5f * b * sin(1.5f * u) * sin(u) + (a + b * cos(1.5f * u)) * cos(u);
+    q[2] = 1.5f * c * cos(1.5f * u);
+    par_shapes__normalize3(q);
+    float qvn[3] = {q[1], -q[0], 0};
+    par_shapes__normalize3(qvn);
+    float ww[3];
+    par_shapes__cross3(ww, q, qvn);
+    xyz[0] = x + d * (qvn[0] * cos(v) + ww[0] * sin(v));
+    xyz[1] = y + d * (qvn[1] * cos(v) + ww[1] * sin(v));
+    xyz[2] = z + d * ww[2] * sin(v);
 }
 
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
@@ -733,6 +791,117 @@ par_shapes_mesh* par_shapes_create_dodecahedron()
     return mesh;
 }
 
+par_shapes_mesh* par_shapes_create_octohedron()
+{
+    static float verts[6 * 3] = {
+        0.000, 0.000, 1.000,
+        1.000, 0.000, 0.000,
+        0.000, 1.000, 0.000,
+        -1.000, 0.000, 0.000,
+        0.000, -1.000, 0.000,
+        0.000, 0.000, -1.000
+    };
+    static uint16_t triangles[8 * 3] = {
+        0,1,2,
+        0,2,3,
+        0,3,4,
+        0,4,1,
+        2,1,5,
+        3,2,5,
+        4,3,5,
+        1,4,5,
+    };
+    int ntris = sizeof(triangles) / sizeof(triangles[0]) / 3;
+    par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
+    int ncorners = sizeof(verts) / sizeof(verts[0]) / 3;
+    mesh->npoints = ncorners;
+    mesh->points = PAR_MALLOC(float, mesh->npoints * 3);
+    memcpy(mesh->points, verts, sizeof(verts));
+    uint16_t const* triangle = triangles;
+    mesh->ntriangles = ntris;
+    mesh->triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
+    uint16_t* tris = mesh->triangles;
+    for (int p = 0; p < ntris; p++) {
+        *tris++ = *triangle++;
+        *tris++ = *triangle++;
+        *tris++ = *triangle++;
+    }
+    return mesh;
+}
+
+par_shapes_mesh* par_shapes_create_tetrahedron()
+{
+    static float verts[4 * 3] = {
+        0.000,  0.000,  1.000,
+        0.943,  0.000, -0.333,
+        -0.471,  0.816, -0.333,
+        -0.471, -0.816, -0.333,
+    };
+    static uint16_t triangles[4 * 3] = {
+        0,1,2,
+        0,2,3,
+        0,3,1,
+        3,2,1,
+    };
+    int ntris = sizeof(triangles) / sizeof(triangles[0]) / 3;
+    par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
+    int ncorners = sizeof(verts) / sizeof(verts[0]) / 3;
+    mesh->npoints = ncorners;
+    mesh->points = PAR_MALLOC(float, mesh->npoints * 3);
+    memcpy(mesh->points, verts, sizeof(verts));
+    uint16_t const* triangle = triangles;
+    mesh->ntriangles = ntris;
+    mesh->triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
+    uint16_t* tris = mesh->triangles;
+    for (int p = 0; p < ntris; p++) {
+        *tris++ = *triangle++;
+        *tris++ = *triangle++;
+        *tris++ = *triangle++;
+    }
+    return mesh;
+}
+
+par_shapes_mesh* par_shapes_create_cube()
+{
+    static float verts[8 * 3] = {
+        0.816,  0.000,  0.577,
+        0.000,  0.816,  0.577,
+        -0.816,  0.000,  0.577,
+        -0.000, -0.816,  0.577,
+        0.816,  0.000, -0.577,
+        0.000,  0.816, -0.577,
+        -0.816,  0.000, -0.577,
+        -0.000, -0.816, -0.577,
+    };
+    static uint16_t quads[6 * 4] = {
+        3,2,1,0,
+        4,5,6,7,
+        0,1,5,4,
+        1,2,6,5,
+        2,3,7,6,
+        3,0,4,7,
+    };
+    int nquads = sizeof(quads) / sizeof(quads[0]) / 4;
+    par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
+    int ncorners = sizeof(verts) / sizeof(verts[0]) / 3;
+    mesh->npoints = ncorners;
+    mesh->points = PAR_MALLOC(float, mesh->npoints * 3);
+    memcpy(mesh->points, verts, sizeof(verts));
+    uint16_t const* quad = quads;
+    mesh->ntriangles = nquads * 2;
+    mesh->triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
+    uint16_t* tris = mesh->triangles;
+    for (int p = 0; p < nquads; p++, quad += 4) {
+        *tris++ = quad[2];
+        *tris++ = quad[1];
+        *tris++ = quad[0];
+        *tris++ = quad[0];
+        *tris++ = quad[3];
+        *tris++ = quad[2];
+    }
+    return mesh;
+}
+
 void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices)
 {
     int npoints = mesh->ntriangles * 3;
@@ -856,44 +1025,6 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
         if (pt[1] < 0) {
             pt[1] = -pow(-pt[1], 0.5) / 2;
         }
-    }
-    par__simplex_noise_free(ctx);
-    return mesh;
-}
-
-// This is crap.  It should probably use Worley noise or something.  Want to
-// improve it? Make a pull request!  For inspiration, see "The Real Time
-// Volumetric Cloudscapes of Horizon Zero Dawn".
-par_shapes_mesh* par_shapes_create_cloud(int seed, int nsubd)
-{
-    par_shapes_mesh* mesh = par_shapes_create_icosahedron();
-    par_shapes_unweld(mesh, false);
-    free(mesh->triangles);
-    mesh->triangles = 0;
-    while (nsubd--) {
-        par_shapes_subdivide(mesh);
-    }
-    for (int i = 0; i < mesh->npoints; i++) {
-        float* v = mesh->points + i * 3;
-        float lsqr = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-        if (lsqr > 0) {
-            par_shapes__scale3(v, 1.0f / lsqr);
-        }
-    }
-    mesh->triangles = PAR_MALLOC(uint16_t, 3 * mesh->ntriangles);
-    for (int i = 0; i < mesh->ntriangles * 3; i++) {
-        mesh->triangles[i] = i;
-    }
-    struct osn_context* ctx;
-    par__simplex_noise(seed, &ctx);
-    for (int p = 0; p < mesh->npoints; p++) {
-        float* pt = mesh->points + p * 3;
-        float a = 0.25, f = 1.0;
-        double n = a * par__simplex_noise2(ctx, f * pt[0], f * pt[2] + pt[1]);
-        a *= 0.5; f *= 2;
-        n += a * par__simplex_noise2(ctx, f * pt[0], f * pt[2] + pt[1]);
-        pt[1] /= 3.0;
-        par_shapes__scale3(pt, 1.0 + n);
     }
     par__simplex_noise_free(ctx);
     return mesh;
