@@ -145,6 +145,12 @@ NSString* getPrefix()
 
 #endif
 
+static void par_filecache__read(void* dest, int nbytes, FILE* file)
+{
+    int consumed = (int) fread(dest, 1, nbytes, file);
+    assert(consumed == nbytes);
+}
+
 int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     par_byte* header, int headersize)
 {
@@ -165,22 +171,18 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     long fsize = ftell(cachefile);
     fseek(cachefile, 0, SEEK_SET);
     if (headersize > 0) {
-        int consumed = (int) fread(header, headersize, 1, cachefile);
-        assert(consumed == headersize);
+        par_filecache__read(header, headersize, cachefile);
     }
     int32_t dnbytes;
-    int consumed;
 #if ENABLE_LZ4
     long cnbytes = fsize - headersize - sizeof(dnbytes);
-    consumed = (int) fread(&dnbytes, 1, sizeof(dnbytes), cachefile);
-    assert(consumed == sizeof(dnbytes));
+    par_filecache__read(&dnbytes, sizeof(dnbytes), cachefile);
 #else
     long cnbytes = fsize - headersize;
     dnbytes = (int32_t) cnbytes;
 #endif
     char* cbuff = (char*) malloc(cnbytes);
-    consumed = (int) fread(cbuff, 1, cnbytes, cachefile);
-    assert(consumed == cnbytes);
+    par_filecache__read(cbuff, cnbytes, cachefile);
 #if ENABLE_LZ4
     char* dbuff = (char*) malloc(dnbytes);
     LZ4_decompress_safe(cbuff, dbuff, (int) cnbytes, dnbytes);
