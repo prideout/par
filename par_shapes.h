@@ -163,6 +163,13 @@ static int par__simplex_noise(int64_t seed, struct osn_context** ctx);
 static void par__simplex_noise_free(struct osn_context* ctx);
 static double par__simplex_noise2(struct osn_context* ctx, double x, double y);
 
+static void par_shapes__copy3(float* result, float const* a)
+{
+    result[0] = a[0];
+    result[1] = a[1];
+    result[2] = a[2];
+}
+
 static void par_shapes__cross3(float* result, float const* a, float const* b)
 {
     float x = (a[1] * b[2]) - (a[2] * b[1]);
@@ -955,7 +962,42 @@ void par_shapes_compute_facet_normals(par_shapes_mesh* mesh)
     }
 }
 
-static void par_shapes_subdivide(par_shapes_mesh* mesh)
+void par_shapes_compute_smooth_normals(par_shapes_mesh* m)
+{
+    free(m->normals);
+    m->normals = PAR_CALLOC(float, m->npoints * 3);
+    uint16_t const* triangle = m->triangles;
+    float next[3], prev[3], cp[3];
+    for (int f = 0; f < m->ntriangles; f++, triangle += 3) {
+        float const* pa = m->points + 3 * triangle[0];
+        float const* pb = m->points + 3 * triangle[1];
+        float const* pc = m->points + 3 * triangle[2];
+        par_shapes__copy3(next, pb);
+        par_shapes__subtract3(next, pa);
+        par_shapes__copy3(prev, pc);
+        par_shapes__subtract3(prev, pa);
+        par_shapes__cross3(cp, next, prev);
+        par_shapes__add3(m->normals + 3 * triangle[0], cp);
+        par_shapes__copy3(next, pc);
+        par_shapes__subtract3(next, pb);
+        par_shapes__copy3(prev, pa);
+        par_shapes__subtract3(prev, pb);
+        par_shapes__cross3(cp, next, prev);
+        par_shapes__add3(m->normals + 3 * triangle[1], cp);
+        par_shapes__copy3(next, pa);
+        par_shapes__subtract3(next, pc);
+        par_shapes__copy3(prev, pb);
+        par_shapes__subtract3(prev, pc);
+        par_shapes__cross3(cp, next, prev);
+        par_shapes__add3(m->normals + 3 * triangle[2], cp);
+    }
+    float* normal = m->normals;
+    for (int p = 0; p < m->npoints; p++, normal += 3) {
+        par_shapes__normalize3(normal);
+    }
+}
+
+static void par_shapes__subdivide(par_shapes_mesh* mesh)
 {
     assert(mesh->npoints == mesh->ntriangles * 3 && "Must be unwelded.");
     int ntriangles = mesh->ntriangles * 4;
@@ -996,7 +1038,7 @@ par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubd)
     free(mesh->triangles);
     mesh->triangles = 0;
     while (nsubd--) {
-        par_shapes_subdivide(mesh);
+        par_shapes__subdivide(mesh);
     }
     for (int i = 0; i < mesh->npoints; i++) {
         par_shapes__normalize3(mesh->points + i * 3);
