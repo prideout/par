@@ -15,6 +15,32 @@ static int fileexists(const char* filename)
 
 int main()
 {
+    describe("par_shapes_export") {
+        it("should generate an OBJ file") {
+            par_shapes_mesh* m;
+            m = par_shapes_create_cylinder(50, 20);
+            par_shapes_export(m, "build/test_shapes_cylinder.obj");
+            assert_ok(fileexists("build/test_shapes_cylinder.obj"));
+            par_shapes_free(m);
+            m = par_shapes_create_parametric_sphere(5, 6);
+            par_shapes_export(m, "build/test_shapes_sphere.obj");
+            assert_ok(fileexists("build/test_shapes_sphere.obj"));
+            par_shapes_free(m);
+            m = par_shapes_create_plane(5, 6);
+            par_shapes_export(m, "build/test_shapes_plane.obj");
+            assert_ok(fileexists("build/test_shapes_plane.obj"));
+            par_shapes_free(m);
+            m = par_shapes_create_torus(7, 10, 0.1);
+            par_shapes_export(m, "build/test_shapes_torus.obj");
+            assert_ok(fileexists("build/test_shapes_torus.obj"));
+            par_shapes_free(m);
+            m = par_shapes_create_klein_bottle(10, 20);
+            par_shapes_export(m, "build/test_shapes_klein.obj");
+            assert_ok(fileexists("build/test_shapes_klein.obj"));
+            par_shapes_free(m);
+        }
+    }
+
     describe("par_shapes_create_cylinder") {
         it("should fail when the number of stacks or slices is invalid") {
             par_shapes_mesh* bad1 = par_shapes_create_cylinder(1, 1);
@@ -33,43 +59,16 @@ int main()
         }
     }
 
-    describe("par_shapes_export") {
-        it("should generate an OBJ file") {
-            par_shapes_mesh* m;
-            m = par_shapes_create_cylinder(5, 20);
-            par_shapes_export(m, "build/test_shapes_cylinder.obj");
-            assert_ok(fileexists("build/test_shapes_cylinder.obj"));
-            par_shapes_free(m);
-            m = par_shapes_create_parametric_sphere(5, 6);
-            par_shapes_export(m, "build/test_shapes_sphere.obj");
-            assert_ok(fileexists("build/test_shapes_sphere.obj"));
-            par_shapes_free(m);
-            m = par_shapes_create_parametric("plane", 5, 6, 0);
-            par_shapes_export(m, "build/test_shapes_plane.obj");
-            assert_ok(fileexists("build/test_shapes_plane.obj"));
-            par_shapes_free(m);
-            m = par_shapes_create_parametric("torus", 7, 10, 0);
-            par_shapes_export(m, "build/test_shapes_torus.obj");
-            assert_ok(fileexists("build/test_shapes_torus.obj"));
-            par_shapes_free(m);
-            m = par_shapes_create_parametric("klein", 10, 20, 0);
-            par_shapes_export(m, "build/test_shapes_klein.obj");
-            assert_ok(fileexists("build/test_shapes_klein.obj"));
-            par_shapes_free(m);
-        }
-    }
-
     describe("par_shapes_merge") {
         it("should concatenate two meshes") {
             par_shapes_mesh* a, *b;
-            a = par_shapes_create_parametric("klein", 10, 20, 0);
+            a = par_shapes_create_klein_bottle(10, 20);
             int npts = a->npoints;
             int ntris = a->ntriangles;
-            b = par_shapes_create_parametric("plane", 3, 3, 0);
+            b = par_shapes_create_plane(3, 3);
             par_shapes_merge(a, b);
             assert_equal(a->npoints, npts + b->npoints);
             assert_equal(a->ntriangles, ntris + b->ntriangles);
-            par_shapes_export(a, "build/test_shapes_merged.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -82,7 +81,6 @@ int main()
             b = par_shapes_create_cylinder(4, 3);
             par_shapes_translate(a, 0.5, 0.5, 0.25);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "build/test_shapes_translation.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -95,7 +93,6 @@ int main()
             par_shapes_rotate(a, PAR_PI * 0.5, axis1);
             par_shapes_rotate(a, PAR_PI * 0.25, axis2);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "build/test_shapes_rotation.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -103,7 +100,6 @@ int main()
             par_shapes_mesh* a;
             a = par_shapes_create_cylinder(15, 3);
             par_shapes_scale(a, 1, 1, 5);
-            par_shapes_export(a, "build/test_shapes_scale.obj");
             par_shapes_free(a);
         }
     }
@@ -121,7 +117,6 @@ int main()
             float bnormal[3] = {0, 1, 0};
             b = par_shapes_create_disk(bradius, slices, bcenter, bnormal);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "build/test_shapes_disks.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -137,7 +132,6 @@ int main()
             par_shapes_compute_aabb(b, aabb);
             par_shapes_translate(b, 0, -aabb[1] / 2, 0);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "build/test_shapes_rock.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -151,7 +145,6 @@ int main()
             b = par_shapes_create_dodecahedron();
             par_shapes_translate(b, 0, 0.934, 0);
             par_shapes_merge(a, b);
-            par_shapes_export(a, "build/test_shapes_dodecahedron.obj");
             par_shapes_free(a);
             par_shapes_free(b);
         }
@@ -165,7 +158,7 @@ int main()
             par_shapes_mesh *a, *b, *c, *d;
             a = par_shapes_create_disk(2.5, tess, O, J);
             b = par_shapes_create_cylinder(tess, 3);
-            c = par_shapes_create_parametric("torus", 15, tess, 0);
+            c = par_shapes_create_torus(15, tess, 0.1);
             d = par_shapes_create_disk(1, tess, top_center, J);
             par_shapes_rotate(c, PAR_PI / tess, K);
             par_shapes_translate(c, 0, 0, 1);
@@ -175,7 +168,6 @@ int main()
             par_shapes_merge(b, d);
             par_shapes_merge(b, a);
             par_shapes_scale(b, 1, 2, 1);
-            par_shapes_export(b, "build/test_shapes_rounded_cylinder.obj");
             par_shapes_free(a);
             par_shapes_free(b);
             par_shapes_free(c);
