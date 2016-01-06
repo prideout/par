@@ -1,6 +1,17 @@
 // SHAPES :: https://github.com/prideout/par
 // Simple C library for creation and manipulation of triangle meshes.
 //
+// The API is divided into three sections:
+//
+//   - Generators.  Create parametric surfaces, platonic solids, etc.
+//   - Queries.     Ask a mesh for its axis-aligned bounding box, etc.
+//   - Transforms.  Rotate a mesh, merge it with another, add normals, etc.
+//
+// In addition to the comment block above each function declaration, the API
+// has informal documentation here:
+//
+//     http://github.prideout.net/shapes/
+//
 // For our purposes, a "mesh" is a list of points and a list of triangles; the
 // former is a flattened list of three-tuples (32-bit floats) and the latter is
 // also a flattened list of three-tuples (16-bit uints).  Triangles are always
@@ -9,17 +20,6 @@
 // Optionally, meshes can contain 3D normals (one per vertex), and 2D texture
 // coordinates (one per vertex).  That's it!  If you need something fancier,
 // look elsewhere.
-//
-// The API is divided into three sections:
-//
-//   - Generators.  Create parametric surfaces, platonic solids, etc.
-//   - Queries.     Ask a mesh for its axis-aligned bounding box, etc.
-//   - Transforms.  Rotate it, merge it with another, add normals, etc.
-//
-// In addition to the comment block above the function declarations, the API
-// has informal documentation here:
-//
-//     http://github.prideout.net/shapes/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
@@ -1107,7 +1107,7 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
     for (int i = 0; i < mesh->npoints; i++) {
         sortmap[i] = i;
     }
-    // 1. qsort on the vertes and on the sortmap.
+    // 1. qsort on the verts and on the sortmap.
     // 2. repair index buffer using the sortmap.
     free(sortmap);
 }
