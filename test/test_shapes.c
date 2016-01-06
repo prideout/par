@@ -23,8 +23,10 @@ int main()
             par_shapes_free(m);
 
             m = par_shapes_create_parametric_sphere(5, 6);
-            par_shapes_export(m, "build/test_shapes_psphere.obj");
+            par_shapes_mesh* m2 = par_shapes_weld(m, 0.001, NULL);
+            par_shapes_export(m2, "build/test_shapes_psphere.obj");
             par_shapes_free(m);
+            par_shapes_free(m2);
 
             m = par_shapes_create_subdivided_sphere(2);
             par_shapes_export(m, "build/test_shapes_ssphere.obj");

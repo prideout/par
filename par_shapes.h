@@ -1078,6 +1078,95 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
     return mesh;
 }
 
+static par_shapes_mesh* par_shapes__clone(par_shapes_mesh const* mesh)
+{
+    par_shapes_mesh* clone = PAR_CALLOC(par_shapes_mesh, 1);
+    clone->npoints = mesh->npoints;
+    clone->points = PAR_MALLOC(float, 3 * clone->npoints);
+    memcpy(clone->points, mesh->points, sizeof(float) * 3 * clone->npoints);
+    clone->ntriangles = mesh->ntriangles;
+    clone->triangles = PAR_MALLOC(uint16_t, 3 * clone->ntriangles);
+    memcpy(clone->triangles, mesh->triangles,
+        sizeof(uint16_t) * 3 * clone->ntriangles);
+    if (mesh->normals) {
+        clone->normals = PAR_MALLOC(float, 3 * clone->npoints);
+        memcpy(clone->normals, mesh->normals,
+            sizeof(float) * 3 * clone->npoints);
+    }
+    if (mesh->tcoords) {
+        clone->tcoords = PAR_MALLOC(float, 2 * clone->npoints);
+        memcpy(clone->tcoords, mesh->tcoords,
+            sizeof(float) * 2 * clone->npoints);
+    }
+    return clone;
+}
+
+static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
+{
+    uint16_t* sortmap = PAR_MALLOC(uint16_t, mesh->npoints);
+    for (int i = 0; i < mesh->npoints; i++) {
+        sortmap[i] = i;
+    }
+    // 1. qsort on the vertes and on the sortmap.
+    // 2. repair index buffer using the sortmap.
+    free(sortmap);
+}
+
+static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
+    float epsilon, uint16_t* weldmap)
+{
+    uint16_t* bins = PAR_CALLOC(uint16_t, gridsize * gridsize * gridsize);
+
+    // prev_binindex = -1
+    // for each pt:
+    //     compute this_binindex
+    //     if this_binindex != prev_binindex
+    //        bins[this_binindex] = i;
+    //     prev_binindex = this_binindex
+
+    // for each pt i:
+    //      if (weldmap[i] != i) {
+    //           continue;
+    //      create an aabb with dims epsilon x epsilon x epsilon centered at pt
+    //      for each bin that intersects with aabb:
+    //          for each pt j in the bin:
+    //              if j is in the aabb:
+    //                  weldmap[j] = i
+    //      }
+
+    free(bins);
+}
+
+par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
+    uint16_t* weldmap)
+{
+    par_shapes_mesh* clone = par_shapes__clone(mesh);
+    float aabb[6];
+    float gridsize = 20;
+    par_shapes_compute_aabb(clone, aabb);
+    float scale[3] = {
+        gridsize / (aabb[3] - aabb[0]),
+        gridsize / (aabb[4] - aabb[1]),
+        gridsize / (aabb[5] - aabb[2]),
+    };
+    par_shapes_translate(clone, -aabb[0], -aabb[1], -aabb[2]);
+    par_shapes_scale(clone, scale[0], scale[1], scale[2]);
+    par_shapes__sort_points(clone, gridsize);
+    bool owner = false;
+    if (!weldmap) {
+        owner = true;
+        weldmap = PAR_MALLOC(uint16_t, mesh->npoints);
+    }
+    for (int i = 0; i < mesh->npoints; i++) {
+        weldmap[i] = i;
+    }
+    par_shapes__weld_points(clone, gridsize, epsilon, weldmap);
+    if (owner) {
+        free(weldmap);
+    }
+    return clone;
+}
+
 // -----------------------------------------------------------------------------
 // BEGIN OPEN SIMPLEX NOISE
 // -----------------------------------------------------------------------------
