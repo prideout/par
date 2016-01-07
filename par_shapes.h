@@ -1123,7 +1123,8 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
     for (int i = 0; i < mesh->npoints; i++) {
         sortmap[i] = i;
     }
-    qsort_r(sortmap, mesh->npoints, sizeof(uint16_t), mesh, par_shapes__cmp1);
+    qsort_r(sortmap, mesh->npoints, sizeof(uint16_t), (void*) mesh,
+        par_shapes__cmp1);
 
     // 1. qsort on the verts and on the sortmap.
     // 2. repair index buffer using the sortmap.
