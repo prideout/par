@@ -1101,12 +1101,30 @@ static par_shapes_mesh* par_shapes__clone(par_shapes_mesh const* mesh)
     return clone;
 }
 
+// TODO: Context should be a struct with:
+//  1) points
+//  2) gridsize
+
+static int par_shapes__cmp1(void *context, const void *a, const void *b)
+{
+    uint16_t ia = *(const uint16_t*) a;
+    uint16_t ib = *(const uint16_t*) b;
+    par_shapes_mesh const* mesh = (par_shapes_mesh const*) context;
+    float const* pa = mesh->points + ia * 3;
+    float const* pb = mesh->points + ib * 3;
+    if (pa[0] < pb[0]) return -1;
+    if (pa[0] > pb[0]) return 1;
+    return 0;
+}
+
 static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
 {
     uint16_t* sortmap = PAR_MALLOC(uint16_t, mesh->npoints);
     for (int i = 0; i < mesh->npoints; i++) {
         sortmap[i] = i;
     }
+    qsort_r(sortmap, mesh->npoints, sizeof(uint16_t), mesh, par_shapes__cmp1);
+
     // 1. qsort on the verts and on the sortmap.
     // 2. repair index buffer using the sortmap.
     free(sortmap);
