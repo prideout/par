@@ -1101,17 +1101,17 @@ static par_shapes_mesh* par_shapes__clone(par_shapes_mesh const* mesh)
     return clone;
 }
 
-// TODO: Context should be a struct with:
-//  1) points
-//  2) gridsize
+static struct {
+    float const* points;
+    int gridsize;
+} par_shapes__sort_context;
 
-static int par_shapes__cmp1(void *context, const void *a, const void *b)
+static int par_shapes__cmp1(const void *a, const void *b)
 {
     uint16_t ia = *(const uint16_t*) a;
     uint16_t ib = *(const uint16_t*) b;
-    par_shapes_mesh const* mesh = (par_shapes_mesh const*) context;
-    float const* pa = mesh->points + ia * 3;
-    float const* pb = mesh->points + ib * 3;
+    float const* pa = par_shapes__sort_context.points + ia * 3;
+    float const* pb = par_shapes__sort_context.points + ib * 3;
     if (pa[0] < pb[0]) return -1;
     if (pa[0] > pb[0]) return 1;
     return 0;
@@ -1123,11 +1123,13 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
     for (int i = 0; i < mesh->npoints; i++) {
         sortmap[i] = i;
     }
-    qsort_r(sortmap, mesh->npoints, sizeof(uint16_t), (void*) mesh,
-        par_shapes__cmp1);
+    par_shapes__sort_context.gridsize = gridsize;
+    par_shapes__sort_context.points = mesh->points;
+    qsort(sortmap, mesh->npoints, sizeof(uint16_t), par_shapes__cmp1);
 
-    // 1. qsort on the verts and on the sortmap.
-    // 2. repair index buffer using the sortmap.
+    // TODO: move the actual coords using the sortmap.
+    // TODO: repair index buffer using the sortmap.
+
     free(sortmap);
 }
 

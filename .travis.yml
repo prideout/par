@@ -22,6 +22,6 @@ script:
     - echo Switching from gcc to clang...
     - rm -rf build
     - export CC=clang CXX=clang++
-    - cmake -Htest -Bbuild
+    - cmake test -Bbuild
     - cmake --build build
     - build/test_shapes
