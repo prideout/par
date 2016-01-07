@@ -225,6 +225,14 @@ static void par_shapes__add3(float* result, float const* a)
     result[2] += a[2];
 }
 
+static float par_shapes__sqrdist3(float const* a, float const* b)
+{
+    float dx = a[0] - b[0];
+    float dy = a[1] - b[1];
+    float dz = a[2] - b[2];
+    return dx * dx + dy * dy + dz * dz;
+}
+
 par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks)
 {
     if (slices < 3 || stacks < 1) {
@@ -1106,19 +1114,36 @@ static struct {
     int gridsize;
 } par_shapes__sort_context;
 
-static int par_shapes__cmp1(const void *a, const void *b)
+static int par_shapes__cmp1(const void *arg0, const void *arg1)
 {
-    uint16_t ia = *(const uint16_t*) a;
-    uint16_t ib = *(const uint16_t*) b;
-    float const* pa = par_shapes__sort_context.points + ia * 3;
-    float const* pb = par_shapes__sort_context.points + ib * 3;
-    if (pa[0] < pb[0]) return -1;
-    if (pa[0] > pb[0]) return 1;
+    const int g = par_shapes__sort_context.gridsize;
+
+    // Convert arg0 into a flattened grid index.
+    uint16_t d0 = *(const uint16_t*) arg0;
+    float const* p0 = par_shapes__sort_context.points + d0 * 3;
+    int i0 = (int) p0[0];
+    int j0 = (int) p0[1];
+    int k0 = (int) p0[2];
+    int index0 = i0 + g * j0 + g * g * k0;
+
+    // Convert arg1 into a flattened grid index.
+    uint16_t d1 = *(const uint16_t*) arg1;
+    float const* p1 = par_shapes__sort_context.points + d1 * 3;
+    int i1 = (int) p1[0];
+    int j1 = (int) p1[1];
+    int k1 = (int) p1[2];
+    int index1 = i1 + g * j1 + g * g * k1;
+
+    // Return the ordering.
+    if (index0 < index1) return -1;
+    if (index0 > index1) return 1;
     return 0;
 }
 
 static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
 {
+    // Run qsort over a list of consecutive integers that get deferenced
+    // within the comparator function; this creates a reorder mapping.
     uint16_t* sortmap = PAR_MALLOC(uint16_t, mesh->npoints);
     for (int i = 0; i < mesh->npoints; i++) {
         sortmap[i] = i;
@@ -1127,35 +1152,165 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
     par_shapes__sort_context.points = mesh->points;
     qsort(sortmap, mesh->npoints, sizeof(uint16_t), par_shapes__cmp1);
 
-    // TODO: move the actual coords using the sortmap.
-    // TODO: repair index buffer using the sortmap.
+    // Apply the reorder mapping to the XYZ coordinate data.
+    float* newpts = PAR_MALLOC(float, mesh->npoints * 3);
+    uint16_t* invmap = PAR_MALLOC(uint16_t, mesh->npoints);
+    float* dstpt = newpts;
+    for (int i = 0; i < mesh->npoints; i++) {
+        invmap[sortmap[i]] = i;
+        float const* srcpt = mesh->points + 3 * sortmap[i];
+        *dstpt++ = *srcpt++;
+        *dstpt++ = *srcpt++;
+        *dstpt++ = *srcpt++;
+    }
+    free(mesh->points);
+    mesh->points = newpts;
 
+    // Apply the inverse reorder mapping to the triangle indices.
+    uint16_t* newinds = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
+    uint16_t* dstind = newinds;
+    uint16_t const* srcind = mesh->triangles;
+    for (int i = 0; i < mesh->ntriangles * 3; i++) {
+        *dstind++ = invmap[*srcind++];
+    }
+    free(mesh->triangles);
+    mesh->triangles = newinds;
+
+    // Cleanup.
     free(sortmap);
+    free(invmap);
 }
 
 static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
     float epsilon, uint16_t* weldmap)
 {
+    // Each bin contains a "pointer" (really an index) to its first point.
+    // We add 1 because 0 is reserved to mean that the bin is empty.
+    // Since the points are spatially sorted, there's no need to store
+    // a point count in each bin.
     uint16_t* bins = PAR_CALLOC(uint16_t, gridsize * gridsize * gridsize);
+    int prev_binindex = -1;
+    for (int p = 0; p < mesh->npoints; p++) {
+        float const* pt = mesh->points + p * 3;
+        int i = (int) pt[0];
+        int j = (int) pt[1];
+        int k = (int) pt[2];
+        int this_binindex = i + gridsize * j + gridsize * gridsize * k;
+        if (this_binindex != prev_binindex) {
+            bins[this_binindex] = 1 + p;
+        }
+        prev_binindex = this_binindex;
+    }
 
-    // prev_binindex = -1
-    // for each pt:
-    //     compute this_binindex
-    //     if this_binindex != prev_binindex
-    //        bins[this_binindex] = i;
-    //     prev_binindex = this_binindex
+    // Examine all bins that intersect the epsilon-sized cube centered at each
+    // point, and check for colocated points within those bins.
+    float const* pt = mesh->points;
+    int nremoved = 0;
+    for (int p = 0; p < mesh->npoints; p++, pt += 3) {
 
-    // for each pt i:
-    //      if (weldmap[i] != i) {
-    //           continue;
-    //      create an aabb with dims epsilon x epsilon x epsilon centered at pt
-    //      for each bin that intersects with aabb:
-    //          for each pt j in the bin:
-    //              if j is in the aabb:
-    //                  weldmap[j] = i
-    //      }
+        // Skip if this point has already been welded.
+        if (weldmap[p] != p) {
+            continue;
+        }
 
+        // Build a list of bins that intersect the epsilon-sized cube.
+        int nearby[9];
+        int nbins = 0;
+        int minp[3], maxp[3];
+        for (int c = 0; c < 3; c++) {
+            minp[c] = (int) (pt[c] - epsilon);
+            maxp[c] = (int) (pt[c] + epsilon);
+        }
+        for (int i = minp[0]; i <= maxp[0]; i++) {
+            for (int j = minp[1]; j <= maxp[1]; j++) {
+                for (int k = minp[2]; k <= maxp[2]; k++) {
+                    int binindex = i + gridsize * j + gridsize * gridsize * k;
+                    uint16_t binvalue = *(bins + binindex);
+                    if (binvalue > 0) {
+                        nearby[nbins++] = binindex;
+                    }
+                }
+            }
+        }
+
+        // Check for colocated points in each nearby bin.
+        for (int b = 0; b < nbins; b++) {
+            int binindex = nearby[b];
+            uint16_t binvalue = *(bins + binindex);
+            uint16_t nindex = binvalue - 1;
+            while (true) {
+
+                // If this isn't "self" and it's colocated, then weld it!
+                if (nindex != p && weldmap[nindex] == nindex) {
+                    float const* thatpt = mesh->points + nindex * 3;
+                    float dist2 = par_shapes__sqrdist3(thatpt, pt);
+                    if (dist2 < epsilon) {
+                        weldmap[nindex] = p;
+                        nremoved++;
+                    }
+                }
+
+                // Advance to the next point if possible.
+                if (++nindex >= mesh->npoints) {
+                    break;
+                }
+
+                // If the next point is outside the bin, then we're done.
+                float const* nextpt = mesh->points + nindex * 3;
+                int i = (int) nextpt[0];
+                int j = (int) nextpt[1];
+                int k = (int) nextpt[2];
+                int nextbinindex = i + gridsize * j + gridsize * gridsize * k;
+                if (nextbinindex != binindex) {
+                    break;
+                }
+            }
+        }
+    }
     free(bins);
+
+    // Apply the weldmap to the vertices.
+    int npoints = mesh->npoints - nremoved;
+    float* newpts = PAR_MALLOC(float, 3 * npoints);
+    float* dst = newpts;
+    uint16_t* condensed_map = PAR_MALLOC(uint16_t, mesh->npoints);
+    uint16_t* cmap = condensed_map;
+    float const* src = mesh->points;
+    int ci = 0;
+    for (int p = 0; p < mesh->npoints; p++, src += 3) {
+        if (weldmap[p] == p) {
+            *dst++ = src[0];
+            *dst++ = src[1];
+            *dst++ = src[2];
+            *cmap++ = ci++;
+        } else {
+            assert(weldmap[p] < p);
+            *cmap++ = condensed_map[weldmap[p]];
+        }
+    }
+    assert(ci == npoints);
+    free(mesh->points);
+    memcpy(weldmap, condensed_map, mesh->npoints * sizeof(uint16_t));
+    free(condensed_map);
+    mesh->points = newpts;
+    mesh->npoints = npoints;
+
+    // Apply the weldmap to the triangle indices and skip the degenerates.
+    uint16_t const* tsrc = mesh->triangles;
+    uint16_t* tdst = mesh->triangles;
+    int ntriangles = 0;
+    for (int i = 0; i < mesh->ntriangles; i++, tsrc += 3) {
+        uint16_t a = weldmap[tsrc[0]];
+        uint16_t b = weldmap[tsrc[1]];
+        uint16_t c = weldmap[tsrc[2]];
+        if (a != b && a != c && b != c) {
+            *tdst++ = a;
+            *tdst++ = b;
+            *tdst++ = c;
+            ntriangles++;
+        }
+    }
+    mesh->ntriangles = ntriangles;
 }
 
 par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
@@ -1163,12 +1318,13 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
 {
     par_shapes_mesh* clone = par_shapes__clone(mesh);
     float aabb[6];
-    float gridsize = 20;
+    int gridsize = 20;
+    float maxcell = gridsize - 1;
     par_shapes_compute_aabb(clone, aabb);
     float scale[3] = {
-        gridsize / (aabb[3] - aabb[0]),
-        gridsize / (aabb[4] - aabb[1]),
-        gridsize / (aabb[5] - aabb[2]),
+        maxcell / (aabb[3] - aabb[0]),
+        maxcell / (aabb[4] - aabb[1]),
+        maxcell / (aabb[5] - aabb[2]),
     };
     par_shapes_translate(clone, -aabb[0], -aabb[1], -aabb[2]);
     par_shapes_scale(clone, scale[0], scale[1], scale[2]);
@@ -1185,6 +1341,8 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
     if (owner) {
         free(weldmap);
     }
+    par_shapes_scale(clone, 1.0 / scale[0], 1.0 / scale[1], 1.0 / scale[2]);
+    par_shapes_translate(clone, aabb[0], aabb[1], aabb[2]);
     return clone;
 }
 
