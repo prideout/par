@@ -1214,7 +1214,7 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
         }
 
         // Build a list of bins that intersect the epsilon-sized cube.
-        int nearby[9];
+        int nearby[8];
         int nbins = 0;
         int minp[3], maxp[3];
         for (int c = 0; c < 3; c++) {
@@ -1227,6 +1227,10 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
                     int binindex = i + gridsize * j + gridsize * gridsize * k;
                     uint16_t binvalue = *(bins + binindex);
                     if (binvalue > 0) {
+                        if (nbins == 8) {
+                            printf("Epsilon value is too large.\n");
+                            break;
+                        }
                         nearby[nbins++] = binindex;
                     }
                 }
