@@ -115,9 +115,6 @@ void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 // a Cornell Box.  Pass 0 for nfaces to reverse every face in the mesh.
 void par_shapes_invert(par_shapes_mesh*, int startface, int nfaces);
 
-// Remove zero-area triangles or close-to-zero-area triangles.
-void par_shapes_remove_degenerate(par_shapes_mesh*, float epsilon);
-
 // Dereference the entire index buffer and replace the point list.
 // This creates an inefficient structure, but is useful for drawing facets.
 // If create_indices is true, a trivial "0 1 2 3..." index buffer is generated.
