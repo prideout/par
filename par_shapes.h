@@ -36,7 +36,7 @@ typedef struct par_shapes_mesh_s {
     float* tcoords;
 } par_shapes_mesh;
 
-void par_shapes_free(par_shapes_mesh*);
+void par_shapes_free_mesh(par_shapes_mesh*);
 
 // Generators ------------------------------------------------------------------
 
@@ -245,7 +245,7 @@ static void par_shapes__compute_welded_normals(par_shapes_mesh* m)
         pdst[2] = pnormal[2];
     }
     free(weldmap);
-    par_shapes_free(welded);
+    par_shapes_free_mesh(welded);
 }
 
 par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks)
@@ -380,7 +380,7 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
     return mesh;
 }
 
-void par_shapes_free(par_shapes_mesh* mesh)
+void par_shapes_free_mesh(par_shapes_mesh* mesh)
 {
     free(mesh->points);
     free(mesh->triangles);
