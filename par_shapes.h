@@ -1140,11 +1140,11 @@ static int par_shapes__cmp1(const void *arg0, const void *arg1)
     return 0;
 }
 
-static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
+static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize,
+    uint16_t* sortmap)
 {
     // Run qsort over a list of consecutive integers that get deferenced
     // within the comparator function; this creates a reorder mapping.
-    uint16_t* sortmap = PAR_MALLOC(uint16_t, mesh->npoints);
     for (int i = 0; i < mesh->npoints; i++) {
         sortmap[i] = i;
     }
@@ -1177,7 +1177,7 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize)
     mesh->triangles = newinds;
 
     // Cleanup.
-    free(sortmap);
+    memcpy(sortmap, invmap, sizeof(uint16_t) * mesh->npoints);
     free(invmap);
 }
 
@@ -1332,7 +1332,8 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
     };
     par_shapes_translate(clone, -aabb[0], -aabb[1], -aabb[2]);
     par_shapes_scale(clone, scale[0], scale[1], scale[2]);
-    par_shapes__sort_points(clone, gridsize);
+    uint16_t* sortmap = PAR_MALLOC(uint16_t, mesh->npoints);
+    par_shapes__sort_points(clone, gridsize, sortmap);
     bool owner = false;
     if (!weldmap) {
         owner = true;
@@ -1344,7 +1345,15 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
     par_shapes__weld_points(clone, gridsize, epsilon, weldmap);
     if (owner) {
         free(weldmap);
+    } else {
+        uint16_t* newmap = PAR_MALLOC(uint16_t, mesh->npoints);
+        for (int i = 0; i < mesh->npoints; i++) {
+            newmap[i] = weldmap[sortmap[i]];
+        }
+        memcpy(weldmap, newmap, sizeof(uint16_t) * mesh->npoints);
+        free(newmap);
     }
+    free(sortmap);
     par_shapes_scale(clone, 1.0 / scale[0], 1.0 / scale[1], 1.0 / scale[2]);
     par_shapes_translate(clone, aabb[0], aabb[1], aabb[2]);
     return clone;
