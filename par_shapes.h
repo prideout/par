@@ -50,11 +50,10 @@ par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks);
 // The outer radius can be controlled with par_shapes_scale.
 par_shapes_mesh* par_shapes_create_torus(int slices, int stacks, float radius);
 
-// Create a sphere with valid texture coordinates and normals, but with
-// small triangles near the poles.
+// Create a sphere with texture coordinates and small triangles near the poles.
 par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks);
 
-// Generate a sphere from a subdivided icosahedron, which produces a nice
+// Generate a sphere from a subdivided icosahedron, which produces a nicer
 // distribution of triangles, but no texture coordinates.
 par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubdivisions);
 
@@ -1052,6 +1051,10 @@ par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubd)
     for (int i = 0; i < mesh->ntriangles * 3; i++) {
         mesh->triangles[i] = i;
     }
+    par_shapes_mesh* tmp = mesh;
+    mesh = par_shapes_weld(mesh, 0.01, 0);
+    par_shapes_free_mesh(tmp);
+    par_shapes_compute_normals(mesh);
     return mesh;
 }
 
@@ -1074,6 +1077,7 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
         }
     }
     par__simplex_noise_free(ctx);
+    par_shapes_compute_normals(mesh);
     return mesh;
 }
 
