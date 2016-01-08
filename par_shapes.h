@@ -101,6 +101,9 @@ void par_shapes_export(par_shapes_mesh const*, char const* objfile);
 // Take a pointer to 6 floats and set them to min xyz, max xyz.
 void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
 
+// Make a deep copy of a mesh.
+par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh);
+
 // Transformations -------------------------------------------------------------
 
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
@@ -123,7 +126,7 @@ void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices);
 // Merge colocated verts, build a new index buffer, and return the
 // optimized mesh.  Epsilon is the maximum distance to consider when
 // welding vertices. The mapping argument can be null, or a pointer to
-// (3 * ntriangles) integers, which gets filled with the mapping from old
+// npoints integers, which gets filled with the mapping from old vertex
 // indices to new indices.
 par_shapes_mesh* par_shapes_weld(par_shapes_mesh const*, float epsilon,
     uint16_t* mapping);
@@ -233,6 +236,24 @@ static float par_shapes__sqrdist3(float const* a, float const* b)
     return dx * dx + dy * dy + dz * dz;
 }
 
+static void par_shapes__compute_welded_normals(par_shapes_mesh* m)
+{
+    m->normals = PAR_MALLOC(float, m->npoints * 3);
+    uint16_t* weldmap = PAR_MALLOC(uint16_t, m->npoints);
+    par_shapes_mesh* welded = par_shapes_weld(m, 0.01, weldmap);
+    par_shapes_compute_smooth_normals(welded);
+    float* pdst = m->normals;
+    for (int i = 0; i < m->npoints; i++, pdst += 3) {
+        int d = weldmap[i];
+        float const* pnormal = welded->normals + d * 3;
+        pdst[0] = pnormal[0];
+        pdst[1] = pnormal[1];
+        pdst[2] = pnormal[2];
+    }
+    free(weldmap);
+    par_shapes_free(welded);
+}
+
 par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks)
 {
     if (slices < 3 || stacks < 1) {
@@ -285,6 +306,7 @@ par_shapes_mesh* par_shapes_create_klein_bottle(int slices, int stacks)
             }
         }
     }
+    par_shapes__compute_welded_normals(mesh);
     return mesh;
 }
 
@@ -360,6 +382,7 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
         v += stacks + 1;
     }
 
+    par_shapes__compute_welded_normals(mesh);
     return mesh;
 }
 
@@ -1086,7 +1109,7 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
     return mesh;
 }
 
-static par_shapes_mesh* par_shapes__clone(par_shapes_mesh const* mesh)
+par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh)
 {
     par_shapes_mesh* clone = PAR_CALLOC(par_shapes_mesh, 1);
     clone->npoints = mesh->npoints;
@@ -1320,7 +1343,7 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
 par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
     uint16_t* weldmap)
 {
-    par_shapes_mesh* clone = par_shapes__clone(mesh);
+    par_shapes_mesh* clone = par_shapes_clone(mesh);
     float aabb[6];
     int gridsize = 20;
     float maxcell = gridsize - 1;
