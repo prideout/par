@@ -880,16 +880,16 @@ par_shapes_mesh* par_shapes_create_octohedron()
 par_shapes_mesh* par_shapes_create_tetrahedron()
 {
     static float verts[4 * 3] = {
-        0.000,  0.000,  1.000,
-        0.943,  0.000, -0.333,
-        -0.471,  0.816, -0.333,
-        -0.471, -0.816, -0.333,
+        0.000, 1.333, 0,
+        0.943, 0, 0,
+        -0.471, 0, 0.816,
+        -0.471, 0, -0.816,
     };
     static uint16_t triangles[4 * 3] = {
-        0,1,2,
-        0,2,3,
-        0,3,1,
-        3,2,1,
+        2,1,0,
+        3,2,0,
+        1,3,0,
+        1,2,3,
     };
     int ntris = sizeof(triangles) / sizeof(triangles[0]) / 3;
     par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
