@@ -912,22 +912,23 @@ par_shapes_mesh* par_shapes_create_tetrahedron()
 par_shapes_mesh* par_shapes_create_cube()
 {
     static float verts[8 * 3] = {
-        0.816,  0.000,  0.577,
-        0.000,  0.816,  0.577,
-        -0.816,  0.000,  0.577,
-        -0.000, -0.816,  0.577,
-        0.816,  0.000, -0.577,
-        0.000,  0.816, -0.577,
-        -0.816,  0.000, -0.577,
-        -0.000, -0.816, -0.577,
+        0, 0, 0, // 0
+        0, 1, 0, // 1
+        1, 1, 0, // 2
+        1, 0, 0, // 3
+        0, 0, 1, // 4
+        0, 1, 1, // 5
+        1, 1, 1, // 6
+        1, 0, 1, // 7
     };
     static uint16_t quads[6 * 4] = {
-        3,2,1,0,
-        4,5,6,7,
-        0,1,5,4,
-        1,2,6,5,
-        2,3,7,6,
-        3,0,4,7,
+        7,6,5,4, // front
+        0,1,2,3, // back
+        6,7,3,2, // right
+        5,6,2,1, // top
+        4,5,1,0, // left
+        7,4,0,3, // bottom
+
     };
     int nquads = sizeof(quads) / sizeof(quads[0]) / 4;
     par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
@@ -940,12 +941,12 @@ par_shapes_mesh* par_shapes_create_cube()
     mesh->triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
     uint16_t* tris = mesh->triangles;
     for (int p = 0; p < nquads; p++, quad += 4) {
-        *tris++ = quad[2];
+        *tris++ = quad[0];
         *tris++ = quad[1];
-        *tris++ = quad[0];
-        *tris++ = quad[0];
-        *tris++ = quad[3];
         *tris++ = quad[2];
+        *tris++ = quad[2];
+        *tris++ = quad[3];
+        *tris++ = quad[0];
     }
     return mesh;
 }
