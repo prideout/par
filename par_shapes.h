@@ -670,13 +670,24 @@ void par_shapes_rotate(par_shapes_mesh* mesh, float radians, float const* axis)
         ((yz * oneMinusC) - (x * s)), (((z * z) * oneMinusC) + c)
     };
     float* p = mesh->points;
-    for (int i = 0; i < mesh->npoints; i++) {
+    for (int i = 0; i < mesh->npoints; i++, p += 3) {
         float x = col0[0] * p[0] + col1[0] * p[1] + col2[0] * p[2];
         float y = col0[1] * p[0] + col1[1] * p[1] + col2[1] * p[2];
         float z = col0[2] * p[0] + col1[2] * p[1] + col2[2] * p[2];
-        *p++ = x;
-        *p++ = y;
-        *p++ = z;
+        p[0] = x;
+        p[1] = y;
+        p[2] = z;
+    }
+    p = mesh->normals;
+    if (p) {
+        for (int i = 0; i < mesh->npoints; i++, p += 3) {
+            float x = col0[0] * p[0] + col1[0] * p[1] + col2[0] * p[2];
+            float y = col0[1] * p[0] + col1[1] * p[1] + col2[1] * p[2];
+            float z = col0[2] * p[0] + col1[2] * p[1] + col2[2] * p[2];
+            p[0] = x;
+            p[1] = y;
+            p[2] = z;
+        }
     }
 }
 
