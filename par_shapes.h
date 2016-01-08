@@ -128,11 +128,8 @@ void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices);
 par_shapes_mesh* par_shapes_weld(par_shapes_mesh const*, float epsilon,
     uint16_t* mapping);
 
-// Consume an unwelded mesh and insert facet normals into the mesh.
-void par_shapes_compute_facet_normals(par_shapes_mesh* m);
-
-// Consume a welded mesh and insert smoothed normals into the mesh.
-void par_shapes_compute_smooth_normals(par_shapes_mesh* m);
+// Compute smooth normals by averaging adjacent facet normals.
+void par_shapes_compute_normals(par_shapes_mesh* m);
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -238,7 +235,7 @@ static void par_shapes__compute_welded_normals(par_shapes_mesh* m)
     m->normals = PAR_MALLOC(float, m->npoints * 3);
     uint16_t* weldmap = PAR_MALLOC(uint16_t, m->npoints);
     par_shapes_mesh* welded = par_shapes_weld(m, 0.01, weldmap);
-    par_shapes_compute_smooth_normals(welded);
+    par_shapes_compute_normals(welded);
     float* pdst = m->normals;
     for (int i = 0; i < m->npoints; i++, pdst += 3) {
         int d = weldmap[i];
@@ -970,33 +967,7 @@ void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices)
     }
 }
 
-void par_shapes_compute_facet_normals(par_shapes_mesh* mesh)
-{
-    assert(mesh->npoints == mesh->ntriangles * 3 && "Must be unwelded.");
-    if (mesh->normals) {
-        free(mesh->normals);
-    }
-    mesh->normals = PAR_MALLOC(float, 3 * mesh->npoints);
-    float const* p = mesh->points;
-    float* n = mesh->normals;
-    for (int t = 0; t < mesh->ntriangles; t++, p += 9, n += 9) {
-        n[0] = p[0];
-        n[1] = p[1];
-        n[2] = p[2];
-        n[3] = p[3];
-        n[4] = p[4];
-        n[5] = p[5];
-        par_shapes__subtract3(n, p + 6);
-        par_shapes__subtract3(n + 3, p + 6);
-        par_shapes__cross3(n, n, n + 3);
-        par_shapes__normalize3(n);
-        n[3] = n[6] = n[0];
-        n[4] = n[7] = n[1];
-        n[5] = n[8] = n[2];
-    }
-}
-
-void par_shapes_compute_smooth_normals(par_shapes_mesh* m)
+void par_shapes_compute_normals(par_shapes_mesh* m)
 {
     free(m->normals);
     m->normals = PAR_CALLOC(float, m->npoints * 3);
