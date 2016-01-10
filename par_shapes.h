@@ -114,6 +114,9 @@ void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 // a Cornell Box.  Pass 0 for nfaces to reverse every face in the mesh.
 void par_shapes_invert(par_shapes_mesh*, int startface, int nfaces);
 
+// Remove all triangles whose area is less than maxarea.
+void par_shapes_remove_degenerate(par_shapes_mesh*, float maxarea);
+
 // Dereference the entire index buffer and replace the point list.
 // This creates an inefficient structure, but is useful for drawing facets.
 // If create_indices is true, a trivial "0 1 2 3..." index buffer is generated.
@@ -1635,6 +1638,34 @@ static double par__simplex_noise2(struct osn_context* ctx, double x, double y)
     }
 
     return value / NORM_CONSTANT_2D;
+}
+
+void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float maxarea)
+{
+    int ntriangles = 0;
+    uint16_t* triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
+    uint16_t* dst = triangles;
+    uint16_t const* src = mesh->triangles;
+    float next[3], prev[3], cp[3];
+    for (int f = 0; f < mesh->ntriangles; f++, src += 3) {
+        float const* pa = mesh->points + 3 * src[0];
+        float const* pb = mesh->points + 3 * src[1];
+        float const* pc = mesh->points + 3 * src[2];
+        par_shapes__copy3(next, pb);
+        par_shapes__subtract3(next, pa);
+        par_shapes__copy3(prev, pc);
+        par_shapes__subtract3(prev, pa);
+        par_shapes__cross3(cp, next, prev);
+        if (fabs(cp[2]) > maxarea) {
+            *dst++ = src[0];
+            *dst++ = src[1];
+            *dst++ = src[2];
+            ntriangles++;
+        }
+    }
+    mesh->ntriangles = ntriangles;
+    free(mesh->triangles);
+    mesh->triangles = triangles;
 }
 
 #undef PAR_MIN
