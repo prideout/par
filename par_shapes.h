@@ -264,8 +264,10 @@ par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks)
     if (slices < 3 || stacks < 3) {
         return 0;
     }
-    return par_shapes_create_parametric(par_shapes__sphere, slices,
-        stacks, 0);
+    par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__sphere,
+        slices, stacks, 0);
+    par_shapes_remove_degenerate(m, 0.01);
+    return m;
 }
 
 par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks)
@@ -273,8 +275,10 @@ par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks)
     if (slices < 3 || stacks < 3) {
         return 0;
     }
-    return par_shapes_create_parametric(par_shapes__hemisphere, slices,
-        stacks, 0);
+    par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__hemisphere,
+        slices, stacks, 0);
+    par_shapes_remove_degenerate(m, 0.01);
+    return m;
 }
 
 par_shapes_mesh* par_shapes_create_torus(int slices, int stacks, float radius)
