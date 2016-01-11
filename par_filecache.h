@@ -88,8 +88,11 @@ static char * _par_strdup(char const* s)
     return 0;
 }
 
-#define PAR_MAX_ENTRIES 64
+#ifndef PAR_HELPERS
 #define PAR_MIN(a, b) (a < b ? a : b)
+#endif
+
+#define PAR_MAX_ENTRIES 64
 #define PAR_ALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 
 typedef struct {

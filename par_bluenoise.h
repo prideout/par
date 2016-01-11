@@ -113,7 +113,10 @@ void par_bluenoise_sort_by_rank(float* pts, int npts);
 #include <math.h>
 #include <string.h>
 
+#ifndef PAR_HELPERS
 #define PAR_CLAMP(x, min, max) ((x < min) ? min : ((x > max) ? max : x))
+#endif
+
 #define PAR_SQR(a) (a * a)
 #define PAR_MINI(a, b) ((a < b) ? a : b)
 #define PAR_MAXI(a, b) ((a > b) ? a : b)
