@@ -133,6 +133,17 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const*, float epsilon,
 // Compute smooth normals by averaging adjacent facet normals.
 void par_shapes_compute_normals(par_shapes_mesh* m);
 
+#ifndef PAR_HELPERS
+#define PAR_HELPERS 1
+#define PAR_PI (3.14159265359)
+#define PAR_MIN(a, b) (a > b ? b : a)
+#define PAR_MAX(a, b) (a > b ? a : b)
+#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
+#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
+#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
+#endif
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
@@ -146,14 +157,6 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 #include <string.h>
 #include <math.h>
 #include <errno.h>
-
-#define PAR_MIN(a, b) (a > b ? b : a)
-#define PAR_MAX(a, b) (a > b ? a : b)
-#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
-#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
-#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
-#define PAR_PI (3.14159265359)
 
 static void par_shapes__sphere(float const* uv, float* xyz, void*);
 static void par_shapes__hemisphere(float const* uv, float* xyz, void*);
@@ -1672,11 +1675,4 @@ void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float maxarea)
     mesh->triangles = triangles;
 }
 
-#undef PAR_MIN
-#undef PAR_MAX
-#undef PAR_CLAMP
-#undef PAR_MALLOC
-#undef PAR_CALLOC
-#undef PAR_SWAP
-#undef PAR_PI
 #endif
