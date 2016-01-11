@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define PAR_PI (3.14159265359)
+#define STRINGIFY(A) #A
 
 int main()
 {
@@ -210,6 +210,47 @@ int main()
             par_shapes_free_mesh(b);
             par_shapes_free_mesh(c);
             par_shapes_free_mesh(d);
+        }
+    }
+
+    describe("lsystems") {
+        it("export a tree-like shape") {
+            char const* program = STRINGIFY(
+            sx 2 sy 2
+            ry 90 rx 90
+            shape tube rx 15  call rlimb rx -15
+            shape tube rx -15 call llimb rx 15
+            shape tube ry 15 call rlimb ry -15
+            shape tube ry 15 call llimb ry -15
+            rule rlimb
+                sx 0.925 sy 0.925
+                tz 1
+                rx 1.2
+                call rlimb2
+            rule rlimb2.1
+                shape connect
+                call rlimb
+            rule rlimb2.1
+                rx 15  shape tube call rlimb rx -15
+                rx -15 shape tube call llimb rx 15
+            rule rlimb.1
+                call llimb
+            rule llimb.1
+                call rlimb
+            rule llimb.10
+                sx 0.925 sy 0.925
+                tz 1
+                rx -1.2
+                shape connect
+                call llimb
+            );
+            const float O[3] = {0, 0, 0};
+            const float J[3] = {0, 1, 0};
+            par_shapes_mesh* mesh = par_shapes_create_lsystem(program, 30, 60);
+            par_shapes_mesh* disk = par_shapes_create_disk(10, 30, O, J);
+            par_shapes_merge(mesh, disk);
+            par_shapes_export(mesh, "build/lsystem.obj");
+            par_shapes_free_mesh(mesh);
         }
     }
 

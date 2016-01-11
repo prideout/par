@@ -92,6 +92,9 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     float const* center, float const* normal);
 
+par_shapes_mesh* par_shapes_create_lsystem(char const* program, int slices,
+    int maxdepth);
+
 // Queries ---------------------------------------------------------------------
 
 // Dump out a text file conforming to the venerable OBJ format.
@@ -176,6 +179,22 @@ static void par_shapes__copy3(float* result, float const* a)
     result[0] = a[0];
     result[1] = a[1];
     result[2] = a[2];
+}
+
+static float par_shapes__dot3(float const* a, float const* b)
+{
+    return b[0] * a[0] + b[1] * a[1] + b[2] * a[2];
+}
+
+static void par_shapes__transform3(float* p, float const* x, float const* y,
+    float const* z)
+{
+    float px = par_shapes__dot3(p, x);
+    float py = par_shapes__dot3(p, y);
+    float pz = par_shapes__dot3(p, z);
+    p[0] = px;
+    p[1] = py;
+    p[2] = pz;
 }
 
 static void par_shapes__cross3(float* result, float const* a, float const* b)
@@ -938,7 +957,6 @@ par_shapes_mesh* par_shapes_create_cube()
         5,6,2,1, // top
         4,5,1,0, // left
         7,4,0,3, // bottom
-
     };
     int nquads = sizeof(quads) / sizeof(quads[0]) / 4;
     par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
@@ -959,6 +977,255 @@ par_shapes_mesh* par_shapes_create_cube()
         *tris++ = quad[0];
     }
     return mesh;
+}
+
+typedef struct {
+    char* cmd;
+    char* arg;
+} par_shapes__command;
+
+typedef struct {
+    char const* name;
+    int weight;
+    int ncommands;
+    par_shapes__command* commands;
+} par_shapes__rule;
+
+typedef struct {
+    int pc;
+    float position[3];
+    float scale[3];
+    par_shapes_mesh* orientation;
+    par_shapes__rule* rule;
+} par_shapes__stackframe;
+
+static par_shapes__rule* par_shapes__pick_rule(const char* name,
+    par_shapes__rule* rules, int nrules)
+{
+    par_shapes__rule* rule = 0;
+    int total = 0;
+    for (int i = 0; i < nrules; i++) {
+        rule = rules + i;
+        if (!strcmp(rule->name, name)) {
+            total += rule->weight;
+        }
+    }
+    float r = (float) rand() / RAND_MAX;
+    float t = 0;
+    for (int i = 0; i < nrules; i++) {
+        rule = rules + i;
+        if (!strcmp(rule->name, name)) {
+            t += (float) rule->weight / total;
+            if (t >= r) {
+                return rule;
+            }
+        }
+    }
+    return rule;
+}
+
+static par_shapes_mesh* par_shapes__create_turtle()
+{
+    const float xaxis[] = {1, 0, 0};
+    const float yaxis[] = {0, 1, 0};
+    const float zaxis[] = {0, 0, 1};
+    par_shapes_mesh* turtle = PAR_CALLOC(par_shapes_mesh, 1);
+    turtle->npoints = 3;
+    turtle->points = PAR_CALLOC(float, turtle->npoints * 3);
+    par_shapes__copy3(turtle->points + 0, xaxis);
+    par_shapes__copy3(turtle->points + 3, yaxis);
+    par_shapes__copy3(turtle->points + 6, zaxis);
+    return turtle;
+}
+
+static par_shapes_mesh* par_shapes__apply_turtle(par_shapes_mesh* mesh,
+    par_shapes_mesh* turtle, float const* pos, float const* scale)
+{
+    par_shapes_mesh* m = par_shapes_clone(mesh);
+    for (int p = 0; p < m->npoints; p++) {
+        float* pt = m->points + p * 3;
+        pt[0] *= scale[0];
+        pt[1] *= scale[1];
+        pt[2] *= scale[2];
+        par_shapes__transform3(pt,
+            turtle->points + 0, turtle->points + 3, turtle->points + 6);
+        pt[0] += pos[0];
+        pt[1] += pos[1];
+        pt[2] += pos[2];
+    }
+    return m;
+}
+
+par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
+    int maxdepth)
+{
+    char program[strlen(text) + 1];
+
+    // The first pass counts the number of rules and commands.
+    strcpy(program, text);
+    char *cmd = strtok(program, " ");
+    int nrules = 1;
+    int ncommands = 0;
+    while (cmd) {
+        char *arg = strtok(0, " ");
+        if (!arg) {
+            puts("lsystem error: unexpected end of program.");
+            break;
+        }
+        if (!strcmp(cmd, "rule")) {
+            nrules++;
+        } else {
+            ncommands++;
+        }
+        cmd = strtok(0, " ");
+    }
+
+    // Allocate space.
+    par_shapes__rule rules[nrules];
+    par_shapes__command commands[ncommands];
+
+    // Initialize the entry rule.
+    par_shapes__rule* current_rule = &rules[0];
+    par_shapes__command* current_command = &commands[0];
+    current_rule->name = "entry";
+    current_rule->weight = 1;
+    current_rule->ncommands = 0;
+    current_rule->commands = current_command;
+
+    // The second pass fills in the structures.
+    strcpy(program, text);
+    cmd = strtok(program, " ");
+    while (cmd) {
+        char *arg = strtok(0, " ");
+        if (!strcmp(cmd, "rule")) {
+            current_rule++;
+
+            // Split the argument into a rule name and weight.
+            char* dot = strchr(arg, '.');
+            if (dot) {
+                current_rule->weight = atoi(dot + 1);
+                *dot = 0;
+            } else {
+                current_rule->weight = 1;
+            }
+
+            current_rule->name = arg;
+            current_rule->ncommands = 0;
+            current_rule->commands = current_command;
+        } else {
+            current_rule->ncommands++;
+            current_command->cmd = cmd;
+            current_command->arg = arg;
+            current_command++;
+        }
+        cmd = strtok(0, " ");
+    }
+
+    // For testing purposes, dump out the parsed program.
+    #ifdef TEST_PARSE
+    for (int i = 0; i < nrules; i++) {
+        par_shapes__rule rule = rules[i];
+        printf("rule %s.%d\n", rule.name, rule.weight);
+        for (int c = 0; c < rule.ncommands; c++) {
+            par_shapes__command cmd = rule.commands[c];
+            printf("\t%s %s\n", cmd.cmd, cmd.arg);
+        }
+    }
+    #endif
+
+    // Instantiate the aggregated shape and the template shapes.
+    par_shapes_mesh* scene = PAR_CALLOC(par_shapes_mesh, 1);
+    par_shapes_mesh* tube = par_shapes_create_cylinder(slices, 1);
+    par_shapes_mesh* turtle = par_shapes__create_turtle();
+
+    const float xaxis[] = {1, 0, 0};
+    const float yaxis[] = {0, 1, 0};
+    const float zaxis[] = {0, 0, 1};
+    const float units[] = {1, 1, 1};
+
+    // Execute the L-system program until the stack size is 0.
+    par_shapes__stackframe* stack =
+        PAR_CALLOC(par_shapes__stackframe, maxdepth);
+    int stackptr = 0;
+    stack[0].orientation = turtle;
+    stack[0].rule = &rules[0];
+    par_shapes__copy3(stack[0].scale, units);
+    while (stackptr >= 0) {
+
+        par_shapes__stackframe* frame = &stack[stackptr];
+        par_shapes__rule* rule = frame->rule;
+        par_shapes_mesh* turtle = frame->orientation;
+        float* position = frame->position;
+        float* scale = frame->scale;
+
+        if (frame->pc >= rule->ncommands) {
+            par_shapes_free_mesh(turtle);
+            stackptr--;
+            continue;
+        }
+
+        par_shapes__command* cmd = rule->commands + (frame->pc++);
+        #ifdef DUMP_TRACE
+        printf("%5s %5s %5s:%d  %03d\n", cmd->cmd, cmd->arg, rule->name,
+            frame->pc - 1, stackptr);
+        #endif
+
+        float value;
+        if (!strcmp(cmd->cmd, "shape")) {
+            par_shapes_mesh* m = par_shapes__apply_turtle(tube, turtle,
+                position, scale);
+            par_shapes_merge(scene, m);
+            par_shapes_free_mesh(m);
+        } else if (!strcmp(cmd->cmd, "call") && stackptr < maxdepth - 1) {
+            rule = par_shapes__pick_rule(cmd->arg, rules, nrules);
+            frame = &stack[++stackptr];
+            frame->rule = rule;
+            frame->orientation = par_shapes_clone(turtle);
+            frame->pc = 0;
+            par_shapes__copy3(frame->scale, scale);
+            par_shapes__copy3(frame->position, position);
+            continue;
+        } else {
+            value = atof(cmd->arg);
+            if (!strcmp(cmd->cmd, "rx")) {
+                par_shapes_rotate(turtle, value * PAR_PI / 180.0, xaxis);
+            } else if (!strcmp(cmd->cmd, "ry")) {
+                par_shapes_rotate(turtle, value * PAR_PI / 180.0, yaxis);
+            } else if (!strcmp(cmd->cmd, "rz")) {
+                par_shapes_rotate(turtle, value * PAR_PI / 180.0, zaxis);
+            } else if (!strcmp(cmd->cmd, "tx")) {
+                float vec[3] = {value, 0, 0};
+                float tx = par_shapes__dot3(turtle->points + 0, vec);
+                float ty = par_shapes__dot3(turtle->points + 3, vec);
+                float tz = par_shapes__dot3(turtle->points + 6, vec);
+                par_shapes__add3(position, (float[]){tx, ty, tz});
+            } else if (!strcmp(cmd->cmd, "ty")) {
+                float vec[3] = {0, value, 0};
+                float tx = par_shapes__dot3(turtle->points + 0, vec);
+                float ty = par_shapes__dot3(turtle->points + 3, vec);
+                float tz = par_shapes__dot3(turtle->points + 6, vec);
+                par_shapes__add3(position, (float[]){tx, ty, tz});
+            } else if (!strcmp(cmd->cmd, "tz")) {
+                float vec[3] = {0, 0, value};
+                float tx = par_shapes__dot3(turtle->points + 0, vec);
+                float ty = par_shapes__dot3(turtle->points + 3, vec);
+                float tz = par_shapes__dot3(turtle->points + 6, vec);
+                par_shapes__add3(position, (float[]){tx, ty, tz});
+            } else if (!strcmp(cmd->cmd, "sx")) {
+                scale[0] *= value;
+            } else if (!strcmp(cmd->cmd, "sy")) {
+                scale[1] *= value;
+            } else if (!strcmp(cmd->cmd, "sz")) {
+                scale[2] *= value;
+            } else if (!strcmp(cmd->cmd, "sa")) {
+                scale[0] *= value;
+                scale[1] *= value;
+                scale[2] *= value;
+            }
+        }
+    }
+    free(stack);
+    return scene;
 }
 
 void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices)
