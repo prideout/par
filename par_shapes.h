@@ -1244,22 +1244,28 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
                 par_shapes_rotate(turtle, value * PAR_PI / 180.0, zaxis);
             } else if (!strcmp(cmd->cmd, "tx")) {
                 float vec[3] = {value, 0, 0};
-                float tx = par_shapes__dot3(turtle->points + 0, vec);
-                float ty = par_shapes__dot3(turtle->points + 3, vec);
-                float tz = par_shapes__dot3(turtle->points + 6, vec);
-                par_shapes__add3(position, (float[]){tx, ty, tz});
+                float t[3] = {
+                    par_shapes__dot3(turtle->points + 0, vec),
+                    par_shapes__dot3(turtle->points + 3, vec),
+                    par_shapes__dot3(turtle->points + 6, vec)
+                };
+                par_shapes__add3(position, t);
             } else if (!strcmp(cmd->cmd, "ty")) {
                 float vec[3] = {0, value, 0};
-                float tx = par_shapes__dot3(turtle->points + 0, vec);
-                float ty = par_shapes__dot3(turtle->points + 3, vec);
-                float tz = par_shapes__dot3(turtle->points + 6, vec);
-                par_shapes__add3(position, (float[]){tx, ty, tz});
+                float t[3] = {
+                    par_shapes__dot3(turtle->points + 0, vec),
+                    par_shapes__dot3(turtle->points + 3, vec),
+                    par_shapes__dot3(turtle->points + 6, vec)
+                };
+                par_shapes__add3(position, t);
             } else if (!strcmp(cmd->cmd, "tz")) {
                 float vec[3] = {0, 0, value};
-                float tx = par_shapes__dot3(turtle->points + 0, vec);
-                float ty = par_shapes__dot3(turtle->points + 3, vec);
-                float tz = par_shapes__dot3(turtle->points + 6, vec);
-                par_shapes__add3(position, (float[]){tx, ty, tz});
+                float t[3] = {
+                    par_shapes__dot3(turtle->points + 0, vec),
+                    par_shapes__dot3(turtle->points + 3, vec),
+                    par_shapes__dot3(turtle->points + 6, vec)
+                };
+                par_shapes__add3(position, t);
             } else if (!strcmp(cmd->cmd, "sx")) {
                 scale[0] *= value;
             } else if (!strcmp(cmd->cmd, "sy")) {
