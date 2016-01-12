@@ -83,15 +83,18 @@ par_shapes_mesh* par_shapes_create_octohedron();
 par_shapes_mesh* par_shapes_create_tetrahedron();
 par_shapes_mesh* par_shapes_create_cube();
 
-// Generate a rock shape that sits on the Y=0 plane, and sinks into it a bit.
-// This includes smooth UVs but no texture coordinates.
-par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
-
 // Generate an orientable disk shape in 3-space.  Does not include normals or
 // texture coordinates.
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     float const* center, float const* normal);
 
+// Generate a rock shape that sits on the Y=0 plane, and sinks into it a bit.
+// This includes smooth normals but no texture coordinates.
+par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
+
+// Create trees or vegetation by executing a recursive turtle graphics program.
+// The program is a list of command-argument pairs.  See the unit test for
+// an example.
 par_shapes_mesh* par_shapes_create_lsystem(char const* program, int slices,
     int maxdepth);
 

@@ -220,12 +220,10 @@ int main()
             ry 90 rx 90
             shape tube rx 15  call rlimb rx -15
             shape tube rx -15 call llimb rx 15
-            shape tube ry 15 call rlimb ry -15
-            shape tube ry 15 call llimb ry -15
+            shape tube ry 15  call rlimb ry -15
+            shape tube ry 15  call llimb ry -15
             rule rlimb
-                sx 0.925 sy 0.925
-                tz 1
-                rx 1.2
+                sx 0.925 sy 0.925 tz 1 rx 1.2
                 call rlimb2
             rule rlimb2.1
                 shape connect
