@@ -321,8 +321,8 @@ par_shapes_mesh* par_shapes_create_klein_bottle(int slices, int stacks)
     par_shapes_mesh* mesh = par_shapes_create_parametric(
         par_shapes__klein, slices, stacks, 0);
     int face = 0;
-    for (int slice = 0; slice < slices; slice++) {
-        for (int stack = 0; stack < stacks; stack++, face += 2) {
+    for (int stack = 0; stack < stacks; stack++) {
+        for (int slice = 0; slice < slices; slice++, face += 2) {
             if (stack < 27 * stacks / 32) {
                 par_shapes_invert(mesh, face, 2);
             }
@@ -362,10 +362,10 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
     float uv[2];
     float xyz[3];
     float* points = mesh->points;
-    for (int slice = 0; slice < slices + 1; slice++) {
-        uv[1] = (float) slice / slices;
-        for (int stack = 0; stack < stacks + 1; stack++) {
-            uv[0] = (float) stack / stacks;
+    for (int stack = 0; stack < stacks + 1; stack++) {
+        uv[0] = (float) stack / stacks;
+        for (int slice = 0; slice < slices + 1; slice++) {
+            uv[1] = (float) slice / slices;
             fn(uv, xyz, userdata);
             *points++ = xyz[0];
             *points++ = xyz[1];
@@ -376,10 +376,10 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
     // Generate texture coordinates.
     mesh->tcoords = PAR_CALLOC(float, 2 * mesh->npoints);
     float* uvs = mesh->tcoords;
-    for (int slice = 0; slice < slices + 1; slice++) {
-        uv[1] = (float) slice / slices;
-        for (int stack = 0; stack < stacks + 1; stack++) {
-            uv[0] = (float) stack / stacks;
+    for (int stack = 0; stack < stacks + 1; stack++) {
+        uv[0] = (float) stack / stacks;
+        for (int slice = 0; slice < slices + 1; slice++) {
+            uv[1] = (float) slice / slices;
             *uvs++ = uv[0];
             *uvs++ = uv[1];
         }
@@ -391,17 +391,17 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
         calloc(sizeof(uint16_t) * 3 * mesh->ntriangles, 1);
     int v = 0;
     uint16_t* face = mesh->triangles;
-    for (int slice = 0; slice < slices; slice++) {
-        for (int stack = 0; stack < stacks; stack++) {
-            int next = stack + 1;
-            *face++ = v + stack;
+    for (int stack = 0; stack < stacks; stack++) {
+        for (int slice = 0; slice < slices; slice++) {
+            int next = slice + 1;
+            *face++ = v + slice + slices + 1;
             *face++ = v + next;
-            *face++ = v + stack + stacks + 1;
+            *face++ = v + slice;
+            *face++ = v + slice + slices + 1;
+            *face++ = v + next + slices + 1;
             *face++ = v + next;
-            *face++ = v + next + stacks + 1;
-            *face++ = v + stack + stacks + 1;
         }
-        v += stacks + 1;
+        v += slices + 1;
     }
 
     par_shapes__compute_welded_normals(mesh);
@@ -1056,6 +1056,48 @@ static par_shapes_mesh* par_shapes__apply_turtle(par_shapes_mesh* mesh,
     return m;
 }
 
+static void par_shapes__connect(par_shapes_mesh* scene,
+    par_shapes_mesh* cylinder, int slices)
+{
+    int stacks = 1;
+    int npoints = (slices + 1) * (stacks + 1);
+    assert(scene->npoints >= npoints && "Cannot connect to empty scene.");
+
+    // Create the new point list.
+    npoints = scene->npoints + (slices + 1);
+    float* points = PAR_MALLOC(float, npoints * 3);
+    memcpy(points, scene->points, sizeof(float) * scene->npoints * 3);
+    float* newpts = points + scene->npoints * 3;
+    memcpy(newpts, cylinder->points + (slices + 1) * 3,
+        sizeof(float) * (slices + 1) * 3);
+    free(scene->points);
+    scene->points = points;
+
+    // Create the new triangle list.
+    int ntriangles = scene->ntriangles + 2 * slices * stacks;
+    uint16_t* triangles = PAR_MALLOC(uint16_t, ntriangles * 3);
+    memcpy(triangles, scene->triangles, 2 * scene->ntriangles * 3);
+    int v = scene->npoints - (slices + 1);
+    uint16_t* face = triangles + scene->ntriangles * 3;
+    for (int stack = 0; stack < stacks; stack++) {
+        for (int slice = 0; slice < slices; slice++) {
+            int next = slice + 1;
+            *face++ = v + slice + slices + 1;
+            *face++ = v + next;
+            *face++ = v + slice;
+            *face++ = v + slice + slices + 1;
+            *face++ = v + next + slices + 1;
+            *face++ = v + next;
+        }
+        v += slices + 1;
+    }
+    free(scene->triangles);
+    scene->triangles = triangles;
+
+    scene->npoints = npoints;
+    scene->ntriangles = ntriangles;
+}
+
 par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
     int maxdepth)
 {
@@ -1174,7 +1216,11 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
         if (!strcmp(cmd->cmd, "shape")) {
             par_shapes_mesh* m = par_shapes__apply_turtle(tube, turtle,
                 position, scale);
-            par_shapes_merge(scene, m);
+            if (!strcmp(cmd->arg, "connect")) {
+                par_shapes__connect(scene, m, slices);
+            } else {
+                par_shapes_merge(scene, m);
+            }
             par_shapes_free_mesh(m);
         } else if (!strcmp(cmd->cmd, "call") && stackptr < maxdepth - 1) {
             rule = par_shapes__pick_rule(cmd->arg, rules, nrules);
