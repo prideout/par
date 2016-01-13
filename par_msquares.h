@@ -29,8 +29,6 @@ typedef struct {
     int ntriangles;       // number of 3-tuples
     int dim;              // number of floats per point (either 2 or 3)
     uint32_t color;       // used only with par_msquares_color_multi
-    int nconntriangles;   // internal use only
-    uint16_t* conntri;    // internal use only
 } par_msquares_mesh;
 
 // Reverses the "insideness" test.
@@ -100,9 +98,20 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
 #define PAR_ALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
 
+typedef struct {
+    float* points;
+    int npoints;
+    uint16_t* triangles;
+    int ntriangles;
+    int dim;
+    uint32_t color;
+    int nconntriangles;
+    uint16_t* conntri;
+} par_msquares__mesh;
+
 struct par_msquares_meshlist_s {
     int nmeshes;
-    par_msquares_mesh** meshes;
+    par_msquares__mesh** meshes;
 };
 
 static int** par_msquares_binary_point_table = 0;
@@ -110,7 +119,7 @@ static int** par_msquares_binary_triangle_table = 0;
 static int* par_msquares_quaternary_triangle_table[64][4];
 static int* par_msquares_quaternary_boundary_table[64][4];
 
-static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
+static par_msquares_meshlist* par_msquares__merge(par_msquares_meshlist** lists,
     int count, int snap);
 
 static void par_init_tables()
@@ -448,7 +457,7 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
         }
         mlists[1] = par_msquares_function(width, height, cellsize, flags,
             &context, gray_multi_inside, gray_height);
-        mlists[0] = par_msquares_merge(mlists, 2, mergeconf);
+        mlists[0] = par_msquares__merge(mlists, 2, mergeconf);
         context.lower_bound = context.upper_bound;
         flags |= connect;
     }
@@ -459,7 +468,7 @@ par_msquares_mesh const* par_msquares_get_mesh(
     par_msquares_meshlist* mlist, int mindex)
 {
     assert(mlist && mindex < mlist->nmeshes);
-    return mlist->meshes[mindex];
+    return (par_msquares_mesh const*) mlist->meshes[mindex];
 }
 
 int par_msquares_get_count(par_msquares_meshlist* mlist)
@@ -473,7 +482,7 @@ void par_msquares_free(par_msquares_meshlist* mlist)
     if (!mlist) {
         return;
     }
-    par_msquares_mesh** meshes = mlist->meshes;
+    par_msquares__mesh** meshes = mlist->meshes;
     for (int i = 0; i < mlist->nmeshes; i++) {
         free(meshes[i]->points);
         free(meshes[i]->triangles);
@@ -486,7 +495,7 @@ void par_msquares_free(par_msquares_meshlist* mlist)
 // Combine multiple meshlists by moving mesh pointers, and optionally apply
 // a "snap" operation that assigns a single Z value across all verts in each
 // mesh.  The Z value determined by the mesh's position in the final mesh list.
-static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
+static par_msquares_meshlist* par_msquares__merge(par_msquares_meshlist** lists,
     int count, int snap)
 {
     par_msquares_meshlist* merged = PAR_ALLOC(par_msquares_meshlist, 1);
@@ -494,8 +503,8 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     for (int i = 0; i < count; i++) {
         merged->nmeshes += lists[i]->nmeshes;
     }
-    merged->meshes = PAR_ALLOC(par_msquares_mesh*, merged->nmeshes);
-    par_msquares_mesh** pmesh = merged->meshes;
+    merged->meshes = PAR_ALLOC(par_msquares__mesh*, merged->nmeshes);
+    par_msquares__mesh** pmesh = merged->meshes;
     for (int i = 0; i < count; i++) {
         par_msquares_meshlist* meshlist = lists[i];
         for (int j = 0; j < meshlist->nmeshes; j++) {
@@ -529,7 +538,7 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
         return merged;
     }
     for (int i = 1; i < merged->nmeshes; i++) {
-        par_msquares_mesh* mesh = merged->meshes[i];
+        par_msquares__mesh* mesh = merged->meshes[i];
 
         // Find all extrusion points.  This is tightly coupled to the
         // tessellation code, which generates two "connector" triangles for each
@@ -556,7 +565,7 @@ static par_msquares_meshlist* par_msquares_merge(par_msquares_meshlist** lists,
     return merged;
 }
 
-static void par_remove_unreferenced_verts(par_msquares_mesh* mesh)
+static void par_remove_unreferenced_verts(par_msquares__mesh* mesh)
 {
     if (mesh->npoints == 0) {
         return;
@@ -629,7 +638,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
         }
         m[1] = par_msquares_function(width, height, cellsize, flags,
             context, insidefn, heightfn);
-        return par_msquares_merge(m, 2, snap | connect);
+        return par_msquares__merge(m, 2, snap | connect);
     }
 
     int invert = flags & PAR_MSQUARES_INVERT;
@@ -644,9 +653,9 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     // Allocate the meshlist and the first mesh.
     par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = 1;
-    mlist->meshes = PAR_ALLOC(par_msquares_mesh*, 1);
-    mlist->meshes[0] = PAR_ALLOC(par_msquares_mesh, 1);
-    par_msquares_mesh* mesh = mlist->meshes[0];
+    mlist->meshes = PAR_ALLOC(par_msquares__mesh*, 1);
+    mlist->meshes[0] = PAR_ALLOC(par_msquares__mesh, 1);
+    par_msquares__mesh* mesh = mlist->meshes[0];
     mesh->dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     int ncols = width / cellsize;
     int nrows = height / cellsize;
@@ -1140,7 +1149,7 @@ typedef struct {
     uint16_t innerb;
     char i;
     char j;
-    par_msquares_mesh* mesh;
+    par_msquares__mesh* mesh;
     int mesh_index;
 } par_connector;
 
@@ -1219,7 +1228,7 @@ static void par_msquares_internal_finalize(par_msquares_meshlist* mlist)
         return;
     }
     for (int m = 1; m < mlist->nmeshes; m++) {
-        par_msquares_mesh* mesh = mlist->meshes[m];
+        par_msquares__mesh* mesh = mlist->meshes[m];
         int ntris = mesh->ntriangles + mesh->nconntriangles;
         uint16_t* triangles = PAR_ALLOC(uint16_t, ntris * 3);
         uint16_t* dst = triangles;
@@ -1291,15 +1300,15 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     // Allocate 1 mesh for each color.
     par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = ncolors;
-    mlist->meshes = PAR_ALLOC(par_msquares_mesh*, ncolors);
-    par_msquares_mesh* mesh;
+    mlist->meshes = PAR_ALLOC(par_msquares__mesh*, ncolors);
+    par_msquares__mesh* mesh;
     int maxtris_per_cell = 6;
     int maxpts_per_cell = 9;
     if (flags & PAR_MSQUARES_CONNECT) {
         maxpts_per_cell += 6;
     }
     for (int i = 0; i < ncolors; i++) {
-        mesh = mlist->meshes[i] = PAR_ALLOC(par_msquares_mesh, 1);
+        mesh = mlist->meshes[i] = PAR_ALLOC(par_msquares__mesh, 1);
         mesh->color = colors[i];
         mesh->points = PAR_ALLOC(float, ncells * maxpts_per_cell * dim);
         mesh->triangles = PAR_ALLOC(uint16_t, ncells * maxtris_per_cell * 3);
@@ -1394,7 +1403,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
             int ncedges = 0;
             for (int c = 0; c < 4; c++) {
                 int color = vals[c];
-                par_msquares_mesh* mesh = mlist->meshes[color];
+                par_msquares__mesh* mesh = mlist->meshes[color];
                 par_connector edge;
                 for (int e = 0; e < nedges[c]; e++) {
                     char previndex = edgespecs[c][e * 2];
@@ -1419,7 +1428,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 int color = vals[c];
                 colors |= color << (8 * c);
                 counts |= ntris[c] << (8 * c);
-                par_msquares_mesh* mesh = mlist->meshes[color];
+                par_msquares__mesh* mesh = mlist->meshes[color];
                 float height = (mesh->color >> 24) / 255.0;
                 conntris_start[c] = mesh->conntri + mesh->nconntriangles * 3;
                 int usedpts[9] = {0};
@@ -1542,7 +1551,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                 for (int c = 0; c < 4; c++) {
                     int color = vals[c];
                     uint16_t* pconninds = conntris_start[c];
-                    par_msquares_mesh* mesh = mlist->meshes[color];
+                    par_msquares__mesh* mesh = mlist->meshes[color];
                     for (int e = 0; e < nedges[c]; e++) {
                         int previndex = edgespecs[c][e * 2];
                         int currindex = edgespecs[c][e * 2 + 1];
@@ -1619,7 +1628,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     // In no way does this create the simplest possible mesh, but at least it's
     // fast and easy.
     for (uint32_t color = 0; color < (uint32_t) ncolors; color++) {
-        par_msquares_mesh* mesh = mlist->meshes[color];
+        par_msquares__mesh* mesh = mlist->meshes[color];
 
         // Populate the per-mesh info grids.
         int ntris = 0;
