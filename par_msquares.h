@@ -54,6 +54,9 @@ typedef struct {
 // Enables quick & dirty (not best) simpification of the returned mesh.
 #define PAR_MSQUARES_SIMPLIFY (1 << 5)
 
+// Indicates that the "color" argument is ABGR instead of ARGB.
+#define PAR_MSQUARES_SWIZZLE (1 << 6)
+
 par_msquares_meshlist* par_msquares_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags);
 
@@ -384,10 +387,17 @@ par_msquares_meshlist* par_msquares_color(par_byte const* data, int width,
 {
     par_color_context context;
     context.bpp = bpp;
-    context.color[0] = (color >> 16) & 0xff;
-    context.color[1] = (color >> 8) & 0xff;
-    context.color[2] = (color & 0xff);
-    context.color[3] = (color >> 24) & 0xff;
+    if (flags & PAR_MSQUARES_SWIZZLE) {
+        context.color[0] = (color >>  0) & 0xff;
+        context.color[1] = (color >>  8) & 0xff;
+        context.color[2] = (color >> 16) & 0xff;
+        context.color[3] = (color >> 24) & 0xff;
+    } else {
+        context.color[0] = (color >> 16) & 0xff;
+        context.color[1] = (color >>  8) & 0xff;
+        context.color[2] = (color >>  0) & 0xff;
+        context.color[3] = (color >> 24) & 0xff;
+    }
     context.data = data;
     context.width = width;
     context.height = height;
