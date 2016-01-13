@@ -10,6 +10,41 @@
 #define THRESHOLD 0.0f
 #define OCEAN_COLOR 0x214562
 
+static void svg_begin(FILE* svgfile)
+{
+    fputs(
+        "<svg viewBox='-.1 -.1 1.2 1.2' width='500px' height='500px' "
+        "version='1.1' "
+        "xmlns='http://www.w3.org/2000/svg'>\n"
+        "<g transform='translate(0 1) scale(1 -1)'>", svgfile);
+}
+
+static void svg_write_path(FILE* svgfile, par_msquares_mesh const* mesh,
+    uint32_t color)
+{
+    par_msquares_boundary* polygon = par_msquares_extract_boundary(mesh);
+    fprintf(svgfile, "<path\n"
+        " fill='#%6.6x'\n"
+        " stroke='#%6.6x'\n"
+        " stroke-width='0.005'\n"
+        " fill-opacity='0.1'\n"
+        " stroke-opacity='0.3'\n"
+        " d='", color, color);
+    for (int c = 0; c < polygon->nchains; c++) {
+        float const* chain = polygon->chains[c];
+        int length = (int) polygon->lengths[c];
+        uint16_t first = 1;
+        for (uint16_t s = 0; s < length; s++) {
+            fprintf(svgfile, "%c%f,%f", first ? 'M' : 'L', chain[s * 2],
+                chain[s * 2 + 1]);
+            first = 0;
+        }
+        fputs("Z", svgfile);
+    }
+    fputs("'\n/>", svgfile);
+    par_msquares_free_boundary(polygon);
+}
+
 static void test_multi()
 {
     unsigned dims[2] = {0, 0};
@@ -19,14 +54,16 @@ static void test_multi()
     float* pt;
     par_msquares_meshlist* mlist;
     par_msquares_mesh const* mesh;
-    FILE* objfile;
+    FILE* objfile, *svgfile;
 
     lodepng_decode_file(&pixels, &dims[0], &dims[1], "test/rgb.png", LCT_RGB,
         8);
     mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE / 2, 3,
         0);
     objfile = fopen("build/msquares_multi_rgb.obj", "wt");
+    svgfile = fopen("build/msquares_multi_rgb.svg", "wt");
     offset = 1;
+    svg_begin(svgfile);
     for (int m = 0; m < par_msquares_get_count(mlist); m++) {
         mesh = par_msquares_get_mesh(mlist, m);
         pt = mesh->points;
@@ -43,7 +80,10 @@ static void test_multi()
             fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
         }
         offset += mesh->npoints;
+        svg_write_path(svgfile, mesh, mesh->color);
     }
+    fputs("</g>\n</svg>", svgfile);
+    fclose(svgfile);
     fclose(objfile);
     par_msquares_free(mlist);
     free(pixels);
@@ -53,7 +93,9 @@ static void test_multi()
     mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE / 2, 4,
         PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_CONNECT);
     objfile = fopen("build/msquares_multi_rgba.obj", "wt");
+    svgfile = fopen("build/msquares_multi_rgba.svg", "wt");
     offset = 1;
+    svg_begin(svgfile);
     for (int m = 0; m < par_msquares_get_count(mlist); m++) {
         mesh = par_msquares_get_mesh(mlist, m);
         pt = mesh->points;
@@ -70,7 +112,10 @@ static void test_multi()
             fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
         }
         offset += mesh->npoints;
+        svg_write_path(svgfile, mesh, mesh->color & 0xffffff);
     }
+    fputs("</g>\n</svg>", svgfile);
+    fclose(svgfile);
     fclose(objfile);
     par_msquares_free(mlist);
     free(pixels);

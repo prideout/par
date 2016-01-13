@@ -5,6 +5,10 @@ im = Image.new('RGB', (256,256))
 draw = ImageDraw.Draw(im)
 draw.ellipse([128,128,512-128,512-128], (255,0,0))
 draw.ellipse([150,150,512-150,512-150], (0,255,0))
+
+draw.ellipse([128-64,128-64,128+64,128+64], (255,0,0))
+draw.ellipse([128-32,128-32,128+32,128+32], (0,0,0))
+
 del draw
 im.save('rgb.png', 'PNG')
 

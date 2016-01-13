@@ -21,7 +21,7 @@ typedef uint8_t par_byte;
 
 typedef struct par_msquares_meshlist_s par_msquares_meshlist;
 
-// Encapsulates the results of a marching squares operation.
+// Results of a marching squares operation.  Triangles are counter-clockwise.
 typedef struct {
     float* points;        // pointer to XY (or XYZ) vertex coordinates
     int npoints;          // number of vertex coordinates
@@ -30,6 +30,18 @@ typedef struct {
     int dim;              // number of floats per point (either 2 or 3)
     uint32_t color;       // used only with par_msquares_color_multi
 } par_msquares_mesh;
+
+// Polyline boundary extracted from a mesh, composed of one or more chains.
+// Counterclockwise chains are solid, clockwise chains are holes.  So, when
+// serializing to SVG, all chains can be aggregated in a single <path>,
+// provided they each terminate with a "Z" and use the default fill rule.
+typedef struct {
+    float* points;        // list of XY vertex coordinates
+    int npoints;          // number of vertex coordinates
+    float** chains;       // list of pointers to the start of each chain
+    uint16_t* lengths;    // list of chain lengths
+    int nchains;          // number of chains
+} par_msquares_boundary;
 
 // Reverses the "insideness" test.
 #define PAR_MSQUARES_INVERT (1 << 0)
@@ -67,6 +79,8 @@ int par_msquares_get_count(par_msquares_meshlist*);
 
 void par_msquares_free(par_msquares_meshlist*);
 
+void par_msquares_free_boundary(par_msquares_boundary*);
+
 typedef int (*par_msquares_inside_fn)(int, void*);
 typedef float (*par_msquares_height_fn)(float, float, void*);
 
@@ -80,6 +94,8 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
 
 par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     int height, int cellsize, int bpp, int flags);
+
+par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -1786,6 +1802,178 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         par_remove_unreferenced_verts(mlist->meshes[i]);
     }
     return mlist;
+}
+
+void par_msquares_free_boundary(par_msquares_boundary* polygon)
+{
+    free(polygon->points);
+    free(polygon->chains);
+    free(polygon->lengths);
+    free(polygon);
+}
+
+typedef struct par__hedge_s {
+    uint32_t key;
+    struct par__hvert_s* endvert;
+    struct par__hedge_s* opposite;
+    struct par__hedge_s* next;
+    struct par__hedge_s* prev;
+} par__hedge;
+
+typedef struct par__hvert_s {
+    par__hedge* incoming;
+} par__hvert;
+
+typedef struct {
+    par_msquares_mesh const* mesh;
+    par__hvert* verts;
+    par__hedge* edges;
+    par__hedge** sorted_edges;
+} par__hemesh;
+
+static int par__hedge_cmp(const void *arg0, const void *arg1)
+{
+    par__hedge* he0 = *((par__hedge**) arg0);
+    par__hedge* he1 = *((par__hedge**) arg1);
+    if (he0->key < he1->key) return -1;
+    if (he0->key > he1->key) return 1;
+    return 0;
+}
+
+static par__hedge* par__hedge_find(par__hemesh* hemesh, uint32_t key)
+{
+    par__hedge target = {0};
+    target.key = key;
+    par__hedge* ptarget = &target;
+    int nedges = hemesh->mesh->ntriangles * 3;
+    par__hedge** result = (par__hedge**) bsearch(&ptarget, hemesh->sorted_edges,
+        nedges, sizeof(par__hedge*), par__hedge_cmp);
+    return result ? *result : 0;
+}
+
+static uint32_t par__hedge_key(par__hvert* a, par__hvert* b, par__hvert* s)
+{
+    uint32_t ai = a - s;
+    uint32_t bi = b - s;
+    return (ai << 16) | bi;
+}
+
+par_msquares_boundary* par_msquares_extract_boundary(
+    par_msquares_mesh const* mesh)
+{
+    par_msquares_boundary* result = PAR_ALLOC(par_msquares_boundary, 1);
+    par__hemesh hemesh = {0};
+    hemesh.mesh = mesh;
+    int nedges = mesh->ntriangles * 3;
+
+    // Populate all fields of verts and edges, except opposite.
+    hemesh.edges = PAR_ALLOC(par__hedge, nedges);
+    par__hvert* hverts = hemesh.verts = PAR_ALLOC(par__hvert, mesh->npoints);
+    par__hedge* edge = hemesh.edges;
+    uint16_t const* tri = mesh->triangles;
+    for (int n = 0; n < mesh->ntriangles; n++, edge += 3, tri += 3) {
+        edge[0].endvert = hverts + tri[1];
+        edge[1].endvert = hverts + tri[2];
+        edge[2].endvert = hverts + tri[0];
+        hverts[tri[1]].incoming = edge + 0;
+        hverts[tri[2]].incoming = edge + 1;
+        hverts[tri[0]].incoming = edge + 2;
+        edge[0].next = edge + 1;
+        edge[1].next = edge + 2;
+        edge[2].next = edge + 0;
+        edge[0].prev = edge + 2;
+        edge[1].prev = edge + 0;
+        edge[2].prev = edge + 1;
+        edge[0].key = par__hedge_key(edge[2].endvert, edge[0].endvert, hverts);
+        edge[1].key = par__hedge_key(edge[0].endvert, edge[1].endvert, hverts);
+        edge[2].key = par__hedge_key(edge[1].endvert, edge[2].endvert, hverts);
+    }
+
+    // Sort the edges according to their key.
+    hemesh.sorted_edges = PAR_ALLOC(par__hedge*, mesh->ntriangles * 3);
+    for (int n = 0; n < nedges; n++) {
+        hemesh.sorted_edges[n] = hemesh.edges + n;
+    }
+    qsort(hemesh.sorted_edges, nedges, sizeof(par__hedge*), par__hedge_cmp);
+
+    // Populate the "opposite" field in each edge.
+    for (int n = 0; n < nedges; n++) {
+        par__hedge* edge = hemesh.edges + n;
+        par__hedge* prev = edge->prev;
+        par__hvert* start = edge->endvert;
+        par__hvert* end = prev->endvert;
+        uint32_t key = par__hedge_key(start, end, hverts);
+        edge->opposite = par__hedge_find(&hemesh, key);
+    }
+
+    // Re-use the sorted_edges array, filling it with boundary edges only.
+    // Also create a mapping table to consolidate all boundary verts.
+    int nborders = 0;
+    for (int n = 0; n < nedges; n++) {
+        par__hedge* edge = hemesh.edges + n;
+        if (!edge->opposite) {
+            hemesh.sorted_edges[nborders++] = edge;
+        }
+    }
+
+    // Allocate for the worst case (all separate triangles).
+    // We'll adjust the lengths later.
+    result->nchains = nborders / 3;
+    result->npoints = nborders + result->nchains;
+    result->points = PAR_ALLOC(float, 2 * result->npoints);
+    result->chains = PAR_ALLOC(float*, result->nchains);
+    result->lengths = PAR_ALLOC(uint16_t, result->nchains);
+
+    // Iterate over each polyline.
+    edge = hemesh.sorted_edges[0];
+    int pt = 0;
+    int nwritten = 0;
+    int nchains = 0;
+    while (1) {
+        float* points = result->points;
+        par__hedge* orig = edge;
+        uint16_t index = edge->prev->endvert - hverts;
+        result->chains[nchains] = points + pt;
+        result->lengths[nchains]++;
+        points[pt++] = mesh->points[index * mesh->dim];
+        points[pt++] = mesh->points[index * mesh->dim + 1];
+        while (1) {
+            index = edge->endvert - hverts;
+            edge->key = 0;
+            nwritten++;
+            result->lengths[nchains]++;
+            points[pt++] = mesh->points[index * mesh->dim];
+            points[pt++] = mesh->points[index * mesh->dim + 1];
+            par__hedge* next = edge->next;
+            while (next != edge) {
+                if (!next->opposite) {
+                    break;
+                }
+                next = next->opposite->next;
+            }
+            edge = next;
+            if (edge == orig) {
+                break;
+            }
+        }
+        nchains++;
+        if (nwritten >= nborders) {
+            break;
+        }
+        for (int i = 0; i < nborders; i++) {
+            edge = hemesh.sorted_edges[i];
+            if (edge->key) {
+                break;
+            }
+        }
+    }
+
+    result->npoints = pt / 2;
+    result->nchains = nchains;
+    free(hemesh.verts);
+    free(hemesh.edges);
+    free(hemesh.sorted_edges);
+    return result;
 }
 
 #undef PAR_MIN
