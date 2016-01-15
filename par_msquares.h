@@ -67,6 +67,10 @@ typedef struct {
 // Indicates that the "color" argument is ABGR instead of ARGB.
 #define PAR_MSQUARES_SWIZZLE (1 << 6)
 
+// Ensures there are no T-junction vertices. (par_msquares_color_multi only)
+// Requires the PAR_MSQUARES_SIMPLIFY flag to be disabled.
+#define PAR_MSQUARES_CLEAN (1 << 7)
+
 par_msquares_meshlist* par_msquares_grayscale(float const* data, int width,
     int height, int cellsize, float threshold, int flags);
 
@@ -111,8 +115,16 @@ par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 #define PAR_MIN(a, b) (a > b ? b : a)
 #define PAR_MAX(a, b) (a > b ? a : b)
 #define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
-#define PAR_ALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
+#define PAR_FREE(BUF) free(BUF)
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
+
+typedef struct {
+    uint16_t* values;
+    size_t count;
+    size_t capacity;
+} par__uint16list;
 
 typedef struct {
     float* points;
@@ -123,6 +135,7 @@ typedef struct {
     uint32_t color;
     int nconntriangles;
     uint16_t* conntri;
+    par__uint16list* tjunctions;
 } par_msquares__mesh;
 
 struct par_msquares_meshlist_s {
@@ -159,16 +172,17 @@ static void par_init_tables()
         "2024460";
     char const* binary_token = BINARY_TABLE;
 
-    par_msquares_binary_point_table = PAR_ALLOC(int*, 16);
-    par_msquares_binary_triangle_table = PAR_ALLOC(int*, 16);
+    par_msquares_binary_point_table = PAR_CALLOC(int*, 16);
+    par_msquares_binary_triangle_table = PAR_CALLOC(int*, 16);
     for (int i = 0; i < 16; i++) {
         int ntris = *binary_token - '0';
         binary_token++;
-        par_msquares_binary_triangle_table[i] = PAR_ALLOC(int, (ntris + 1) * 3);
+        par_msquares_binary_triangle_table[i] =
+            PAR_CALLOC(int, (ntris + 1) * 3);
         int* sqrtris = par_msquares_binary_triangle_table[i];
         sqrtris[0] = ntris;
         int mask = 0;
-        int* sqrpts = par_msquares_binary_point_table[i] = PAR_ALLOC(int, 7);
+        int* sqrpts = par_msquares_binary_point_table[i] = PAR_CALLOC(int, 7);
         sqrpts[0] = 0;
         for (int j = 0; j < ntris * 3; j++, binary_token++) {
             int midp = *binary_token - '0';
@@ -248,7 +262,7 @@ static void par_init_tables()
         "1701312414616700";
     char const* quaternary_token = QUATERNARY_TABLE;
 
-    int* quaternary_values = PAR_ALLOC(int, strlen(QUATERNARY_TABLE));
+    int* quaternary_values = PAR_CALLOC(int, strlen(QUATERNARY_TABLE));
     int* vals = quaternary_values;
     for (int i = 0; i < 64; i++) {
         int ntris = *quaternary_token++ - '0';
@@ -306,7 +320,7 @@ static void par_init_tables()
         "2188723881278830218872388127883011717100";
     quaternary_token = QUATERNARY_EDGES;
 
-    quaternary_values = PAR_ALLOC(int, strlen(QUATERNARY_EDGES));
+    quaternary_values = PAR_CALLOC(int, strlen(QUATERNARY_EDGES));
     vals = quaternary_values;
     for (int i = 0; i < 64; i++) {
         int nedges = *quaternary_token++ - '0';
@@ -447,7 +461,7 @@ par_msquares_meshlist* par_msquares_grayscale_multi(float const* data,
     int nthresholds, int flags)
 {
     par_msquares_meshlist* mlists[2];
-    mlists[0] = PAR_ALLOC(par_msquares_meshlist, 1);
+    mlists[0] = PAR_CALLOC(par_msquares_meshlist, 1);
     int connect = flags & PAR_MSQUARES_CONNECT;
     int snap = flags & PAR_MSQUARES_SNAP;
     int heights = flags & PAR_MSQUARES_HEIGHTS;
@@ -514,12 +528,12 @@ void par_msquares_free(par_msquares_meshlist* mlist)
 static par_msquares_meshlist* par_msquares__merge(par_msquares_meshlist** lists,
     int count, int snap)
 {
-    par_msquares_meshlist* merged = PAR_ALLOC(par_msquares_meshlist, 1);
+    par_msquares_meshlist* merged = PAR_CALLOC(par_msquares_meshlist, 1);
     merged->nmeshes = 0;
     for (int i = 0; i < count; i++) {
         merged->nmeshes += lists[i]->nmeshes;
     }
-    merged->meshes = PAR_ALLOC(par_msquares__mesh*, merged->nmeshes);
+    merged->meshes = PAR_CALLOC(par_msquares__mesh*, merged->nmeshes);
     par_msquares__mesh** pmesh = merged->meshes;
     for (int i = 0; i < count; i++) {
         par_msquares_meshlist* meshlist = lists[i];
@@ -560,7 +574,7 @@ static par_msquares_meshlist* par_msquares__merge(par_msquares_meshlist** lists,
         // tessellation code, which generates two "connector" triangles for each
         // extruded edge.  The first two verts of the second triangle are the
         // verts that need to be displaced.
-        char* markers = PAR_ALLOC(char, mesh->npoints);
+        char* markers = PAR_CALLOC(char, mesh->npoints);
         int tri = mesh->ntriangles - mesh->nconntriangles;
         while (tri < mesh->ntriangles) {
             markers[mesh->triangles[tri * 3 + 3]] = 1;
@@ -586,7 +600,7 @@ static void par_remove_unreferenced_verts(par_msquares__mesh* mesh)
     if (mesh->npoints == 0) {
         return;
     }
-    char* markers = PAR_ALLOC(char, mesh->npoints);
+    char* markers = PAR_CALLOC(char, mesh->npoints);
     uint16_t const* ptris = mesh->triangles;
     int newnpts = 0;
     for (int i = 0; i < mesh->ntriangles * 3; i++, ptris++) {
@@ -595,8 +609,8 @@ static void par_remove_unreferenced_verts(par_msquares__mesh* mesh)
             markers[*ptris] = 1;
         }
     }
-    float* newpts = PAR_ALLOC(float, newnpts * mesh->dim);
-    uint16_t* mapping = PAR_ALLOC(uint16_t, mesh->npoints);
+    float* newpts = PAR_CALLOC(float, newnpts * mesh->dim);
+    uint16_t* mapping = PAR_CALLOC(uint16_t, mesh->npoints);
     float const* ppts = mesh->points;
     float* pnewpts = newpts;
     int j = 0;
@@ -667,10 +681,10 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     }
 
     // Allocate the meshlist and the first mesh.
-    par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
+    par_msquares_meshlist* mlist = PAR_CALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = 1;
-    mlist->meshes = PAR_ALLOC(par_msquares__mesh*, 1);
-    mlist->meshes[0] = PAR_ALLOC(par_msquares__mesh, 1);
+    mlist->meshes = PAR_CALLOC(par_msquares__mesh*, 1);
+    mlist->meshes[0] = PAR_CALLOC(par_msquares__mesh, 1);
     par_msquares__mesh* mesh = mlist->meshes[0];
     mesh->dim = (flags & PAR_MSQUARES_HEIGHTS) ? 3 : 2;
     int ncols = width / cellsize;
@@ -688,17 +702,17 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     int nconntris = 0;
     uint16_t* edgemap = 0;
     if (flags & PAR_MSQUARES_CONNECT) {
-        conntris = PAR_ALLOC(uint16_t, maxedges * 6);
+        conntris = PAR_CALLOC(uint16_t, maxedges * 6);
         maxtris +=  maxedges * 2;
         maxpts += maxedges * 2;
-        edgemap = PAR_ALLOC(uint16_t, maxpts);
+        edgemap = PAR_CALLOC(uint16_t, maxpts);
         for (int i = 0; i < maxpts; i++) {
             edgemap[i] = 0xffff;
         }
     }
-    uint16_t* tris = PAR_ALLOC(uint16_t, maxtris * 3);
+    uint16_t* tris = PAR_CALLOC(uint16_t, maxtris * 3);
     int ntris = 0;
-    float* pts = PAR_ALLOC(float, maxpts * mesh->dim);
+    float* pts = PAR_CALLOC(float, maxpts * mesh->dim);
     int npts = 0;
 
     // The "verts" x/y/z arrays are the 4 corners and 4 midpoints around the
@@ -712,8 +726,8 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     uint16_t* ptris = tris;
     uint16_t* pconntris = conntris;
     float* ppts = pts;
-    uint8_t* prevrowmasks = PAR_ALLOC(uint8_t, ncols);
-    int* prevrowinds = PAR_ALLOC(int, ncols * 3);
+    uint8_t* prevrowmasks = PAR_CALLOC(uint8_t, ncols);
+    int* prevrowinds = PAR_CALLOC(int, ncols * 3);
 
     // If simplification is enabled, we need to track all 'F' cells and their
     // repsective triangle indices.
@@ -721,9 +735,9 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     uint16_t* simplification_tris = 0;
     uint8_t* simplification_ntris = 0;
     if (flags & PAR_MSQUARES_SIMPLIFY) {
-        simplification_codes = PAR_ALLOC(uint8_t, nrows * ncols);
-        simplification_tris = PAR_ALLOC(uint16_t, nrows * ncols);
-        simplification_ntris = PAR_ALLOC(uint8_t, nrows * ncols);
+        simplification_codes = PAR_CALLOC(uint8_t, nrows * ncols);
+        simplification_tris = PAR_CALLOC(uint16_t, nrows * ncols);
+        simplification_ntris = PAR_CALLOC(uint8_t, nrows * ncols);
     }
 
     // Do the march!
@@ -1002,7 +1016,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
         // Build a new index array cell-by-cell.  If any given cell is 'F' and
         // its neighbor to the south is also 'F', then it's part of a run.
         int nnewtris = ntris + nconntris - neliminated_triangles;
-        uint16_t* newtris = PAR_ALLOC(uint16_t, nnewtris * 3);
+        uint16_t* newtris = PAR_CALLOC(uint16_t, nnewtris * 3);
         uint16_t* pnewtris = newtris;
         in_run = 0;
         for (int row = 0; row < nrows - 1; row += 2) {
@@ -1085,7 +1099,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
         free(simplification_ntris);
 
         // Remove unreferenced points.
-        char* markers = PAR_ALLOC(char, npts);
+        char* markers = PAR_CALLOC(char, npts);
         ptris = tris;
         int newnpts = 0;
         for (int i = 0; i < ntris * 3; i++, ptris++) {
@@ -1100,8 +1114,8 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
                 markers[conntris[i]] = 1;
             }
         }
-        float* newpts = PAR_ALLOC(float, newnpts * mesh->dim);
-        uint16_t* mapping = PAR_ALLOC(uint16_t, npts);
+        float* newpts = PAR_CALLOC(float, newnpts * mesh->dim);
+        uint16_t* mapping = PAR_CALLOC(uint16_t, npts);
         ppts = pts;
         float* pnewpts = newpts;
         int j = 0;
@@ -1238,7 +1252,7 @@ static uint32_t par_msquares_argb(par_byte const* pdata, int bpp)
 }
 
 // Merge connective triangles into the primary triangle list.
-static void par_msquares_internal_finalize(par_msquares_meshlist* mlist)
+static void par_msquares__finalize(par_msquares_meshlist* mlist)
 {
     if (mlist->nmeshes < 2 || mlist->meshes[1]->nconntriangles == 0) {
         return;
@@ -1246,7 +1260,7 @@ static void par_msquares_internal_finalize(par_msquares_meshlist* mlist)
     for (int m = 1; m < mlist->nmeshes; m++) {
         par_msquares__mesh* mesh = mlist->meshes[m];
         int ntris = mesh->ntriangles + mesh->nconntriangles;
-        uint16_t* triangles = PAR_ALLOC(uint16_t, ntris * 3);
+        uint16_t* triangles = PAR_CALLOC(uint16_t, ntris * 3);
         uint16_t* dst = triangles;
         uint16_t const* src = mesh->triangles;
         for (int t = 0; t < mesh->ntriangles; t++) {
@@ -1269,6 +1283,80 @@ static void par_msquares_internal_finalize(par_msquares_meshlist* mlist)
     }
 }
 
+static par__uint16list* par__uint16list_create()
+{
+    par__uint16list* list = PAR_CALLOC(par__uint16list, 1);
+    list->count = 0;
+    list->capacity = 32;
+    list->values = PAR_CALLOC(uint16_t, list->capacity);
+    return list;
+}
+
+static void par__uint16list_add3(par__uint16list* list,
+    uint16_t a, uint16_t b, uint16_t c)
+{
+    if (list->count + 3 > list->capacity) {
+        list->capacity *= 2;
+        list->values = PAR_REALLOC(uint16_t, list->values, list->capacity);
+    }
+    list->values[list->count++] = a;
+    list->values[list->count++] = b;
+    list->values[list->count++] = c;
+}
+
+static void par__uint16list_free(par__uint16list* list)
+{
+    if (list) {
+        PAR_FREE(list->values);
+        PAR_FREE(list);
+    }
+}
+
+static void par_msquares__repair_tjunctions(par_msquares_meshlist* mlist)
+{
+    for (int m = 0; m < mlist->nmeshes; m++) {
+        par_msquares__mesh* mesh = mlist->meshes[m];
+        par__uint16list* tjunctions = mesh->tjunctions;
+        int njunctions = (int) tjunctions->count / 3;
+        if (njunctions == 0) {
+            continue;
+        }
+        int ntriangles = mesh->ntriangles + njunctions;
+        mesh->triangles = PAR_REALLOC(uint16_t, mesh->triangles,
+            ntriangles * 3);
+        uint16_t const* jun = tjunctions->values;
+        uint16_t* new_triangles = mesh->triangles + mesh->ntriangles * 3;
+        int ncreated = 0;
+        for (int j = 0; j < njunctions; j++, jun += 3) {
+            uint16_t* tri = mesh->triangles;
+            int t;
+            for (t = 0; t < mesh->ntriangles; t++, tri += 3) {
+                int i = -1;
+                if (tri[0] == jun[0] && tri[1] == jun[1]) {
+                    i = 0;
+                } else if (tri[1] == jun[0] && tri[2] == jun[1]) {
+                    i = 1;
+                } else if (tri[2] == jun[0] && tri[0] == jun[1]) {
+                    i = 2;
+                } else {
+                    continue;
+                }
+                new_triangles[0] = tri[(i + 0) % 3];
+                new_triangles[1] = jun[2];
+                new_triangles[2] = tri[(i + 2) % 3];
+                tri[(i + 0) % 3] = jun[2];
+                new_triangles += 3;
+                ncreated++;
+                break;
+            }
+            // TODO: Need to investigate the "msquares_multi_diagram.obj" test.
+            assert(t != mesh->ntriangles &&
+                "Error with T-Junction repair; please disable the CLEAN flag.");
+        }
+        mesh->ntriangles += ncreated;
+    }
+}
+
 par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     int height, int cellsize, int bpp, int flags)
 {
@@ -1284,6 +1372,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     const int north_to_south[9] = { -1, -1, -1, -1,  2,  1,  0, -1, -1 };
     assert(!(flags & PAR_MSQUARES_HEIGHTS) || bpp == 4);
     assert(bpp > 0 && bpp <= 4 && "Bytes per pixel must be 1, 2, 3, or 4.");
+    assert(!(flags & PAR_MSQUARES_CLEAN) || !(flags & PAR_MSQUARES_SIMPLIFY));
     assert(!(flags & PAR_MSQUARES_SNAP) &&
         "SNAP is not supported with color_multi");
     assert(!(flags & PAR_MSQUARES_INVERT) &&
@@ -1305,7 +1394,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     }
 
     // Convert the color image to grayscale using the mapping table.
-    par_byte* pixels = PAR_ALLOC(par_byte, width * height);
+    par_byte* pixels = PAR_CALLOC(par_byte, width * height);
     pdata = data;
     for (int i = 0; i < width * height; i++, pdata += bpp) {
         uint32_t color = par_msquares_argb(pdata, bpp);
@@ -1314,9 +1403,9 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     }
 
     // Allocate 1 mesh for each color.
-    par_msquares_meshlist* mlist = PAR_ALLOC(par_msquares_meshlist, 1);
+    par_msquares_meshlist* mlist = PAR_CALLOC(par_msquares_meshlist, 1);
     mlist->nmeshes = ncolors;
-    mlist->meshes = PAR_ALLOC(par_msquares__mesh*, ncolors);
+    mlist->meshes = PAR_CALLOC(par_msquares__mesh*, ncolors);
     par_msquares__mesh* mesh;
     int maxtris_per_cell = 6;
     int maxpts_per_cell = 9;
@@ -1324,13 +1413,14 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         maxpts_per_cell += 6;
     }
     for (int i = 0; i < ncolors; i++) {
-        mesh = mlist->meshes[i] = PAR_ALLOC(par_msquares__mesh, 1);
+        mesh = mlist->meshes[i] = PAR_CALLOC(par_msquares__mesh, 1);
         mesh->color = colors[i];
-        mesh->points = PAR_ALLOC(float, ncells * maxpts_per_cell * dim);
-        mesh->triangles = PAR_ALLOC(uint16_t, ncells * maxtris_per_cell * 3);
+        mesh->points = PAR_CALLOC(float, ncells * maxpts_per_cell * dim);
+        mesh->triangles = PAR_CALLOC(uint16_t, ncells * maxtris_per_cell * 3);
         mesh->dim = dim;
+        mesh->tjunctions = par__uint16list_create();
         if (flags & PAR_MSQUARES_CONNECT) {
-            mesh->conntri = PAR_ALLOC(uint16_t, ncells * 8 * 3);
+            mesh->conntri = PAR_CALLOC(uint16_t, ncells * 8 * 3);
         }
     }
 
@@ -1349,17 +1439,17 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     uint16_t inds1[256 * 9];
     uint16_t* currinds = inds0;
     uint16_t* previnds = inds1;
-    uint16_t* rowindsa = PAR_ALLOC(uint16_t, ncols * 3 * 256);
-    uint8_t* rowcellsa = PAR_ALLOC(uint8_t, ncols * 256);
-    uint16_t* rowindsb = PAR_ALLOC(uint16_t, ncols * 3 * 256);
-    uint8_t* rowcellsb = PAR_ALLOC(uint8_t, ncols * 256);
+    uint16_t* rowindsa = PAR_CALLOC(uint16_t, ncols * 3 * 256);
+    uint8_t* rowcellsa = PAR_CALLOC(uint8_t, ncols * 256);
+    uint16_t* rowindsb = PAR_CALLOC(uint16_t, ncols * 3 * 256);
+    uint8_t* rowcellsb = PAR_CALLOC(uint8_t, ncols * 256);
     uint16_t* prevrowinds = rowindsa;
     uint16_t* currrowinds = rowindsb;
     uint8_t* prevrowcells = rowcellsa;
     uint8_t* currrowcells = rowcellsb;
     uint32_t* simplification_words = 0;
     if (flags & PAR_MSQUARES_SIMPLIFY) {
-        simplification_words = PAR_ALLOC(uint32_t, 2 * nrows * ncols);
+        simplification_words = PAR_CALLOC(uint32_t, 2 * nrows * ncols);
     }
 
     // Do the march!
@@ -1514,6 +1604,29 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
                     }
                 }
 
+                // Look for T junctions and note them for later repairs.
+                uint8_t prc = prevrowcell;
+                if (usedpts[4] && !usedpts[5] && usedpts[6] && (prc & 2)) {
+                    // Above cell had a middle vert, current cell straddles it.
+                    par__uint16list_add3(mesh->tjunctions,
+                        pcurrinds[4], pcurrinds[6], pprevrowinds[1]);
+                } else if ((prc & 1) && !(prc & 2) && (prc & 4) && usedpts[5]) {
+                    // Current cell has a middle vert, above cell straddles it.
+                    par__uint16list_add3(mesh->tjunctions,
+                        pprevrowinds[0], pprevrowinds[2], pcurrinds[5]);
+                }
+                uint8_t pcc = col > 0 ? prevcell[color] : 0;
+                if (usedpts[0] && !usedpts[7] && usedpts[6] && (pcc & 8)) {
+                    // Left cell had a middle vert, current cell straddles it.
+                    par__uint16list_add3(mesh->tjunctions,
+                        pcurrinds[6], pcurrinds[0], pprevinds[3]);
+                }
+                if ((pcc & 4) && !(pcc & 8) && (pcc & 16) && usedpts[7]) {
+                    // Current cell has a middle vert, left cell straddles it.
+                    par__uint16list_add3(mesh->tjunctions,
+                        pprevinds[2], pprevinds[4], pcurrinds[7]);
+                }
+
                 // Stamp out the cell's triangle indices for this color.
                 uint16_t* tdst = mesh->triangles + mesh->ntriangles * 3;
                 mesh->ntriangles += ntris[c];
@@ -1626,19 +1739,25 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         PAR_SWAP(uint8_t*, prevrowcells, currrowcells);
         PAR_SWAP(uint16_t*, prevrowinds, currrowinds);
     }
-    assert(mesh->npoints <= ncells * maxpts_per_cell);
-    assert(mesh->ntriangles <= ncells * maxtris_per_cell);
     free(prevrowinds);
     free(prevrowcells);
     free(pixels);
+
+    if (flags & PAR_MSQUARES_CLEAN) {
+        par_msquares__repair_tjunctions(mlist);
+    }
+    for (int m = 0; m < mlist->nmeshes; m++) {
+        par_msquares__mesh* mesh = mlist->meshes[m];
+        par__uint16list_free(mesh->tjunctions);
+    }
     if (!(flags & PAR_MSQUARES_SIMPLIFY)) {
-        par_msquares_internal_finalize(mlist);
+        par_msquares__finalize(mlist);
         return mlist;
     }
 
-    uint8_t* simplification_blocks = PAR_ALLOC(uint8_t, nrows * ncols);
-    uint32_t* simplification_tris = PAR_ALLOC(uint32_t, nrows * ncols);
-    uint8_t* simplification_ntris = PAR_ALLOC(uint8_t, nrows * ncols);
+    uint8_t* simplification_blocks = PAR_CALLOC(uint8_t, nrows * ncols);
+    uint32_t* simplification_tris = PAR_CALLOC(uint32_t, nrows * ncols);
+    uint8_t* simplification_ntris = PAR_CALLOC(uint8_t, nrows * ncols);
 
     // Perform quick-n-dirty simplification by iterating two rows at a time.
     // In no way does this create the simplest possible mesh, but at least it's
@@ -1712,7 +1831,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
         // Build a new index array cell-by-cell.  If any given cell is 'F' and
         // its neighbor to the south is also 'F', then it's part of a run.
         int nnewtris = mesh->ntriangles - neliminated_triangles;
-        uint16_t* newtris = PAR_ALLOC(uint16_t, nnewtris * 3);
+        uint16_t* newtris = PAR_CALLOC(uint16_t, nnewtris * 3);
         uint16_t* pnewtris = newtris;
         in_run = 0;
         uint16_t* tris = mesh->triangles;
@@ -1797,7 +1916,7 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
     free(simplification_tris);
     free(simplification_words);
 
-    par_msquares_internal_finalize(mlist);
+    par_msquares__finalize(mlist);
     for (int i = 0; i < mlist->nmeshes; i++) {
         par_remove_unreferenced_verts(mlist->meshes[i]);
     }
@@ -1861,14 +1980,14 @@ static uint32_t par__hedge_key(par__hvert* a, par__hvert* b, par__hvert* s)
 par_msquares_boundary* par_msquares_extract_boundary(
     par_msquares_mesh const* mesh)
 {
-    par_msquares_boundary* result = PAR_ALLOC(par_msquares_boundary, 1);
+    par_msquares_boundary* result = PAR_CALLOC(par_msquares_boundary, 1);
     par__hemesh hemesh = {0};
     hemesh.mesh = mesh;
     int nedges = mesh->ntriangles * 3;
 
     // Populate all fields of verts and edges, except opposite.
-    hemesh.edges = PAR_ALLOC(par__hedge, nedges);
-    par__hvert* hverts = hemesh.verts = PAR_ALLOC(par__hvert, mesh->npoints);
+    hemesh.edges = PAR_CALLOC(par__hedge, nedges);
+    par__hvert* hverts = hemesh.verts = PAR_CALLOC(par__hvert, mesh->npoints);
     par__hedge* edge = hemesh.edges;
     uint16_t const* tri = mesh->triangles;
     for (int n = 0; n < mesh->ntriangles; n++, edge += 3, tri += 3) {
@@ -1890,7 +2009,7 @@ par_msquares_boundary* par_msquares_extract_boundary(
     }
 
     // Sort the edges according to their key.
-    hemesh.sorted_edges = PAR_ALLOC(par__hedge*, mesh->ntriangles * 3);
+    hemesh.sorted_edges = PAR_CALLOC(par__hedge*, mesh->ntriangles * 3);
     for (int n = 0; n < nedges; n++) {
         hemesh.sorted_edges[n] = hemesh.edges + n;
     }
@@ -1920,9 +2039,9 @@ par_msquares_boundary* par_msquares_extract_boundary(
     // We'll adjust the lengths later.
     result->nchains = nborders / 3;
     result->npoints = nborders + result->nchains;
-    result->points = PAR_ALLOC(float, 2 * result->npoints);
-    result->chains = PAR_ALLOC(float*, result->nchains);
-    result->lengths = PAR_ALLOC(uint16_t, result->nchains);
+    result->points = PAR_CALLOC(float, 2 * result->npoints);
+    result->chains = PAR_CALLOC(float*, result->nchains);
+    result->lengths = PAR_CALLOC(uint16_t, result->nchains);
 
     // Iterate over each polyline.
     edge = hemesh.sorted_edges[0];
@@ -1979,6 +2098,8 @@ par_msquares_boundary* par_msquares_extract_boundary(
 #undef PAR_MIN
 #undef PAR_MAX
 #undef PAR_CLAMP
-#undef PAR_ALLOC
+#undef PAR_CALLOC
+#undef PAR_REALLOC
+#undef PAR_FREE
 #undef PAR_SWAP
 #endif

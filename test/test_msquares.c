@@ -56,10 +56,42 @@ static void test_multi()
     par_msquares_mesh const* mesh;
     FILE* objfile, *svgfile;
 
+    lodepng_decode_file(&pixels, &dims[0], &dims[1], "test/tverts.png", LCT_RGB,
+        8);
+    mlist = par_msquares_color_multi(pixels, dims[0], dims[1], 12, 3,
+        PAR_MSQUARES_CLEAN);
+    objfile = fopen("build/msquares_multi_tverts.obj", "wt");
+    svgfile = fopen("build/msquares_multi_tverts.svg", "wt");
+    offset = 1;
+    svg_begin(svgfile);
+    for (int m = 0; m < par_msquares_get_count(mlist); m++) {
+        mesh = par_msquares_get_mesh(mlist, m);
+        pt = mesh->points;
+        for (int i = 0; i < mesh->npoints; i++) {
+            float z = mesh->dim > 2 ? pt[2] : 0;
+            fprintf(objfile, "v %f %f %f\n", pt[0], pt[1], z);
+            pt += mesh->dim;
+        }
+        index = mesh->triangles;
+        for (int i = 0; i < mesh->ntriangles; i++) {
+            int a = offset + *index++;
+            int b = offset + *index++;
+            int c = offset + *index++;
+            fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
+        }
+        offset += mesh->npoints;
+        svg_write_path(svgfile, mesh, mesh->color & 0xffffff);
+    }
+    fputs("</g>\n</svg>", svgfile);
+    fclose(svgfile);
+    fclose(objfile);
+    par_msquares_free(mlist);
+    free(pixels);
+
     lodepng_decode_file(&pixels, &dims[0], &dims[1], "test/rgb.png", LCT_RGB,
         8);
     mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE / 2, 3,
-        0);
+        PAR_MSQUARES_CLEAN);
     objfile = fopen("build/msquares_multi_rgb.obj", "wt");
     svgfile = fopen("build/msquares_multi_rgb.svg", "wt");
     offset = 1;
@@ -91,7 +123,7 @@ static void test_multi()
     lodepng_decode_file(&pixels, &dims[0], &dims[1], "test/rgba.png", LCT_RGBA,
         8);
     mlist = par_msquares_color_multi(pixels, dims[0], dims[1], CELLSIZE / 2, 4,
-        PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_CONNECT);
+        PAR_MSQUARES_HEIGHTS | PAR_MSQUARES_CONNECT | PAR_MSQUARES_CLEAN);
     objfile = fopen("build/msquares_multi_rgba.obj", "wt");
     svgfile = fopen("build/msquares_multi_rgba.svg", "wt");
     offset = 1;
