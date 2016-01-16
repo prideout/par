@@ -20,16 +20,16 @@ static void svg_begin(FILE* svgfile)
 }
 
 static void svg_write_path(FILE* svgfile, par_msquares_mesh const* mesh,
-    uint32_t color)
+    uint32_t color, float fill, float stroke)
 {
     par_msquares_boundary* polygon = par_msquares_extract_boundary(mesh);
     fprintf(svgfile, "<path\n"
         " fill='#%6.6x'\n"
         " stroke='#%6.6x'\n"
         " stroke-width='0.005'\n"
-        " fill-opacity='0.1'\n"
-        " stroke-opacity='0.3'\n"
-        " d='", color, color);
+        " fill-opacity='%f'\n"
+        " stroke-opacity='%f'\n"
+        " d='", color, color, fill, stroke);
     for (int c = 0; c < polygon->nchains; c++) {
         float const* chain = polygon->chains[c];
         int length = (int) polygon->lengths[c];
@@ -80,7 +80,7 @@ static void test_multi()
             fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
         }
         offset += mesh->npoints;
-        svg_write_path(svgfile, mesh, mesh->color & 0xffffff);
+        svg_write_path(svgfile, mesh, mesh->color & 0xffffff, 0.5, 0.5);
     }
     fputs("</g>\n</svg>", svgfile);
     fclose(svgfile);
@@ -112,7 +112,7 @@ static void test_multi()
             fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
         }
         offset += mesh->npoints;
-        svg_write_path(svgfile, mesh, mesh->color);
+        svg_write_path(svgfile, mesh, mesh->color, 0.5, 0.5);
     }
     fputs("</g>\n</svg>", svgfile);
     fclose(svgfile);
@@ -144,7 +144,7 @@ static void test_multi()
             fprintf(objfile, "f %d/%d %d/%d %d/%d\n", a, a, b, b, c, c);
         }
         offset += mesh->npoints;
-        svg_write_path(svgfile, mesh, mesh->color & 0xffffff);
+        svg_write_path(svgfile, mesh, mesh->color & 0xffffff, 0.5, 0.5);
     }
     fputs("</g>\n</svg>", svgfile);
     fclose(svgfile);
@@ -307,7 +307,7 @@ static void test_grayscale()
     float* pt;
     par_msquares_meshlist* mlist;
     par_msquares_mesh const* mesh;
-    FILE* objfile;
+    FILE* objfile, *svgfile;
     int offset = 1;
 
     // -----------------------------
@@ -368,7 +368,10 @@ static void test_grayscale()
         THRESHOLD, flags);
     assert(par_msquares_get_count(mlist) == 2);
     objfile = fopen("build/msquares_gray_dual.obj", "wt");
+    svgfile = fopen("build/msquares_gray_dual.svg", "wt");
+    svg_begin(svgfile);
     mesh = par_msquares_get_mesh(mlist, 0);
+    svg_write_path(svgfile, mesh, 0x050b0, 0.5, 1.0);
     pt = mesh->points;
     for (i = 0; i < mesh->npoints; i++) {
         float z = mesh->dim > 2 ? pt[2] : 0;
@@ -385,6 +388,8 @@ static void test_grayscale()
     }
     offset = mesh->npoints + 1;
     mesh = par_msquares_get_mesh(mlist, 1);
+    svg_write_path(svgfile, mesh, 0x10e050, 1.0, 0.0);
+    svg_write_path(svgfile, mesh, 0, 0.0, 1.0);
     pt = mesh->points;
     for (i = 0; i < mesh->npoints; i++) {
         float z = mesh->dim > 2 ? pt[2] : 0;
@@ -400,6 +405,27 @@ static void test_grayscale()
     }
     fclose(objfile);
     par_msquares_free(mlist);
+
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        -0.02, flags);
+    mesh = par_msquares_get_mesh(mlist, 0);
+    svg_write_path(svgfile, mesh, 0xffffff, 0.0, 1.0);
+    par_msquares_free(mlist);
+
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        -0.06, flags);
+    mesh = par_msquares_get_mesh(mlist, 0);
+    svg_write_path(svgfile, mesh, 0xffffff, 0.0, 0.5);
+    par_msquares_free(mlist);
+
+    mlist = par_msquares_grayscale(pixels, IMGWIDTH, IMGHEIGHT, CELLSIZE,
+        -0.1, flags);
+    mesh = par_msquares_get_mesh(mlist, 0);
+    svg_write_path(svgfile, mesh, 0xffffff, 0.0, 0.25);
+    par_msquares_free(mlist);
+
+    fputs("</g>\n</svg>", svgfile);
+    fclose(svgfile);
 
     // -----------------------------
     // msquares_gray_heights
