@@ -1104,7 +1104,8 @@ static void par_shapes__connect(par_shapes_mesh* scene,
 par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
     int maxdepth)
 {
-    char program[strlen(text) + 1];
+    char* program;
+    program = PAR_MALLOC(char, strlen(text) + 1);
 
     // The first pass counts the number of rules and commands.
     strcpy(program, text);
@@ -1126,8 +1127,8 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
     }
 
     // Allocate space.
-    par_shapes__rule rules[nrules];
-    par_shapes__command commands[ncommands];
+    par_shapes__rule* rules = PAR_MALLOC(par_shapes__rule, nrules);
+    par_shapes__command* commands = PAR_MALLOC(par_shapes__command, ncommands);
 
     // Initialize the entry rule.
     par_shapes__rule* current_rule = &rules[0];
@@ -1280,6 +1281,9 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
         }
     }
     free(stack);
+    free(program);
+    free(rules);
+    free(commands);
     return scene;
 }
 
