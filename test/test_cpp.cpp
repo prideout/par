@@ -13,6 +13,9 @@
 #define PAR_FILECACHE_IMPLEMENTATION
 #include "par_filecache.h"
 
+#define PAR_BUBBLES_IMPLEMENTATION
+#include "par_bubbles.h"
+
 int main(int argc, char* argv[])
 {
     return 0;

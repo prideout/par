@@ -40,3 +40,9 @@ add_executable(
     test_shapes.c
     console-colors.c)
 target_link_libraries(test_shapes m)
+
+add_executable(
+    test_bubbles
+    test_bubbles.c
+    console-colors.c)
+target_link_libraries(test_bubbles m)

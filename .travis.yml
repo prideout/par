@@ -24,4 +24,5 @@ script:
     - export CC=clang CXX=clang++
     - cmake test -Bbuild
     - cmake --build build
+    - build/test_bubbles
     - build/test_shapes
