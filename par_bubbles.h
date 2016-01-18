@@ -26,6 +26,7 @@ par_bubbles_t* par_bubbles_pack(double const* radiuses, int nradiuses);
 
 // All these functions consume a list of nodes, where each node is
 // represented by an integer.  The integer is an index to the node's parent.
+// The root node is its own parent, and it must be the first node in the list.
 // Unlike the flat packing API, clients do not have control over radius.
 // However, they do have control over bounding area.
 
@@ -46,7 +47,7 @@ par_bubbles_t* par_bubbles_hpack_cylinder(int* nodes, int nnodes, double* dims);
 // If the result is -1, there is no node at the given pick coordinate.
 int par_bubbles_pick(par_bubbles_t*, double x, double y);
 
-// Take a pointer to 6 floats and set them to min xyz, max xyz.
+// Get bounding box; take a pointer to 4 floats and set them to min xy, max xy.
 void par_bubbles_compute_aabb(par_bubbles_t const*, double* aabb);
 
 // Dump out a SVG file for diagnostic purposes.
@@ -67,13 +68,16 @@ typedef struct {
 } par_bubbles__node;
 
 typedef struct {
-    double* xyr;
-    int count;
-    double const* client_radii;
-    int const* client_graph;
-    int const* client_parents;
-    par_bubbles__node* chain;
+    double* xyr;              // results array
+    int count;                // client-provided count
+    double const* radiuses;   // client-provided radius list
+    par_bubbles__node* chain; // counterclockwise enveloping chain
+    int const* graph_parents; // client-provided parent indices
+    int* graph_children;      // flat list of children indices
+    int* graph_heads;         // list of "pointers" to first child
+    int* graph_tails;         // list of "pointers" to one-past-last child
     int npacked;
+    int maxwidth;
 } par_bubbles__t;
 
 #ifndef PARB_HELPERS
@@ -114,10 +118,34 @@ static double par_bubbles__len2(double const* a)
     return a[0] * a[0] + a[1] * a[1];
 }
 
+static void par_bubbles__initgraph(par_bubbles__t* bubbles)
+{
+    int const* parents = bubbles->graph_parents;
+    int* nchildren = PAR_CALLOC(int, bubbles->count);
+    for (int i = 0; i < bubbles->count; i++) {
+        nchildren[parents[i]]++;
+    }
+    int c = 0;
+    bubbles->graph_heads = PAR_CALLOC(int, bubbles->count * 2);
+    bubbles->graph_tails = bubbles->graph_heads + bubbles->count;
+    for (int i = 0; i < bubbles->count; i++) {
+        bubbles->maxwidth = PAR_MAX(bubbles->maxwidth, nchildren[i]);
+        bubbles->graph_heads[i] = bubbles->graph_tails[i] = c;
+        c += nchildren[i];
+    }
+    bubbles->graph_heads[0] = bubbles->graph_tails[0] = 1;
+    bubbles->graph_children = PAR_MALLOC(int, c);
+    for (int i = 1; i < bubbles->count; i++) {
+        int parent = parents[i];
+        bubbles->graph_children[bubbles->graph_tails[parent]++] = i;
+    }
+    PAR_FREE(nchildren);
+}
+
 static void par_bubbles__initflat(par_bubbles__t* bubbles)
 {
     double* xyr = bubbles->xyr;
-    double const* radii = bubbles->client_radii;
+    double const* radii = bubbles->radiuses;
     par_bubbles__node* chain = bubbles->chain;
     *xyr++ = -*radii;
     *xyr++ = 0;
@@ -178,9 +206,9 @@ static int par_bubbles__collide(par_bubbles__t* bubbles, int ci, int cn,
     return 0;
 }
 
-static void par_bubbles__pack(par_bubbles__t* bubbles)
+static void par_bubbles__packflat(par_bubbles__t* bubbles)
 {
-    double const* radii = bubbles->client_radii;
+    double const* radii = bubbles->radiuses;
     double* xyr = bubbles->xyr;
     par_bubbles__node* chain = bubbles->chain;
 
@@ -237,33 +265,135 @@ static void par_bubbles__pack(par_bubbles__t* bubbles)
     }
 
     bubbles->npacked = bubbles->count;
-    bubbles->count = ci;
 }
 
 par_bubbles_t* par_bubbles_pack(double const* radiuses, int nradiuses)
 {
     par_bubbles__t* bubbles = PAR_CALLOC(par_bubbles__t, 1);
     if (nradiuses > 0) {
-        bubbles->client_radii = radiuses;
+        bubbles->radiuses = radiuses;
         bubbles->count = nradiuses;
         bubbles->chain = PAR_MALLOC(par_bubbles__node, nradiuses);
         bubbles->xyr = PAR_MALLOC(double, 3 * nradiuses);
         par_bubbles__initflat(bubbles);
-        par_bubbles__pack(bubbles);
+        par_bubbles__packflat(bubbles);
     }
     return (par_bubbles_t*) bubbles;
+}
+
+// TODO: use a stack instead of recursion
+void par_bubbles__compute_radius(par_bubbles__t* bubbles,
+    par_bubbles__t* worker, int parent)
+{
+    int head = bubbles->graph_heads[parent];
+    int tail = bubbles->graph_tails[parent];
+    int nchildren = tail - head;
+    int pr = parent * 3 + 2;
+    bubbles->xyr[pr] = 1;
+    if (nchildren == 0) {
+        return;
+    }
+    for (int children_index = head; children_index != tail; children_index++) {
+        int child = bubbles->graph_children[children_index];
+        par_bubbles__compute_radius(bubbles, worker, child);
+        bubbles->xyr[pr] += bubbles->xyr[child * 3 + 2];
+    }
+    bubbles->xyr[pr] = sqrtf(bubbles->xyr[pr]);
+}
+
+void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
+    int parent)
+{
+    int head = bubbles->graph_heads[parent];
+    int tail = bubbles->graph_tails[parent];
+    int nchildren = tail - head;
+    if (nchildren == 0) {
+        return;
+    }
+
+    // Cast away const because we're using the worker as a cache to avoid
+    // a kazillion malloc / free calls.
+    double* radiuses = (double*) worker->radiuses;
+
+    // We perform flat layout twice: once without padding (to determine scale)
+    // and then again with scaled padding.
+    double cx, cy, cr;
+    double px = bubbles->xyr[parent * 3 + 0];
+    double py = bubbles->xyr[parent * 3 + 1];
+    double pr = bubbles->xyr[parent * 3 + 2];
+    const double PAR_HPACK_PADDING1 = 0.1;
+    const double PAR_HPACK_PADDING2 = 0.05;
+    double scaled_padding = 0.0;
+    while (1) {
+        worker->npacked = 0;
+        worker->count = nchildren;
+        int c = 0;
+        for (int cindex = head; cindex != tail; cindex++) {
+            int child = bubbles->graph_children[cindex];
+            radiuses[c++] = bubbles->xyr[child * 3 + 2] + scaled_padding;
+        }
+        par_bubbles__initflat(worker);
+        par_bubbles__packflat(worker);
+        double aabb[6];
+        par_bubbles_compute_aabb((par_bubbles_t const*) worker, aabb);
+        cx = 0.5 * (aabb[0] + aabb[2]);
+        cy = 0.5 * (aabb[1] + aabb[3]);
+        cr = 0;
+        for (int c = 0; c < nchildren; c++) {
+            double x = worker->xyr[c * 3 + 0] - cx;
+            double y = worker->xyr[c * 3 + 1] - cy;
+            double r = worker->xyr[c * 3 + 2];
+            cr = PAR_MAX(cr, r + sqrtf(x * x + y * y));
+        }
+        if (scaled_padding || !PAR_HPACK_PADDING1) {
+            break;
+        } else {
+            scaled_padding = PAR_HPACK_PADDING1 / cr;
+        }
+    }
+    scaled_padding *= cr;
+    cr += PAR_HPACK_PADDING2 * cr;
+    if (nchildren == 1) {
+        cr *= 2;
+    }
+
+    // Transform the children to fit nicely into their parent.
+    int c = 0;
+    pr /= cr;
+    for (int cindex = head; cindex != tail; cindex++) {
+        int child = bubbles->graph_children[cindex];
+        bubbles->xyr[child * 3 + 0] = px + pr * (worker->xyr[c * 3 + 0] - cx);
+        bubbles->xyr[child * 3 + 1] = py + pr * (worker->xyr[c * 3 + 1] - cy);
+        bubbles->xyr[child * 3 + 2] -= scaled_padding;
+        bubbles->xyr[child * 3 + 2] *= pr;
+        c++;
+    }
+
+    // Recursion.  TODO: It might be better to use our own stack here.
+    for (int cindex = head; cindex != tail; cindex++) {
+        par_bubbles__hpack(bubbles, worker, bubbles->graph_children[cindex]);
+    }
 }
 
 par_bubbles_t* par_bubbles_hpack_circle(int* nodes, int nnodes, double radius)
 {
     par_bubbles__t* bubbles = PAR_CALLOC(par_bubbles__t, 1);
     if (nnodes > 0) {
-        // bubbles->client_graph = nodes;
-        // bubbles->count = nnodes;
-        // bubbles->chain = PAR_MALLOC(par_bubbles__node, nradiuses);
-        // bubbles->xyr = PAR_MALLOC(double, 3 * nradiuses);
-        // par_bubbles__initgraph(bubbles);
-        // par_bubbles__pack(bubbles);
+        bubbles->graph_parents = nodes;
+        bubbles->count = nnodes;
+        bubbles->chain = PAR_MALLOC(par_bubbles__node, nnodes);
+        bubbles->xyr = PAR_MALLOC(double, 3 * nnodes);
+        par_bubbles__initgraph(bubbles);
+        par_bubbles__t* worker = PAR_CALLOC(par_bubbles__t, 1);
+        worker->radiuses = PAR_MALLOC(double, bubbles->maxwidth);
+        worker->chain = PAR_MALLOC(par_bubbles__node, bubbles->maxwidth);
+        worker->xyr = PAR_MALLOC(double, 3 * bubbles->maxwidth);
+        par_bubbles__compute_radius(bubbles, worker, 0);
+        bubbles->xyr[0] = 0;
+        bubbles->xyr[1] = 0;
+        bubbles->xyr[2] = radius;
+        par_bubbles__hpack(bubbles, worker, 0);
+        par_bubbles_free_result((par_bubbles_t*) worker);
     }
     return (par_bubbles_t*) bubbles;
 }
@@ -271,6 +401,8 @@ par_bubbles_t* par_bubbles_hpack_circle(int* nodes, int nnodes, double radius)
 void par_bubbles_free_result(par_bubbles_t* pubbub)
 {
     par_bubbles__t* bubbles = (par_bubbles__t*) pubbub;
+    PAR_FREE(bubbles->graph_children);
+    PAR_FREE(bubbles->graph_heads);
     PAR_FREE(bubbles->chain);
     PAR_FREE(bubbles->xyr);
     PAR_FREE(bubbles);
@@ -298,25 +430,24 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
     par_bubbles_compute_aabb(bubbles, aabb);
     double maxextent = PAR_MAX(aabb[2] - aabb[0], aabb[3] - aabb[1]);
     double padding = 0.05 * maxextent;
-    double spacing = 1.0 / maxextent;
     FILE* svgfile = fopen(filename, "wt");
     fprintf(svgfile,
         "<svg viewBox='%f %f %f %f' width='700px' height='700px' "
         "version='1.1' "
         "xmlns='http://www.w3.org/2000/svg'>\n"
-        "<g stroke-width='%f' stroke='white' fill-opacity='0.2' fill='white' "
+        "<g stroke-width='0.5' stroke-opacity='0.5' stroke='black' "
+        "fill-opacity='0.2' fill='#2A8BB6' "
         "transform='scale(1 -1) transform(0 %f)'>\n"
-        "<rect fill-opacity='1' stroke='#475473' fill='#475473' x='%f' y='%f' "
+        "<rect fill-opacity='0.1' stroke='none' fill='#2A8BB6' x='%f' y='%f' "
         "width='100%%' height='100%%'/>\n",
         aabb[0] - padding, aabb[1] - padding,
         aabb[2] - aabb[0] + 2 * padding, aabb[3] - aabb[1] + 2 * padding,
-        spacing,
         aabb[1] - padding,
         aabb[0] - padding, aabb[1] - padding);
     double const* xyr = bubbles->xyr;
     for (int i = 0; i < bubbles->count; i++, xyr += 3) {
-        fprintf(svgfile, "<circle cx='%f' cy='%f' r='%f'/>\n",
-            xyr[0], xyr[1], xyr[2] - spacing);
+        fprintf(svgfile, "<circle stroke-width='%f' cx='%f' cy='%f' r='%f'/>\n",
+            xyr[2] * 0.01, xyr[0], xyr[1], xyr[2]);
         fprintf(svgfile, "<text text-anchor='middle' stroke='none' "
             "x='%f' y='%f' font-size='%f'>%d</text>\n",
             xyr[0], xyr[1] + xyr[2] * 0.125, xyr[2] * 0.5, i);

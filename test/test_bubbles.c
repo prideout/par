@@ -64,9 +64,19 @@ int main()
             par_bubbles_free_result(bubbles);
         }
 
-        it("should work with hierarchy") {
+        it("should work with small hierarchy") {
+            static int hierarchy[10] = {
+                0, 0, 0, 0, 1, 1, 2,
+                5, 5, 5,
+            };
+            bubbles = par_bubbles_hpack_circle(hierarchy, 10, 100);
+            par_bubbles_export(bubbles, "build/test_bubbles_hpack_circle1.svg");
+            par_bubbles_free_result(bubbles);
+        }
+
+        it("should work with big hierarchy") {
             bubbles = par_bubbles_hpack_circle(hierarchy, NNODES, 100);
-            par_bubbles_export(bubbles, "build/test_bubbles_hpack_circle.svg");
+            par_bubbles_export(bubbles, "build/test_bubbles_hpack_circle2.svg");
             par_bubbles_free_result(bubbles);
         }
 
