@@ -10,6 +10,50 @@
 
 int main()
 {
+    describe("cylinders and spheres") {
+        it("should fail when the number of stacks or slices is invalid") {
+            par_shapes_mesh* bad1 = par_shapes_create_cylinder(1, 1);
+            par_shapes_mesh* bad2 = par_shapes_create_cylinder(1, 3);
+            par_shapes_mesh* good = par_shapes_create_cylinder(3, 1);
+            assert_null(bad1);
+            assert_null(bad2);
+            assert_ok(good);
+            par_shapes_free_mesh(good);
+        }
+        it("should generate correct number of vertices") {
+            par_shapes_mesh* m = par_shapes_create_cylinder(5, 6);
+            assert_equal(m->npoints, 42);
+            par_shapes_free_mesh(m);
+        }
+        it("should have expected number of triangles") {
+            par_shapes_mesh* m;
+            int slices, stacks ;
+
+            slices = 5; stacks = 6;
+            m = par_shapes_create_cylinder(slices, stacks);
+            assert_equal(m->ntriangles, slices * stacks * 2);
+            par_shapes_free_mesh(m);
+
+            slices = 5; stacks = 6;
+            m = par_shapes_create_parametric_sphere(slices, stacks);
+            par_shapes_export(m, "build/test_shapes_psphere.obj");
+            assert_equal(m->ntriangles, slices * 2 + (stacks - 2) * slices * 2);
+            par_shapes_free_mesh(m);
+
+            slices = 12; stacks = 13;
+            m = par_shapes_create_parametric_sphere(slices, stacks);
+            par_shapes_export(m, "build/test_shapes_psphere.obj");
+            assert_equal(m->ntriangles, slices * 2 + (stacks - 2) * slices * 2);
+            par_shapes_free_mesh(m);
+
+            slices = 16; stacks = 16;
+            m = par_shapes_create_parametric_sphere(slices, stacks);
+            par_shapes_export(m, "build/test_shapes_psphere.obj");
+            assert_equal(m->ntriangles, slices * 2 + (stacks - 2) * slices * 2);
+            par_shapes_free_mesh(m);
+        }
+    }
+
     describe("par_shapes_export") {
         it("should generate an OBJ file") {
             par_shapes_mesh* m;
@@ -20,10 +64,6 @@ int main()
 
             m = par_shapes_create_torus(7, 10, 0.1);
             par_shapes_export(m, "build/test_shapes_torus.obj");
-            par_shapes_free_mesh(m);
-
-            m = par_shapes_create_parametric_sphere(5, 6);
-            par_shapes_export(m, "build/test_shapes_psphere.obj");
             par_shapes_free_mesh(m);
 
             m = par_shapes_create_subdivided_sphere(2);
@@ -76,24 +116,6 @@ int main()
             par_shapes_export(m, "build/test_shapes_disk.obj");
             par_shapes_free_mesh(m);
 
-        }
-    }
-
-    describe("par_shapes_create_cylinder") {
-        it("should fail when the number of stacks or slices is invalid") {
-            par_shapes_mesh* bad1 = par_shapes_create_cylinder(1, 1);
-            par_shapes_mesh* bad2 = par_shapes_create_cylinder(1, 3);
-            par_shapes_mesh* good = par_shapes_create_cylinder(3, 1);
-            assert_null(bad1);
-            assert_null(bad2);
-            assert_ok(good);
-            par_shapes_free_mesh(good);
-        }
-        it("should generate correct number of faces and vertices") {
-            par_shapes_mesh* m = par_shapes_create_cylinder(5, 6);
-            assert_equal(m->npoints, 42);
-            assert_equal(m->ntriangles, 60);
-            par_shapes_free_mesh(m);
         }
     }
 
