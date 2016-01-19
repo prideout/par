@@ -88,6 +88,9 @@ par_shapes_mesh* par_shapes_create_cube();
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     float const* center, float const* normal);
 
+// Create an empty shape.  Useful for building scenes with merge_and_free.
+par_shapes_mesh* par_shapes_create_empty();
+
 // Generate a rock shape that sits on the Y=0 plane, and sinks into it a bit.
 // This includes smooth normals but no texture coordinates.
 par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
@@ -115,6 +118,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
 void par_shapes_translate(par_shapes_mesh*, float x, float y, float z);
 void par_shapes_rotate(par_shapes_mesh*, float radians, float const* axis);
 void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
+void par_shapes_merge_and_free(par_shapes_mesh* dst, par_shapes_mesh* src);
 
 // Reverse the winding of a run of faces.  Useful when drawing the inside of
 // a Cornell Box.  Pass 0 for nfaces to reverse every face in the mesh.
@@ -393,8 +397,7 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
 
     // Generate faces.
     mesh->ntriangles = 2 * slices * stacks;
-    mesh->triangles = (uint16_t*)
-        calloc(sizeof(uint16_t) * 3 * mesh->ntriangles, 1);
+    mesh->triangles = PAR_CALLOC(uint16_t, 3 * mesh->ntriangles);
     int v = 0;
     uint16_t* face = mesh->triangles;
     for (int stack = 0; stack < stacks; stack++) {
@@ -630,8 +633,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
 par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     float const* center, float const* normal)
 {
-    par_shapes_mesh* mesh = (par_shapes_mesh*)
-        calloc(sizeof(par_shapes_mesh), 1);
+    par_shapes_mesh* mesh = PAR_CALLOC(par_shapes_mesh, 1);
     mesh->npoints = slices + 1;
     mesh->points = PAR_MALLOC(float, 3 * mesh->npoints);
     float* points = mesh->points;
@@ -669,6 +671,11 @@ par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
     par_shapes_rotate(mesh, acos(nnormal[2]), axis);
     par_shapes_translate(mesh, center[0], center[1], center[2]);
     return mesh;
+}
+
+par_shapes_mesh* par_shapes_create_empty()
+{
+    return PAR_CALLOC(par_shapes_mesh, 1);
 }
 
 void par_shapes_translate(par_shapes_mesh* m, float x, float y, float z)
@@ -734,6 +741,12 @@ void par_shapes_scale(par_shapes_mesh* m, float x, float y, float z)
         *points++ *= y;
         *points++ *= z;
     }
+}
+
+void par_shapes_merge_and_free(par_shapes_mesh* dst, par_shapes_mesh* src)
+{
+    par_shapes_merge(dst, src);
+    par_shapes_free_mesh(src);
 }
 
 void par_shapes_compute_aabb(par_shapes_mesh const* m, float* aabb)
