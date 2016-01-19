@@ -36,19 +36,16 @@ int main()
 
             slices = 5; stacks = 6;
             m = par_shapes_create_parametric_sphere(slices, stacks);
-            par_shapes_export(m, "build/test_shapes_psphere.obj");
             assert_equal(m->ntriangles, slices * 2 + (stacks - 2) * slices * 2);
             par_shapes_free_mesh(m);
 
             slices = 12; stacks = 13;
             m = par_shapes_create_parametric_sphere(slices, stacks);
-            par_shapes_export(m, "build/test_shapes_psphere.obj");
             assert_equal(m->ntriangles, slices * 2 + (stacks - 2) * slices * 2);
             par_shapes_free_mesh(m);
 
             slices = 16; stacks = 16;
             m = par_shapes_create_parametric_sphere(slices, stacks);
-            par_shapes_export(m, "build/test_shapes_psphere.obj");
             assert_equal(m->ntriangles, slices * 2 + (stacks - 2) * slices * 2);
             par_shapes_free_mesh(m);
         }
@@ -57,10 +54,6 @@ int main()
     describe("par_shapes_export") {
         it("should generate an OBJ file") {
             par_shapes_mesh* m;
-
-            m = par_shapes_create_cylinder(50, 20);
-            par_shapes_export(m, "build/test_shapes_cylinder.obj");
-            par_shapes_free_mesh(m);
 
             m = par_shapes_create_torus(7, 10, 0.1);
             par_shapes_export(m, "build/test_shapes_torus.obj");
