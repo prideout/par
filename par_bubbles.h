@@ -53,6 +53,20 @@ void par_bubbles_compute_aabb(par_bubbles_t const*, double* aabb);
 // Dump out a SVG file for diagnostic purposes.
 void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 
+#ifndef PAR_HELPERS
+#define PAR_HELPERS 1
+#define PAR_PI (3.14159265359)
+#define PAR_MIN(a, b) (a > b ? b : a)
+#define PAR_MAX(a, b) (a > b ? a : b)
+#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
+#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
+#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
+#define PAR_FREE(BUF) free(BUF)
+#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
+#define PAR_SQR(a) (a * a)
+#endif
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
@@ -61,6 +75,7 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 typedef struct {
     int prev;
@@ -79,19 +94,6 @@ typedef struct {
     int npacked;
     int maxwidth;
 } par_bubbles__t;
-
-#ifndef PARB_HELPERS
-#define PARB_HELPERS 1
-#define PAR_PI (3.14159265359)
-#define PAR_MIN(a, b) (a > b ? b : a)
-#define PAR_MAX(a, b) (a > b ? a : b)
-#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
-#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
-#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
-#define PAR_FREE(BUF) free(BUF)
-#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
-#endif
 
 // Assigns an xy to "c" such that it becomes tangent to "a" and "b".
 static void par_bubbles__place(double* c, double const* a, double const* b)

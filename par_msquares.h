@@ -101,6 +101,20 @@ par_msquares_meshlist* par_msquares_color_multi(par_byte const* data, int width,
 
 par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 
+#ifndef PAR_HELPERS
+#define PAR_HELPERS 1
+#define PAR_PI (3.14159265359)
+#define PAR_MIN(a, b) (a > b ? b : a)
+#define PAR_MAX(a, b) (a > b ? a : b)
+#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
+#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
+#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
+#define PAR_FREE(BUF) free(BUF)
+#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
+#define PAR_SQR(a) (a * a)
+#endif
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
@@ -111,14 +125,6 @@ par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 #include <assert.h>
 #include <float.h>
 #include <string.h>
-
-#define PAR_MIN(a, b) (a > b ? b : a)
-#define PAR_MAX(a, b) (a > b ? a : b)
-#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
-#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
-#define PAR_FREE(BUF) free(BUF)
-#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
 
 typedef struct {
     uint16_t* values;
@@ -2095,11 +2101,4 @@ par_msquares_boundary* par_msquares_extract_boundary(
     return result;
 }
 
-#undef PAR_MIN
-#undef PAR_MAX
-#undef PAR_CLAMP
-#undef PAR_CALLOC
-#undef PAR_REALLOC
-#undef PAR_FREE
-#undef PAR_SWAP
 #endif

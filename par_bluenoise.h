@@ -101,6 +101,20 @@ float* par_bluenoise_generate_exact(
 // replaces the 3rd component with an index.
 void par_bluenoise_sort_by_rank(float* pts, int npts);
 
+#ifndef PAR_HELPERS
+#define PAR_HELPERS 1
+#define PAR_PI (3.14159265359)
+#define PAR_MIN(a, b) (a > b ? b : a)
+#define PAR_MAX(a, b) (a > b ? a : b)
+#define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
+#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
+#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
+#define PAR_FREE(BUF) free(BUF)
+#define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
+#define PAR_SQR(a) (a * a)
+#endif
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
@@ -113,14 +127,8 @@ void par_bluenoise_sort_by_rank(float* pts, int npts);
 #include <math.h>
 #include <string.h>
 
-#ifndef PAR_HELPERS
-#define PAR_CLAMP(x, min, max) ((x < min) ? min : ((x > max) ? max : x))
-#endif
-
-#define PAR_SQR(a) (a * a)
 #define PAR_MINI(a, b) ((a < b) ? a : b)
 #define PAR_MAXI(a, b) ((a > b) ? a : b)
-#define PAR_ALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 
 typedef struct {
     float x;
@@ -297,9 +305,9 @@ float* par_bluenoise_generate(
 static par_bluenoise_context* par_bluenoise_create(
     char const* filepath, int nbytes, int maxpts)
 {
-    par_bluenoise_context* ctx = PAR_ALLOC(par_bluenoise_context, 1);
+    par_bluenoise_context* ctx = PAR_MALLOC(par_bluenoise_context, 1);
     ctx->maxpoints = maxpts;
-    ctx->points = PAR_ALLOC(par_vec3, maxpts);
+    ctx->points = PAR_MALLOC(par_vec3, maxpts);
     ctx->density = 0;
     ctx->abridged = 0;
     par_bluenoise_set_window(ctx, 1024, 768);
@@ -312,7 +320,7 @@ static par_bluenoise_context* par_bluenoise_create(
         fseek(fin, 0, SEEK_END);
         nbytes = (int) ftell(fin);
         fseek(fin, 0, SEEK_SET);
-        buf = PAR_ALLOC(char, nbytes);
+        buf = PAR_MALLOC(char, nbytes);
         int consumed = (int) fread(buf, nbytes, 1, fin);
         assert(consumed == nbytes);
         fclose(fin);
@@ -322,28 +330,28 @@ static par_bluenoise_context* par_bluenoise_create(
     int ntiles = ctx->ntiles = freadi();
     int nsubtiles = ctx->nsubtiles = freadi();
     int nsubdivs = ctx->nsubdivs = freadi();
-    par_tile* tiles = ctx->tiles = PAR_ALLOC(par_tile, ntiles);
+    par_tile* tiles = ctx->tiles = PAR_MALLOC(par_tile, ntiles);
     for (int i = 0; i < ntiles; i++) {
         tiles[i].n = freadi();
         tiles[i].e = freadi();
         tiles[i].s = freadi();
         tiles[i].w = freadi();
-        tiles[i].subdivs = PAR_ALLOC(int*, nsubdivs);
+        tiles[i].subdivs = PAR_MALLOC(int*, nsubdivs);
         for (int j = 0; j < nsubdivs; j++) {
-            int* subdiv = PAR_ALLOC(int, PAR_SQR(nsubtiles));
+            int* subdiv = PAR_MALLOC(int, PAR_SQR(nsubtiles));
             for (int k = 0; k < PAR_SQR(nsubtiles); k++) {
                 subdiv[k] = freadi();
             }
             tiles[i].subdivs[j] = subdiv;
         }
         tiles[i].npoints = freadi();
-        tiles[i].points = PAR_ALLOC(par_vec2, tiles[i].npoints);
+        tiles[i].points = PAR_MALLOC(par_vec2, tiles[i].npoints);
         for (int j = 0; j < tiles[i].npoints; j++) {
             tiles[i].points[j].x = freadf();
             tiles[i].points[j].y = freadf();
         }
         tiles[i].nsubpts = freadi();
-        tiles[i].subpts = PAR_ALLOC(par_vec2, tiles[i].nsubpts);
+        tiles[i].subpts = PAR_MALLOC(par_vec2, tiles[i].nsubpts);
         for (int j = 0; j < tiles[i].nsubpts; j++) {
             tiles[i].subpts[j].x = freadf();
             tiles[i].subpts[j].y = freadf();
@@ -383,7 +391,7 @@ void par_bluenoise_density_from_gray(par_bluenoise_context* ctx,
 {
     ctx->density_width = width;
     ctx->density_height = height;
-    ctx->density = PAR_ALLOC(unsigned char, width * height);
+    ctx->density = PAR_MALLOC(unsigned char, width * height);
     unsigned char* dst = ctx->density;
     for (int j = 0; j < height; j++) {
         for (int i = 0; i < width; i++) {
@@ -400,7 +408,7 @@ void par_bluenoise_density_from_color(par_bluenoise_context* ctx,
     unsigned int bkgd = background_color;
     ctx->density_width = width;
     ctx->density_height = height;
-    ctx->density = PAR_ALLOC(unsigned char, width * height);
+    ctx->density = PAR_MALLOC(unsigned char, width * height);
     unsigned char* dst = ctx->density;
     unsigned int mask = 0x000000ffu;
     if (bpp > 1) {
@@ -470,7 +478,7 @@ float* par_bluenoise_generate_exact(
     if (ctx->maxpoints < maxpoints) {
         free(ctx->points);
         ctx->maxpoints = maxpoints;
-        ctx->points = PAR_ALLOC(par_vec3, maxpoints);
+        ctx->points = PAR_MALLOC(par_vec3, maxpoints);
     }
     int ngenerated = 0;
     int nprevious = 0;
@@ -496,7 +504,7 @@ float* par_bluenoise_generate_exact(
     par_bluenoise_sort_by_rank(&ctx->points->x, ngenerated);
     if (stride != 3) {
         int nbytes = sizeof(float) * stride * ndesired;
-        float* pts = PAR_ALLOC(float, stride * ndesired);
+        float* pts = PAR_MALLOC(float, stride * ndesired);
         float* dst = pts;
         const float* src = &ctx->points->x;
         for (int i = 0; i < ndesired; i++, src++) {
@@ -513,10 +521,7 @@ float* par_bluenoise_generate_exact(
     return &ctx->points->x;
 }
 
-#undef PAR_CLAMP
-#undef PAR_SQR
 #undef PAR_MINI
 #undef PAR_MAXI
-#undef PAR_ALLOC
 
 #endif
