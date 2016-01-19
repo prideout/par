@@ -120,8 +120,8 @@ void par_shapes_scale(par_shapes_mesh*, float x, float y, float z);
 // a Cornell Box.  Pass 0 for nfaces to reverse every face in the mesh.
 void par_shapes_invert(par_shapes_mesh*, int startface, int nfaces);
 
-// Remove all triangles whose area is less than maxarea.
-void par_shapes_remove_degenerate(par_shapes_mesh*, float maxarea);
+// Remove all triangles whose area is less than minarea.
+void par_shapes_remove_degenerate(par_shapes_mesh*, float minarea);
 
 // Dereference the entire index buffer and replace the point list.
 // This creates an inefficient structure, but is useful for drawing facets.
@@ -291,7 +291,7 @@ par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks)
     }
     par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__sphere,
         slices, stacks, 0);
-    par_shapes_remove_degenerate(m, 0.01);
+    par_shapes_remove_degenerate(m, 0.0001);
     return m;
 }
 
@@ -302,7 +302,7 @@ par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks)
     }
     par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__hemisphere,
         slices, stacks, 0);
-    par_shapes_remove_degenerate(m, 0.01);
+    par_shapes_remove_degenerate(m, 0.0001);
     return m;
 }
 
@@ -1973,13 +1973,14 @@ static double par__simplex_noise2(struct osn_context* ctx, double x, double y)
     return value / NORM_CONSTANT_2D;
 }
 
-void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float maxarea)
+void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float mintriarea)
 {
     int ntriangles = 0;
     uint16_t* triangles = PAR_MALLOC(uint16_t, mesh->ntriangles * 3);
     uint16_t* dst = triangles;
     uint16_t const* src = mesh->triangles;
     float next[3], prev[3], cp[3];
+    float mincplen2 = (mintriarea * 2) * (mintriarea * 2);
     for (int f = 0; f < mesh->ntriangles; f++, src += 3) {
         float const* pa = mesh->points + 3 * src[0];
         float const* pb = mesh->points + 3 * src[1];
@@ -1989,7 +1990,8 @@ void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float maxarea)
         par_shapes__copy3(prev, pc);
         par_shapes__subtract3(prev, pa);
         par_shapes__cross3(cp, next, prev);
-        if (fabs(cp[2]) > maxarea) {
+        float cplen2 = par_shapes__dot3(cp, cp);
+        if (cplen2 >= mincplen2) {
             *dst++ = src[0];
             *dst++ = src[1];
             *dst++ = src[2];
