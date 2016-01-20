@@ -2,10 +2,39 @@
 // Simple C library for packing circles into hierarchical (or flat) diagrams.
 //
 // Based on "Visualization of Large Hierarchical Data by Circle Packing" by
-// Wang et al, with an extension for cylinderical space.
+// Wang et al (2006), with an extension for cylinderical space.
+//
+// Also uses Emo Welzl's "Smallest enclosing disks" algorithm (1991).
+//
+// The API is divided into three sections:
+//
+//   - Enclosing.  Compute the smallest bounding circle for points or circles.
+//   - Packing.    Pack circles together, or into other circles.
+//   - Queries.    Given a touch points, pick a circle from a hierarchy, etc.
+//
+// In addition to the comment block above each function declaration, the API
+// has informal documentation here:
+//
+//     http://github.prideout.net/bubbles/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
+
+#ifndef PAR_BUBBLES_H
+#define PAR_BUBBLES_H
+
+// Enclosing -------------------------------------------------------------------
+
+// Reads an array of (x,y) coordinates, writes a single 3-tuple (x,y,radius).
+void par_bubbles_enclose_points(double const* xy, int npts, double* result);
+
+// Reads an array of 3-tuples (x,y,radius), writes a 3-tuple (x,y,radius).
+void par_bubbles_enclose_disks(double const* xyr, int ndisks, double* result);
+
+// Low-level function used internally to create a circle tangent to 3 points.
+void par_bubbles_touch_three_points(double const* xy, double* result);
+
+// Packing ---------------------------------------------------------------------
 
 // Tiny POD structure returned by all packing functions.  Private data is
 // attached after the public fields, so clients should call the provided
@@ -70,6 +99,8 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
+
+#endif // PAR_BUBBLES_H
 
 #ifdef PAR_BUBBLES_IMPLEMENTATION
 
@@ -269,6 +300,23 @@ static void par_bubbles__packflat(par_bubbles__t* bubbles)
     bubbles->npacked = bubbles->count;
 }
 
+void par_bubbles_touch_three_points(double const* xy, double* xyr)
+{
+    // Many thanks to Stephen Schmitts:
+    // http://www.abecedarical.com/zenosamples/zs_circle3pts.html
+    double p1x = xy[0], p1y = xy[1];
+    double p2x = xy[2], p2y = xy[3];
+    double p3x = xy[4], p3y = xy[5];
+    double a = p2x - p1x, b = p2y - p1y;
+    double c = p3x - p1x, d = p3y - p1y;
+    double e = a * (p2x + p1x) * 0.5 + b * (p2y + p1y) * 0.5;
+    double f = c * (p3x + p1x) * 0.5 + d * (p3y + p1y) * 0.5;
+    double det = a*d - b*c;
+    double cx = xyr[0] = (d*e - b*f) / det;
+    double cy = xyr[1] = (-c*e + a*f) / det;
+    xyr[2] = sqrt((p1x - cx)*(p1x - cx) + (p1y - cy)*(p1y - cy));
+}
+
 par_bubbles_t* par_bubbles_pack(double const* radiuses, int nradiuses)
 {
     par_bubbles__t* bubbles = PAR_CALLOC(par_bubbles__t, 1);
@@ -458,4 +506,4 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
     fclose(svgfile);
 }
 
-#endif
+#endif // PAR_BUBBLES_IMPLEMENTATION

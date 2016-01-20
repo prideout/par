@@ -24,6 +24,9 @@
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
 
+#ifndef PAR_SHAPES_H
+#define PAR_SHAPES_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -160,6 +163,8 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
+
+#endif // PAR_SHAPES_H
 
 #ifdef PAR_SHAPES_IMPLEMENTATION
 
@@ -2019,4 +2024,4 @@ void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float mintriarea)
     mesh->triangles = triangles;
 }
 
-#endif
+#endif // PAR_SHAPES_IMPLEMENTATION
