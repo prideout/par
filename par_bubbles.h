@@ -107,6 +107,7 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <float.h>
 
 typedef struct {
     int prev;
@@ -298,6 +299,172 @@ static void par_bubbles__packflat(par_bubbles__t* bubbles)
     }
 
     bubbles->npacked = bubbles->count;
+}
+
+static void par__disk_from_two(double const* xy1, double const* xy2,
+    double* result)
+{
+    double dx = xy1[0] - xy2[0];
+    double dy = xy1[1] - xy2[1];
+    result[0] = 0.5 * (xy1[0] + xy2[0]);
+    result[1] = 0.5 * (xy1[1] + xy2[1]);
+    result[2] = sqrt(dx * dx + dy * dy) / 2.0;
+}
+
+static int par__disk_contains(double const* xyr, double const* xy)
+{
+    double dx = xyr[0] - xy[0];
+    double dy = xyr[1] - xy[1];
+    return dx * dx + dy * dy <= PAR_SQR(xyr[2]);
+}
+
+static void par__set2(double* dst, double const* a, double const* b, int* npts)
+{
+    *npts = 2;
+    double pts[] = { a[0], a[1], b[0], b[1] };
+    dst[0] = pts[0];
+    dst[1] = pts[1];
+    dst[2] = pts[2];
+    dst[3] = pts[3];
+}
+
+static void par__set3(double* dst, double const* a, double const* b,
+    double const* c, int* npts)
+{
+    *npts = 3;
+    double pts[] = { a[0], a[1], b[0], b[1], c[0], c[1] };
+    dst[0] = pts[0];
+    dst[1] = pts[1];
+    dst[2] = pts[2];
+    dst[3] = pts[3];
+    dst[4] = pts[4];
+    dst[5] = pts[5];
+}
+
+static void par__disk_add_support(double* spts, int* pnspts, double* xy)
+{
+    int nspts = *pnspts;
+    if (nspts <= 1) {
+        spts[nspts * 2] = xy[0];
+        spts[nspts * 2 + 1] = xy[1];
+        (*pnspts)++;
+        return;
+    }
+
+    double disk[3];
+
+    if (nspts == 2) {
+        double* xy0 = spts;
+        double* xy1 = spts + 2;
+        double* xy2 = xy;
+        par__disk_from_two(xy0, xy1, disk);
+        if (par__disk_contains(disk, xy2)) {
+            return;
+        }
+        par__disk_from_two(xy0, xy2, disk);
+        if (par__disk_contains(disk, xy1)) {
+            par__set2(spts, xy0, xy2, pnspts);
+            return;
+        }
+        par__disk_from_two(xy1, xy2, disk);
+        if (par__disk_contains(disk, xy0)) {
+            par__set2(spts, xy1, xy2, pnspts);
+            return;
+        }
+        par__set3(spts, xy0, xy1, xy2, pnspts);
+        return;
+    }
+
+    double* xy0 = spts;
+    double* xy1 = spts + 2;
+    double* xy2 = spts + 4;
+    double* xy3 = xy;
+
+    // Try 0-1-2.
+    par_bubbles_touch_three_points(xy0, disk);
+    if (par__disk_contains(disk, xy3)) {
+        return;
+    }
+
+    par__disk_from_two(xy0, xy3, disk);
+    if (par__disk_contains(disk, xy1) && par__disk_contains(disk, xy2)) {
+        par__set2(spts, xy0, xy3, pnspts);
+        return;
+    }
+
+    par__disk_from_two(xy1, xy3, disk);
+    if (par__disk_contains(disk, xy0) && par__disk_contains(disk, xy2)) {
+        par__set2(spts, xy1, xy3, pnspts);
+        return;
+    }
+
+    par__disk_from_two(xy2, xy3, disk);
+    if (par__disk_contains(disk, xy0) && par__disk_contains(disk, xy1)) {
+        par__set2(spts, xy2, xy3, pnspts);
+        return;
+    }
+
+    int result = 0;
+    double minr = DBL_MAX;
+
+    // We've tried 0-1-2, so now try 0-1-3
+    PAR_SWAP(double, xy2[0], xy3[0]);
+    PAR_SWAP(double, xy2[1], xy3[1]);
+    par_bubbles_touch_three_points(xy0, disk);
+    if (par__disk_contains(disk, xy3) && disk[2] < minr) {
+        result = 2;
+        minr = disk[2];
+    }
+    PAR_SWAP(double, xy2[0], xy3[0]);
+    PAR_SWAP(double, xy2[1], xy3[1]);
+
+    // We've tried 0-1-2 and 0-1-3.  Try 3-1-2.
+    PAR_SWAP(double, xy0[0], xy3[0]);
+    PAR_SWAP(double, xy0[1], xy3[1]);
+    par_bubbles_touch_three_points(xy0, disk);
+    if (par__disk_contains(disk, xy3) && disk[2] < minr) {
+        result = 3;
+        minr = disk[2];
+    }
+    PAR_SWAP(double, xy0[0], xy3[0]);
+    PAR_SWAP(double, xy0[1], xy3[1]);
+
+    // Try 0-3-2.
+    PAR_SWAP(double, xy1[0], xy3[0]);
+    PAR_SWAP(double, xy1[1], xy3[1]);
+    par_bubbles_touch_three_points(xy0, disk);
+    if (par__disk_contains(disk, xy3) && disk[2] < minr) {
+        return;
+    }
+    PAR_SWAP(double, xy1[0], xy3[0]);
+    PAR_SWAP(double, xy1[1], xy3[1]);
+
+    if (result == 2) {
+        PAR_SWAP(double, xy2[0], xy3[0]);
+        PAR_SWAP(double, xy2[1], xy3[1]);
+        return;
+    }
+    PAR_SWAP(double, xy0[0], xy3[0]);
+    PAR_SWAP(double, xy0[1], xy3[1]);
+}
+
+void par_bubbles_enclose_points(double const* xy, int npts, double* result)
+{
+    if (npts == 0) {
+        return;
+    }
+    double supports[8];
+    int nsupports = 0;
+    while (npts--) {
+        double p[2] = {xy[0], xy[1]};
+        par__disk_add_support(supports, &nsupports, p);
+        xy += 2;
+    }
+    if (nsupports == 2) {
+        par__disk_from_two(supports, supports + 2, result);
+        return;
+    }
+    par_bubbles_touch_three_points(supports, result);
 }
 
 void par_bubbles_touch_three_points(double const* xy, double* xyr)
