@@ -23,16 +23,21 @@
 #ifndef PAR_BUBBLES_H
 #define PAR_BUBBLES_H
 
-// Enclosing -------------------------------------------------------------------
+// Enclosing / Touching --------------------------------------------------------
 
-// Reads an array of (x,y) coordinates, writes a single 3-tuple (x,y,radius).
+// Read an array of (x,y) coordinates, write a single 3-tuple (x,y,radius).
 void par_bubbles_enclose_points(double const* xy, int npts, double* result);
 
-// Reads an array of 3-tuples (x,y,radius), writes a 3-tuple (x,y,radius).
+// Read an array of 3-tuples (x,y,radius), write a 3-tuple (x,y,radius).
 void par_bubbles_enclose_disks(double const* xyr, int ndisks, double* result);
 
-// Low-level function used internally to create a circle tangent to 3 points.
+// Find the circle (x,y,radius) that is tangent to 3 points (x,y).
 void par_bubbles_touch_three_points(double const* xy, double* result);
+
+// Find the position of disk "c" that makes it tangent to "a" and "b".
+// Note that the ordering of a and b can affect where c will land.
+// All three arguments are pointers to three-tuples (x,y,radius).
+void par_bubbles_touch_two_disks(double* c, double const* a, double const* b);
 
 // Packing ---------------------------------------------------------------------
 
@@ -46,29 +51,14 @@ typedef struct {
 
 void par_bubbles_free_result(par_bubbles_t*);
 
-// Flat Packing ----------------------------------------------------------------
-
-// Entry point for simple non-hierarchical packing.  Takes a list of radii.
+// Entry point for unbounded non-hierarchical packing.  Takes a list of radii.
 par_bubbles_t* par_bubbles_pack(double const* radiuses, int nradiuses);
 
-// Hierarchical Packing --------------------------------------------------------
-
-// All these functions consume a list of nodes, where each node is
-// represented by an integer.  The integer is an index to the node's parent.
-// The root node is its own parent, and it must be the first node in the list.
-// Unlike the flat packing API, clients do not have control over radius.
-// However, they do have control over bounding area.
-
-// Pack the circles into a circle that is centered at the origin.
+// Consume a hierarchy defined by a list of integers.  Each integer is an index
+// to its parent. The root node is its own parent, and it must be the first node
+// in the list. Clients do not have control over individual radiuses, only the
+// radius of the outermost enclosing disk.
 par_bubbles_t* par_bubbles_hpack_circle(int* nodes, int nnodes, double radius);
-
-// Pack the circles into a rectangle centered at the origin.  Takes a pointer
-// to two doubles: width and height.
-par_bubbles_t* par_bubbles_hpack_rect(int* nodes, int nnodes, double* dims);
-
-// Pack the circles into an unwrapped cylinder surface.  The dimensions are a
-// two-tuple of circumference (i.e., unwrapped width) and height.
-par_bubbles_t* par_bubbles_hpack_cylinder(int* nodes, int nnodes, double* dims);
 
 // Queries ---------------------------------------------------------------------
 
@@ -108,6 +98,7 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
+#include <assert.h>
 
 typedef struct {
     int prev;
@@ -128,7 +119,7 @@ typedef struct {
 } par_bubbles__t;
 
 // Assigns an xy to "c" such that it becomes tangent to "a" and "b".
-static void par_bubbles__place(double* c, double const* a, double const* b)
+void par_bubbles_touch_two_disks(double* c, double const* a, double const* b)
 {
     double db = a[2] + c[2], dx = b[0] - a[0], dy = b[1] - a[1];
     if (db && (dx || dy)) {
@@ -194,7 +185,7 @@ static void par_bubbles__initflat(par_bubbles__t* bubbles)
         return;
     }
     xyr[2] = *radii;
-    par_bubbles__place(xyr, xyr - 6, xyr - 3);
+    par_bubbles_touch_two_disks(xyr, xyr - 6, xyr - 3);
     if (bubbles->count == ++bubbles->npacked) {
         return;
     }
@@ -266,7 +257,7 @@ static void par_bubbles__packflat(par_bubbles__t* bubbles)
         ci_xyr[2] = radii[ci];
         double* cm_xyr = xyr + cm * 3;
         double* cn_xyr = xyr + cn * 3;
-        par_bubbles__place(ci_xyr, cn_xyr, cm_xyr);
+        par_bubbles_touch_two_disks(ci_xyr, cn_xyr, cm_xyr);
 
         // Check for a collision.  In the paper, "Cj" is the intersecting node.
         int cj_f;
@@ -318,134 +309,55 @@ static int par__disk_contains(double const* xyr, double const* xy)
     return dx * dx + dy * dy <= PAR_SQR(xyr[2]);
 }
 
-static void par__set2(double* dst, double const* a, double const* b, int* npts)
+static void par__easydisk(double* disk, double const* edgepts, int nedgepts)
 {
-    *npts = 2;
-    double pts[] = { a[0], a[1], b[0], b[1] };
-    dst[0] = pts[0];
-    dst[1] = pts[1];
-    dst[2] = pts[2];
-    dst[3] = pts[3];
+    if (nedgepts == 0) {
+        disk[0] = 0;
+        disk[1] = 0;
+        disk[2] = 0;
+        return;
+    }
+    if (nedgepts == 1) {
+        disk[0] = edgepts[0];
+        disk[1] = edgepts[1];
+        disk[2] = 0;
+        return;
+    }
+    par__disk_from_two(edgepts, edgepts + 2, disk);
+    if (nedgepts == 2 || par__disk_contains(disk, edgepts + 4)) {
+        return;
+    }
+    par__disk_from_two(edgepts, edgepts + 4, disk);
+    if (par__disk_contains(disk, edgepts + 2)) {
+        return;
+    }
+    par__disk_from_two(edgepts + 2, edgepts + 4, disk);
+    if (par__disk_contains(disk, edgepts)) {
+        return;
+    }
+    par_bubbles_touch_three_points(edgepts, disk);
 }
 
-static void par__set3(double* dst, double const* a, double const* b,
-    double const* c, int* npts)
+static void par__minidisk(double* disk, double const* pts, int npts,
+    double const* edgepts, int nedgepts)
 {
-    *npts = 3;
-    double pts[] = { a[0], a[1], b[0], b[1], c[0], c[1] };
-    dst[0] = pts[0];
-    dst[1] = pts[1];
-    dst[2] = pts[2];
-    dst[3] = pts[3];
-    dst[4] = pts[4];
-    dst[5] = pts[5];
-}
-
-static void par__disk_add_support(double* spts, int* pnspts, double* xy)
-{
-    int nspts = *pnspts;
-    if (nspts <= 1) {
-        spts[nspts * 2] = xy[0];
-        spts[nspts * 2 + 1] = xy[1];
-        (*pnspts)++;
+    if (npts == 0 || nedgepts == 3) {
+        par__easydisk(disk, edgepts, nedgepts);
         return;
     }
-
-    double disk[3];
-
-    if (nspts == 2) {
-        double* xy0 = spts;
-        double* xy1 = spts + 2;
-        double* xy2 = xy;
-        par__disk_from_two(xy0, xy1, disk);
-        if (par__disk_contains(disk, xy2)) {
-            return;
+    assert(nedgepts < 3);
+    double const* pt = pts + (--npts) * 2;
+    par__minidisk(disk, pts, npts, edgepts, nedgepts);
+    if (!par__disk_contains(disk, pt)) {
+        double edgepts1[6];
+        for (int i = 0; i < nedgepts * 2; i += 2) {
+            edgepts1[i] = edgepts[i];
+            edgepts1[i + 1] = edgepts[i + 1];
         }
-        par__disk_from_two(xy0, xy2, disk);
-        if (par__disk_contains(disk, xy1)) {
-            par__set2(spts, xy0, xy2, pnspts);
-            return;
-        }
-        par__disk_from_two(xy1, xy2, disk);
-        if (par__disk_contains(disk, xy0)) {
-            par__set2(spts, xy1, xy2, pnspts);
-            return;
-        }
-        par__set3(spts, xy0, xy1, xy2, pnspts);
-        return;
+        edgepts1[2 * nedgepts] = pt[0];
+        edgepts1[2 * nedgepts + 1] = pt[1];
+        par__minidisk(disk, pts, npts, edgepts1, ++nedgepts);
     }
-
-    double* xy0 = spts;
-    double* xy1 = spts + 2;
-    double* xy2 = spts + 4;
-    double* xy3 = xy;
-
-    // Try 0-1-2.
-    par_bubbles_touch_three_points(xy0, disk);
-    if (par__disk_contains(disk, xy3)) {
-        return;
-    }
-
-    par__disk_from_two(xy0, xy3, disk);
-    if (par__disk_contains(disk, xy1) && par__disk_contains(disk, xy2)) {
-        par__set2(spts, xy0, xy3, pnspts);
-        return;
-    }
-
-    par__disk_from_two(xy1, xy3, disk);
-    if (par__disk_contains(disk, xy0) && par__disk_contains(disk, xy2)) {
-        par__set2(spts, xy1, xy3, pnspts);
-        return;
-    }
-
-    par__disk_from_two(xy2, xy3, disk);
-    if (par__disk_contains(disk, xy0) && par__disk_contains(disk, xy1)) {
-        par__set2(spts, xy2, xy3, pnspts);
-        return;
-    }
-
-    int result = 0;
-    double minr = DBL_MAX;
-
-    // We've tried 0-1-2, so now try 0-1-3
-    PAR_SWAP(double, xy2[0], xy3[0]);
-    PAR_SWAP(double, xy2[1], xy3[1]);
-    par_bubbles_touch_three_points(xy0, disk);
-    if (par__disk_contains(disk, xy3) && disk[2] < minr) {
-        result = 2;
-        minr = disk[2];
-    }
-    PAR_SWAP(double, xy2[0], xy3[0]);
-    PAR_SWAP(double, xy2[1], xy3[1]);
-
-    // We've tried 0-1-2 and 0-1-3.  Try 3-1-2.
-    PAR_SWAP(double, xy0[0], xy3[0]);
-    PAR_SWAP(double, xy0[1], xy3[1]);
-    par_bubbles_touch_three_points(xy0, disk);
-    if (par__disk_contains(disk, xy3) && disk[2] < minr) {
-        result = 3;
-        minr = disk[2];
-    }
-    PAR_SWAP(double, xy0[0], xy3[0]);
-    PAR_SWAP(double, xy0[1], xy3[1]);
-
-    // Try 0-3-2.
-    PAR_SWAP(double, xy1[0], xy3[0]);
-    PAR_SWAP(double, xy1[1], xy3[1]);
-    par_bubbles_touch_three_points(xy0, disk);
-    if (par__disk_contains(disk, xy3) && disk[2] < minr) {
-        return;
-    }
-    PAR_SWAP(double, xy1[0], xy3[0]);
-    PAR_SWAP(double, xy1[1], xy3[1]);
-
-    if (result == 2) {
-        PAR_SWAP(double, xy2[0], xy3[0]);
-        PAR_SWAP(double, xy2[1], xy3[1]);
-        return;
-    }
-    PAR_SWAP(double, xy0[0], xy3[0]);
-    PAR_SWAP(double, xy0[1], xy3[1]);
 }
 
 void par_bubbles_enclose_points(double const* xy, int npts, double* result)
@@ -453,18 +365,7 @@ void par_bubbles_enclose_points(double const* xy, int npts, double* result)
     if (npts == 0) {
         return;
     }
-    double supports[8];
-    int nsupports = 0;
-    while (npts--) {
-        double p[2] = {xy[0], xy[1]};
-        par__disk_add_support(supports, &nsupports, p);
-        xy += 2;
-    }
-    if (nsupports == 2) {
-        par__disk_from_two(supports, supports + 2, result);
-        return;
-    }
-    par_bubbles_touch_three_points(supports, result);
+    par__minidisk(result, xy, npts, 0, 0);
 }
 
 void par_bubbles_touch_three_points(double const* xy, double* xyr)
