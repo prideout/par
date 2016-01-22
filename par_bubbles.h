@@ -29,12 +29,13 @@
 void par_bubbles_enclose_points(double const* xy, int npts, double* result);
 
 // Read an array of 3-tuples (x,y,radius), write a 3-tuple (x,y,radius).
+// Internally, this approximates each disk with an enclosing octagon.
 void par_bubbles_enclose_disks(double const* xyr, int ndisks, double* result);
 
 // Find the circle (x,y,radius) that is tangent to 3 points (x,y).
 void par_bubbles_touch_three_points(double const* xy, double* result);
 
-// Find the position of disk "c" that makes it tangent to "a" and "b".
+// Find a position for disk "c" that makes it tangent to "a" and "b".
 // Note that the ordering of a and b can affect where c will land.
 // All three arguments are pointers to three-tuples (x,y,radius).
 void par_bubbles_touch_two_disks(double* c, double const* a, double const* b);
@@ -366,6 +367,30 @@ void par_bubbles_enclose_points(double const* xy, int npts, double* result)
         return;
     }
     par__minidisk(result, xy, npts, 0, 0);
+}
+
+void par_bubbles_enclose_disks(double const* xyr, int ndisks, double* result)
+{
+    int ngon = 8;
+    int npts = ndisks * ngon;
+    double* pts = PAR_MALLOC(double, npts * 2);
+    double* ppts = pts;
+    float dtheta = PAR_PI * 2.0 / ngon;
+
+    for (int i = 0; i < ndisks; i++) {
+        double cx = xyr[i * 3];
+        double cy = xyr[i * 3 + 1];
+        double cr = xyr[i * 3 + 2];
+        double a = 2.0 * cr / (1.0 + sqrt(2));
+        double r = 0.5 * sqrt(2) * a * sqrt(2 + sqrt(2));
+        float theta = 0;
+        for (int j = 0; j < ngon; j++, theta += dtheta) {
+            *ppts++ = cx + r * cos(theta);
+            *ppts++ = cy + r * sin(theta);
+        }
+    }
+    par_bubbles_enclose_points(pts, npts, result);
+    PAR_FREE(pts);
 }
 
 void par_bubbles_touch_three_points(double const* xy, double* xyr)
