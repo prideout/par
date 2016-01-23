@@ -119,26 +119,6 @@ typedef struct {
     int maxwidth;
 } par_bubbles__t;
 
-// Assigns an xy to "c" such that it becomes tangent to "a" and "b".
-void par_bubbles_touch_two_disks(double* c, double const* a, double const* b)
-{
-    double db = a[2] + c[2], dx = b[0] - a[0], dy = b[1] - a[1];
-    if (db && (dx || dy)) {
-        double da = b[2] + c[2], dc = dx * dx + dy * dy;
-        da *= da;
-        db *= db;
-        double x = 0.5 + (db - da) / (2 * dc);
-        double db1 = db - dc;
-        double y0 = PAR_MAX(0, 2 * da * (db + dc) - db1 * db1 - da * da);
-        double y = sqrt(y0) / (2 * dc);
-        c[0] = a[0] + x * dx + y * dy;
-        c[1] = a[1] + x * dy - y * dx;
-    } else {
-        c[0] = a[0] + db;
-        c[1] = a[1];
-    }
-}
-
 static double par_bubbles__len2(double const* a)
 {
     return a[0] * a[0] + a[1] * a[1];
@@ -410,6 +390,25 @@ void par_bubbles_touch_three_points(double const* xy, double* xyr)
     xyr[2] = sqrt((p1x - cx)*(p1x - cx) + (p1y - cy)*(p1y - cy));
 }
 
+void par_bubbles_touch_two_disks(double* c, double const* a, double const* b)
+{
+    double db = a[2] + c[2], dx = b[0] - a[0], dy = b[1] - a[1];
+    if (db && (dx || dy)) {
+        double da = b[2] + c[2], dc = dx * dx + dy * dy;
+        da *= da;
+        db *= db;
+        double x = 0.5 + (db - da) / (2 * dc);
+        double db1 = db - dc;
+        double y0 = PAR_MAX(0, 2 * da * (db + dc) - db1 * db1 - da * da);
+        double y = sqrt(y0) / (2 * dc);
+        c[0] = a[0] + x * dx + y * dy;
+        c[1] = a[1] + x * dy - y * dx;
+    } else {
+        c[0] = a[0] + db;
+        c[1] = a[1];
+    }
+}
+
 par_bubbles_t* par_bubbles_pack(double const* radiuses, int nradiuses)
 {
     par_bubbles__t* bubbles = PAR_CALLOC(par_bubbles__t, 1);
@@ -460,7 +459,7 @@ void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
 
     // We perform flat layout twice: once without padding (to determine scale)
     // and then again with scaled padding.
-    double cx, cy, cr;
+    double enclosure[3];
     double px = bubbles->xyr[parent * 3 + 0];
     double py = bubbles->xyr[parent * 3 + 1];
     double pr = bubbles->xyr[parent * 3 + 2];
@@ -477,23 +476,34 @@ void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
         }
         par_bubbles__initflat(worker);
         par_bubbles__packflat(worker);
+
+        // Using Welzl's algorithm instead of a simple AABB enclosure is
+        // slightly slower and doesn't yield much aesthetic improvement.
+
+        #if PAR_BUBBLES_HPACK_WELZL
+        par_bubbles_enclose_disks(worker->xyr, nchildren, enclosure);
+        #else
         double aabb[6];
         par_bubbles_compute_aabb((par_bubbles_t const*) worker, aabb);
-        cx = 0.5 * (aabb[0] + aabb[2]);
-        cy = 0.5 * (aabb[1] + aabb[3]);
-        cr = 0;
+        enclosure[0] = 0.5 * (aabb[0] + aabb[2]);
+        enclosure[1] = 0.5 * (aabb[1] + aabb[3]);
+        enclosure[2] = 0;
         for (int c = 0; c < nchildren; c++) {
-            double x = worker->xyr[c * 3 + 0] - cx;
-            double y = worker->xyr[c * 3 + 1] - cy;
+            double x = worker->xyr[c * 3 + 0] - enclosure[0];
+            double y = worker->xyr[c * 3 + 1] - enclosure[1];
             double r = worker->xyr[c * 3 + 2];
-            cr = PAR_MAX(cr, r + sqrtf(x * x + y * y));
+            enclosure[2] = PAR_MAX(enclosure[2], r + sqrtf(x * x + y * y));
         }
+        #endif
+
         if (scaled_padding || !PAR_HPACK_PADDING1) {
             break;
         } else {
-            scaled_padding = PAR_HPACK_PADDING1 / cr;
+            scaled_padding = PAR_HPACK_PADDING1 / enclosure[2];
         }
     }
+
+    double cx = enclosure[0], cy = enclosure[1], cr = enclosure[2];
     scaled_padding *= cr;
     cr += PAR_HPACK_PADDING2 * cr;
     if (nchildren == 1) {
