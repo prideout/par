@@ -4,13 +4,13 @@
 // Based on "Visualization of Large Hierarchical Data by Circle Packing" by
 // Wang et al (2006), with an extension for cylinderical space.
 //
-// Also uses Emo Welzl's "Smallest enclosing disks" algorithm (1991).
+// Also implements Emo Welzl's "Smallest enclosing disks" algorithm (1991).
 //
 // The API is divided into three sections:
 //
 //   - Enclosing.  Compute the smallest bounding circle for points or circles.
 //   - Packing.    Pack circles together, or into other circles.
-//   - Queries.    Given a touch points, pick a circle from a hierarchy, etc.
+//   - Queries.    Given a touch point, pick a circle from a hierarchy, etc.
 //
 // In addition to the comment block above each function declaration, the API
 // has informal documentation here:
@@ -65,7 +65,7 @@ par_bubbles_t* par_bubbles_hpack_circle(int* nodes, int nnodes, double radius);
 
 // Find the node at the given position.  Children are "on top" of their parents.
 // If the result is -1, there is no node at the given pick coordinate.
-int par_bubbles_pick(par_bubbles_t*, double x, double y);
+int par_bubbles_pick(par_bubbles_t const*, double x, double y);
 
 // Get bounding box; take a pointer to 4 floats and set them to min xy, max xy.
 void par_bubbles_compute_aabb(par_bubbles_t const*, double* aabb);
@@ -84,7 +84,7 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 #define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
 #define PAR_FREE(BUF) free(BUF)
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
-#define PAR_SQR(a) (a * a)
+#define PAR_SQR(a) ((a) * (a))
 #endif
 
 // -----------------------------------------------------------------------------
@@ -409,6 +409,16 @@ void par_bubbles_touch_two_disks(double* c, double const* a, double const* b)
     }
 }
 
+void par_bubbles_free_result(par_bubbles_t* pubbub)
+{
+    par_bubbles__t* bubbles = (par_bubbles__t*) pubbub;
+    PAR_FREE(bubbles->graph_children);
+    PAR_FREE(bubbles->graph_heads);
+    PAR_FREE(bubbles->chain);
+    PAR_FREE(bubbles->xyr);
+    PAR_FREE(bubbles);
+}
+
 par_bubbles_t* par_bubbles_pack(double const* radiuses, int nradiuses)
 {
     par_bubbles__t* bubbles = PAR_CALLOC(par_bubbles__t, 1);
@@ -502,7 +512,6 @@ void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
             scaled_padding = PAR_HPACK_PADDING1 / enclosure[2];
         }
     }
-
     double cx = enclosure[0], cy = enclosure[1], cr = enclosure[2];
     scaled_padding *= cr;
     cr += PAR_HPACK_PADDING2 * cr;
@@ -551,14 +560,34 @@ par_bubbles_t* par_bubbles_hpack_circle(int* nodes, int nnodes, double radius)
     return (par_bubbles_t*) bubbles;
 }
 
-void par_bubbles_free_result(par_bubbles_t* pubbub)
+// TODO: use a stack instead of recursion
+static int par_bubbles__pick(par_bubbles__t const* bubbles, int parent,
+    double x, double y)
 {
-    par_bubbles__t* bubbles = (par_bubbles__t*) pubbub;
-    PAR_FREE(bubbles->graph_children);
-    PAR_FREE(bubbles->graph_heads);
-    PAR_FREE(bubbles->chain);
-    PAR_FREE(bubbles->xyr);
-    PAR_FREE(bubbles);
+    double const* xyr = bubbles->xyr + parent * 3;
+    double d2 = PAR_SQR(x - xyr[0]) + PAR_SQR(y - xyr[1]);
+    if (d2 > PAR_SQR(xyr[2])) {
+        return -1;
+    }
+    int head = bubbles->graph_heads[parent];
+    int tail = bubbles->graph_tails[parent];
+    for (int cindex = head; cindex != tail; cindex++) {
+        int child = bubbles->graph_children[cindex];
+        int result = par_bubbles__pick(bubbles, child, x, y);
+        if (result > -1) {
+            return result;
+        }
+    }
+    return parent;
+}
+
+int par_bubbles_pick(par_bubbles_t const* cbubbles, double x, double y)
+{
+    par_bubbles__t const* bubbles = (par_bubbles__t const*) cbubbles;
+    if (bubbles->count == 0) {
+        return -1;
+    }
+    return par_bubbles__pick(bubbles, 0, x, y);
 }
 
 void par_bubbles_compute_aabb(par_bubbles_t const* bubbles, double* aabb)
