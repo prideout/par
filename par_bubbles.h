@@ -23,6 +23,8 @@
 #ifndef PAR_BUBBLES_H
 #define PAR_BUBBLES_H
 
+#include <stdbool.h>
+
 // Enclosing / Touching --------------------------------------------------------
 
 // Read an array of (x,y) coordinates, write a single 3-tuple (x,y,radius).
@@ -48,6 +50,7 @@ void par_bubbles_touch_two_disks(double* c, double const* a, double const* b);
 typedef struct {
     double* xyr; // array of 3-tuples (x y radius) in same order as input data
     int count;   // number of 3-tuples
+    int* ids;    // if non-null, populated by par_bubbles_cull with the mapping
 } par_bubbles_t;
 
 void par_bubbles_free_result(par_bubbles_t*);
@@ -69,6 +72,17 @@ int par_bubbles_pick(par_bubbles_t const*, double x, double y);
 
 // Get bounding box; take a pointer to 4 floats and set them to min xy, max xy.
 void par_bubbles_compute_aabb(par_bubbles_t const*, double* aabb);
+
+// Check if the given circle (3-tuple) intersects the given aabb (4-tuple).
+bool par_bubbles_check_aabb(double const* disk, double const* aabb);
+
+// Clip the bubble diagram to the given AABB (4-tuple of left,bottom, right,top)
+// and return the result.  Circles smaller than the given world-space
+// "minradius" are removed.  Optionally, an existing diagram (dst) can be passed
+// in to receive the culled dataset to reduce the number of memory allocations.
+// Pass null to "dst" to create a new culled diagram.
+par_bubbles_t* par_bubbles_cull(par_bubbles_t const* src,
+    double const* aabb, double minradius, par_bubbles_t* dst);
 
 // Dump out a SVG file for diagnostic purposes.
 void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
@@ -109,6 +123,7 @@ typedef struct {
 typedef struct {
     double* xyr;              // results array
     int count;                // client-provided count
+    int* ids;                 // populated by par_bubbles_cull
     double const* radiuses;   // client-provided radius list
     par_bubbles__node* chain; // counterclockwise enveloping chain
     int const* graph_parents; // client-provided parent indices
@@ -117,6 +132,7 @@ typedef struct {
     int* graph_tails;         // list of "pointers" to one-past-last child
     int npacked;
     int maxwidth;
+    int capacity;
 } par_bubbles__t;
 
 static double par_bubbles__len2(double const* a)
@@ -341,6 +357,22 @@ static void par__minidisk(double* disk, double const* pts, int npts,
     }
 }
 
+static void par_bubbles__copy_disk(par_bubbles__t const* src,
+    par_bubbles__t* dst, int parent)
+{
+    int i = dst->count++;
+    if (dst->capacity < dst->count) {
+        dst->capacity = PAR_MAX(16, dst->capacity) * 2;
+        dst->xyr = PAR_REALLOC(double, dst->xyr, 3 * dst->capacity);
+        dst->ids = PAR_REALLOC(int, dst->ids, dst->capacity);
+    }
+    double const* xyr = src->xyr + parent * 3;
+    dst->xyr[i * 3] = xyr[0];
+    dst->xyr[i * 3 + 1] = xyr[1];
+    dst->xyr[i * 3 + 2] = xyr[2];
+    dst->ids[i] = parent;
+}
+
 void par_bubbles_enclose_points(double const* xy, int npts, double* result)
 {
     if (npts == 0) {
@@ -416,6 +448,7 @@ void par_bubbles_free_result(par_bubbles_t* pubbub)
     PAR_FREE(bubbles->graph_heads);
     PAR_FREE(bubbles->chain);
     PAR_FREE(bubbles->xyr);
+    PAR_FREE(bubbles->ids);
     PAR_FREE(bubbles);
 }
 
@@ -604,6 +637,48 @@ void par_bubbles_compute_aabb(par_bubbles_t const* bubbles, double* aabb)
         aabb[2] = PAR_MAX(xyr[0] + xyr[2], aabb[2]);
         aabb[3] = PAR_MAX(xyr[1] + xyr[2], aabb[3]);
     }
+}
+
+bool par_bubbles_check_aabb(double const* disk, double const* aabb)
+{
+    double cx = PAR_CLAMP(disk[0], aabb[0], aabb[2]);
+    double cy = PAR_CLAMP(disk[1], aabb[1], aabb[3]);
+    double dx = disk[0] - cx;
+    double dy = disk[1] - cy;
+    double d2 = dx * dx + dy * dy;
+    return d2 < (disk[2] * disk[2]);
+}
+
+static void par_bubbles__cull(par_bubbles__t const* src, double const* aabb,
+    double minradius, par_bubbles__t* dst, int parent)
+{
+    double const* xyr = src->xyr + parent * 3;
+    if (xyr[2] < minradius || !par_bubbles_check_aabb(xyr, aabb)) {
+        return;
+    }
+    par_bubbles__copy_disk(src, dst, parent);
+    int head = src->graph_heads[parent];
+    int tail = src->graph_tails[parent];
+    for (int cindex = head; cindex != tail; cindex++) {
+        int child = src->graph_children[cindex];
+        par_bubbles__cull(src, aabb, minradius, dst, child);
+    }
+}
+
+par_bubbles_t* par_bubbles_cull(par_bubbles_t const* psrc,
+    double const* aabb, double minradius, par_bubbles_t* pdst)
+{
+    par_bubbles__t const* src = (par_bubbles__t const*) psrc;
+    par_bubbles__t* dst = (par_bubbles__t*) pdst;
+    if (!dst) {
+        dst = PAR_CALLOC(par_bubbles__t, 1);
+        pdst = (par_bubbles_t*) dst;
+    }
+    if (src->count == 0) {
+        return pdst;
+    }
+    par_bubbles__cull(src, aabb, minradius, dst, 0);
+    return pdst;
 }
 
 void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
