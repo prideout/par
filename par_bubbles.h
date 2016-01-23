@@ -49,8 +49,8 @@ void par_bubbles_touch_two_disks(double* c, double const* a, double const* b);
 // free function rather than freeing the memory manually.
 typedef struct {
     double* xyr; // array of 3-tuples (x y radius) in same order as input data
-    int count;   // number of 3-tuples
-    int* ids;    // if non-null, populated by par_bubbles_cull with the mapping
+    int count;   // number of 3-tuples in "xyr"
+    int* ids;    // if non-null, filled by par_bubbles_cull with a mapping table
 } par_bubbles_t;
 
 void par_bubbles_free_result(par_bubbles_t*);
@@ -66,7 +66,7 @@ par_bubbles_t* par_bubbles_hpack_circle(int* nodes, int nnodes, double radius);
 
 // Queries ---------------------------------------------------------------------
 
-// Find the node at the given position.  Children are "on top" of their parents.
+// Find the node at the given position.  Children are on top of their parents.
 // If the result is -1, there is no node at the given pick coordinate.
 int par_bubbles_pick(par_bubbles_t const*, double x, double y);
 
@@ -76,11 +76,12 @@ void par_bubbles_compute_aabb(par_bubbles_t const*, double* aabb);
 // Check if the given circle (3-tuple) intersects the given aabb (4-tuple).
 bool par_bubbles_check_aabb(double const* disk, double const* aabb);
 
-// Clip the bubble diagram to the given AABB (4-tuple of left,bottom, right,top)
+// Clip the bubble diagram to the given AABB (4-tuple of left,bottom,right,top)
 // and return the result.  Circles smaller than the given world-space
 // "minradius" are removed.  Optionally, an existing diagram (dst) can be passed
-// in to receive the culled dataset to reduce the number of memory allocations.
-// Pass null to "dst" to create a new culled diagram.
+// in to receive the culled dataset, which reduces the number of memory allocs
+// when calling this function frequently.  Pass null to "dst" to create a new
+// culled diagram.
 par_bubbles_t* par_bubbles_cull(par_bubbles_t const* src,
     double const* aabb, double minradius, par_bubbles_t* dst);
 
@@ -673,6 +674,8 @@ par_bubbles_t* par_bubbles_cull(par_bubbles_t const* psrc,
     if (!dst) {
         dst = PAR_CALLOC(par_bubbles__t, 1);
         pdst = (par_bubbles_t*) dst;
+    } else {
+        dst->count = 0;
     }
     if (src->count == 0) {
         return pdst;
