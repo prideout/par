@@ -112,8 +112,10 @@ void par_shapes_export(par_shapes_mesh const*, char const* objfile);
 // Take a pointer to 6 floats and set them to min xyz, max xyz.
 void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
 
-// Make a deep copy of a mesh.
-par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh);
+// Make a deep copy of a mesh.  To make a brand new copy, pass null to "target".
+// To avoid memory churn, pass an existing mesh to "target".
+par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
+    par_shapes_mesh* target);
 
 // Transformations -------------------------------------------------------------
 
@@ -593,7 +595,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     float* points = PAR_MALLOC(float, vecsize * npoints / 4);
     memcpy(points, dst->points, vecsize * dst->npoints);
     memcpy(points + 3 * dst->npoints, src->points, vecsize * src->npoints);
-    free(dst->points);
+    PAR_FREE(dst->points);
     dst->points = points;
     dst->npoints = npoints;
     if (src->normals || dst->normals) {
@@ -604,7 +606,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
         if (src->normals) {
             memcpy(norms + 3 * offset, src->normals, vecsize * src->npoints);
         }
-        free(dst->normals);
+        PAR_FREE(dst->normals);
         dst->normals = norms;
     }
     if (src->tcoords || dst->tcoords) {
@@ -616,7 +618,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
         if (src->tcoords) {
             memcpy(uvs + 2 * offset, src->tcoords, uvsize * src->npoints);
         }
-        free(dst->tcoords);
+        PAR_FREE(dst->tcoords);
         dst->tcoords = uvs;
     }
     int ntriangles = dst->ntriangles + src->ntriangles;
@@ -630,7 +632,7 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
         *ptriangles++ = offset + *striangles++;
         *ptriangles++ = offset + *striangles++;
     }
-    free(dst->triangles);
+    PAR_FREE(dst->triangles);
     dst->triangles = triangles;
     dst->ntriangles = ntriangles;
 }
@@ -1065,7 +1067,7 @@ static par_shapes_mesh* par_shapes__create_turtle()
 static par_shapes_mesh* par_shapes__apply_turtle(par_shapes_mesh* mesh,
     par_shapes_mesh* turtle, float const* pos, float const* scale)
 {
-    par_shapes_mesh* m = par_shapes_clone(mesh);
+    par_shapes_mesh* m = par_shapes_clone(mesh, 0);
     for (int p = 0; p < m->npoints; p++) {
         float* pt = m->points + p * 3;
         pt[0] *= scale[0];
@@ -1251,7 +1253,7 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
             rule = par_shapes__pick_rule(cmd->arg, rules, nrules);
             frame = &stack[++stackptr];
             frame->rule = rule;
-            frame->orientation = par_shapes_clone(turtle);
+            frame->orientation = par_shapes_clone(turtle, 0);
             frame->pc = 0;
             par_shapes__copy3(frame->scale, scale);
             par_shapes__copy3(frame->position, position);
@@ -1450,23 +1452,26 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int subd)
     return mesh;
 }
 
-par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh)
+par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
+    par_shapes_mesh* clone)
 {
-    par_shapes_mesh* clone = PAR_CALLOC(par_shapes_mesh, 1);
+    if (!clone) {
+        clone = PAR_CALLOC(par_shapes_mesh, 1);
+    }
     clone->npoints = mesh->npoints;
-    clone->points = PAR_MALLOC(float, 3 * clone->npoints);
+    clone->points = PAR_REALLOC(float, clone->points, 3 * clone->npoints);
     memcpy(clone->points, mesh->points, sizeof(float) * 3 * clone->npoints);
     clone->ntriangles = mesh->ntriangles;
-    clone->triangles = PAR_MALLOC(uint16_t, 3 * clone->ntriangles);
+    clone->triangles = PAR_REALLOC(uint16_t, clone->triangles, 3 * clone->ntriangles);
     memcpy(clone->triangles, mesh->triangles,
         sizeof(uint16_t) * 3 * clone->ntriangles);
     if (mesh->normals) {
-        clone->normals = PAR_MALLOC(float, 3 * clone->npoints);
+        clone->normals = PAR_REALLOC(float, clone->normals, 3 * clone->npoints);
         memcpy(clone->normals, mesh->normals,
             sizeof(float) * 3 * clone->npoints);
     }
     if (mesh->tcoords) {
-        clone->tcoords = PAR_MALLOC(float, 2 * clone->npoints);
+        clone->tcoords = PAR_REALLOC(float, clone->tcoords, 2 * clone->npoints);
         memcpy(clone->tcoords, mesh->tcoords,
             sizeof(float) * 2 * clone->npoints);
     }
@@ -1684,7 +1689,7 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
 par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
     uint16_t* weldmap)
 {
-    par_shapes_mesh* clone = par_shapes_clone(mesh);
+    par_shapes_mesh* clone = par_shapes_clone(mesh, 0);
     float aabb[6];
     int gridsize = 20;
     float maxcell = gridsize - 1;
