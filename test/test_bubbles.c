@@ -3,6 +3,10 @@
 #define PAR_BUBBLES_IMPLEMENTATION
 #include "par_bubbles.h"
 
+#define PAR_SHAPES_T uint32_t
+#define PAR_SHAPES_IMPLEMENTATION
+#include "par_shapes.h"
+
 static par_bubbles_t* bubbles;
 
 #define NRADIUSES 100
@@ -32,6 +36,16 @@ static int hierarchy[NNODES] = {
     226, 226, 210, 230, 230, 230, 230, 230, 230, 230, 230, 230,
     230, 230, 230, 230, 230, 230, 210, 210, 210, 210, 210, 168,
 };
+
+static int get_depth(int* tree, int i)
+{
+    int d = 0;
+    while (i) {
+        i = tree[i];
+        d++;
+    }
+    return d;
+}
 
 int main()
 {
@@ -74,10 +88,59 @@ int main()
             par_bubbles_free_result(bubbles);
         }
 
-        it("should work with big hierarchy") {
+        it("can be exported to an SVG") {
             bubbles = par_bubbles_hpack_circle(hierarchy, NNODES, 100);
             par_bubbles_export(bubbles, "build/test_bubbles_hpack_circle2.svg");
             par_bubbles_free_result(bubbles);
+        }
+
+        it("can be exported to an OBJ") {
+
+            const int nnodes = 2e3;
+            const float zscale = 0.01;
+
+            // First, generate a random tree.  Square the random parent pointers
+            // to make the graph distribution a bit more interesting, and to
+            // make it easier for humans to find deep portions of the tree.
+            int* tree = malloc(sizeof(int) * nnodes);
+            tree[0] = 0;
+            for (int i = 1; i < nnodes; i++) {
+                float a = (float) rand() / RAND_MAX;
+                float b = (float) rand() / RAND_MAX;
+                tree[i] = i * a * b;
+            }
+
+            // Perform circle packing.
+            bubbles = par_bubbles_hpack_circle(tree, nnodes, 1.0);
+
+            // Create template shape.
+            float normal[3] = {0, 0, 1};
+            float center[3] = {0, 0, 0};
+            par_shapes_mesh* template = par_shapes_create_disk(1.0, 64,
+                center, normal);
+
+            // Merge each circle into the scene.
+            par_shapes_mesh* scene = par_shapes_create_empty();
+            double const* xyr = bubbles->xyr;
+            par_shapes_mesh* clone = 0;
+            for (int i = 0; i < bubbles->count; i++, xyr += 3) {
+                float d = get_depth(tree, i);
+                clone = par_shapes_clone(template, clone);
+                par_shapes_scale(clone, xyr[2], xyr[2], 1.0);
+                par_shapes_translate(clone, xyr[0], xyr[1], d * zscale);
+                par_shapes_merge(scene, clone);
+            }
+
+            // Export the OBJ file.
+            char const* const filename = "build/bubbles.obj";
+            par_shapes_export(scene, filename);
+
+            // Free memory.
+            par_shapes_free_mesh(template);
+            par_shapes_free_mesh(clone);
+            par_shapes_free_mesh(scene);
+            par_bubbles_free_result(bubbles);
+            free(tree);
         }
 
     }
