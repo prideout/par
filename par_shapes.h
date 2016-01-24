@@ -592,48 +592,33 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     uint16_t offset = dst->npoints;
     int npoints = dst->npoints + src->npoints;
     int vecsize = sizeof(float) * 3;
-    float* points = PAR_MALLOC(float, vecsize * npoints / 4);
-    memcpy(points, dst->points, vecsize * dst->npoints);
-    memcpy(points + 3 * dst->npoints, src->points, vecsize * src->npoints);
-    PAR_FREE(dst->points);
-    dst->points = points;
+    dst->points = PAR_REALLOC(float, dst->points, 3 * npoints);
+    memcpy(dst->points + 3 * dst->npoints, src->points, vecsize * src->npoints);
     dst->npoints = npoints;
     if (src->normals || dst->normals) {
-        float* norms = PAR_CALLOC(float, vecsize * npoints / 4);
-        if (dst->normals) {
-            memcpy(norms, dst->normals, vecsize * offset);
-        }
+        dst->normals = PAR_REALLOC(float, dst->normals, 3 * npoints);
         if (src->normals) {
-            memcpy(norms + 3 * offset, src->normals, vecsize * src->npoints);
+            memcpy(dst->normals + 3 * offset, src->normals,
+                vecsize * src->npoints);
         }
-        PAR_FREE(dst->normals);
-        dst->normals = norms;
     }
     if (src->tcoords || dst->tcoords) {
         int uvsize = sizeof(float) * 2;
-        float* uvs = PAR_CALLOC(float, uvsize * npoints /4);
-        if (dst->tcoords) {
-            memcpy(uvs, dst->tcoords, uvsize * offset);
-        }
+        dst->tcoords = PAR_REALLOC(float, dst->tcoords, 2 * npoints);
         if (src->tcoords) {
-            memcpy(uvs + 2 * offset, src->tcoords, uvsize * src->npoints);
+            memcpy(dst->tcoords + 2 * offset, src->tcoords,
+                uvsize * src->npoints);
         }
-        PAR_FREE(dst->tcoords);
-        dst->tcoords = uvs;
     }
     int ntriangles = dst->ntriangles + src->ntriangles;
-    int trisize = sizeof(uint16_t) * 3;
-    uint16_t* triangles = PAR_MALLOC(uint16_t, trisize * ntriangles / 2);
-    memcpy(triangles, dst->triangles, trisize * dst->ntriangles);
-    uint16_t* ptriangles = triangles + 3 * dst->ntriangles;
+    dst->triangles = PAR_REALLOC(uint16_t, dst->triangles, 3 * ntriangles);
+    uint16_t* ptriangles = dst->triangles + 3 * dst->ntriangles;
     uint16_t const* striangles = src->triangles;
     for (int i = 0; i < src->ntriangles; i++) {
         *ptriangles++ = offset + *striangles++;
         *ptriangles++ = offset + *striangles++;
         *ptriangles++ = offset + *striangles++;
     }
-    PAR_FREE(dst->triangles);
-    dst->triangles = triangles;
     dst->ntriangles = ntriangles;
 }
 
@@ -1462,7 +1447,8 @@ par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
     clone->points = PAR_REALLOC(float, clone->points, 3 * clone->npoints);
     memcpy(clone->points, mesh->points, sizeof(float) * 3 * clone->npoints);
     clone->ntriangles = mesh->ntriangles;
-    clone->triangles = PAR_REALLOC(uint16_t, clone->triangles, 3 * clone->ntriangles);
+    clone->triangles = PAR_REALLOC(uint16_t, clone->triangles, 3 *
+        clone->ntriangles);
     memcpy(clone->triangles, mesh->triangles,
         sizeof(uint16_t) * 3 * clone->ntriangles);
     if (mesh->normals) {
