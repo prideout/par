@@ -8,7 +8,7 @@ library    | description  | link
 ------------------- | ---- | ---
 **par_msquares.h** | efficient marching squares implementation | [blog post](http://github.prideout.net/marching-squares/)
 **par_shapes.h** | generate parametric surfaces and other simple shapes | [blog post](http://github.prideout.net/shapes/)
-**par_bubbles.h** | pack circles into hierarchical diagrams |
+**par_bubbles.h** | pack circles into hierarchical diagrams | [blog post](http://github.prideout.net/bubbles/)
 **par_bluenoise.h** | generate progressive 2D point sequences | [blog post](http://github.prideout.net/recursive-wang-tiles/)
 **par_easycurl.h** | simple HTTP requests using libcurl |
 **par_filecache.h** | LRU caching on your device's filesystem |
