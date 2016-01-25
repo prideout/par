@@ -2,7 +2,7 @@
 // Simple C library for packing circles into hierarchical (or flat) diagrams.
 //
 // Based on "Visualization of Large Hierarchical Data by Circle Packing" by
-// Wang et al (2006), with an extension for cylinderical space.
+// Wang et al (2006).
 //
 // Also implements Emo Welzl's "Smallest enclosing disks" algorithm (1991).
 //
@@ -343,7 +343,6 @@ static void par__minidisk(double* disk, double const* pts, int npts,
         par__easydisk(disk, edgepts, nedgepts);
         return;
     }
-    assert(nedgepts < 3);
     double const* pt = pts + (--npts) * 2;
     par__minidisk(disk, pts, npts, edgepts, nedgepts);
     if (!par__disk_contains(disk, pt)) {
