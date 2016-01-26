@@ -35,12 +35,12 @@
 #endif
 
 typedef struct par_shapes_mesh_s {
-    float* points;
-    int npoints;
-    PAR_SHAPES_T* triangles;
-    int ntriangles;
-    float* normals;
-    float* tcoords;
+    float* points;           // Flat list of 3-tuples (X Y Z X Y Z...)
+    int npoints;             // Number of points (not the number of floats).
+    PAR_SHAPES_T* triangles; // Flat list of 3-tuples (I J K I J K...)
+    int ntriangles;          // Number of triangles (not the number of indices).
+    float* normals;          // Optional list of 3-tuples (X Y Z X Y Z...)
+    float* tcoords;          // Optional list of 2-tuples (U V U V U V...)
 } par_shapes_mesh;
 
 void par_shapes_free_mesh(par_shapes_mesh*);
@@ -60,8 +60,9 @@ par_shapes_mesh* par_shapes_create_torus(int slices, int stacks, float radius);
 // Create a sphere with texture coordinates and small triangles near the poles.
 par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks);
 
-// Generate a sphere from a subdivided icosahedron, which produces a nicer
-// distribution of triangles, but no texture coordinates.
+// Approximate a sphere with a subdivided icosahedron, which produces a nice
+// distribution of triangles, but no texture coordinates.  Each subdivision
+// level scales the number of triangles by four, so use a very low number.
 par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubdivisions);
 
 // More parametric surfaces.
@@ -99,7 +100,8 @@ par_shapes_mesh* par_shapes_create_disk(float radius, int slices,
 par_shapes_mesh* par_shapes_create_empty();
 
 // Generate a rock shape that sits on the Y=0 plane, and sinks into it a bit.
-// This includes smooth normals but no texture coordinates.
+// This includes smooth normals but no texture coordinates.  Each subdivision
+// level scales the number of triangles by four, so use a very low number.
 par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
 
 // Create trees or vegetation by executing a recursive turtle graphics program.
