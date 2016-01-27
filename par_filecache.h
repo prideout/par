@@ -22,8 +22,6 @@
 
 #include <stdbool.h>
 
-typedef uint8_t par_byte;
-
 // Initialize the filecache using the given prefix (usually a folder path with
 // a trailing slash) and the given maximum byte count.  If items already exist
 // in the cache when this is called, they are not evicted.  Cached items are
@@ -33,14 +31,14 @@ void par_filecache_init(char const* prefix, int maxsize);
 // Save a blob to the cache using the given unique name.  If adding the blob
 // would cause the cache to exceed maxsize, the least-recently-used item is
 // evicted at this time.
-void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
-    par_byte* header, int headersize);
+void par_filecache_save(char const* name, uint8_t const* payload,
+    int payloadsize, uint8_t const* header, int headersize);
 
 // Check if the given blob is in the cache; if not, return 0.  If so, return 1
 // and allocate new memory for payload.  The caller should free the payload.
 // The header is preallocated so the caller needs to know its size beforehand.
-bool par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
-    par_byte* header, int headersize);
+bool par_filecache_load(char const* name, uint8_t** payload, int* payloadsize,
+    uint8_t* header, int headersize);
 
 // Remove all items from the cache.
 void par_filecache_evict_all();
@@ -169,8 +167,8 @@ static bool par_filecache__read(void* dest, int nbytes, FILE* file)
     return consumed == 1;
 }
 
-bool par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
-    par_byte* header, int headersize)
+bool par_filecache_load(char const* name, uint8_t** payload, int* payloadsize,
+    uint8_t* header, int headersize)
 {
     char qualified[PATH_MAX];
     size_t len = strlen(name);
@@ -213,14 +211,14 @@ bool par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     char* dbuff = cbuff;
 #endif
     fclose(cachefile);
-    *payload = (par_byte*) dbuff;
+    *payload = (uint8_t*) dbuff;
     *payloadsize = dnbytes;
     _update_table(name, (int) cnbytes);
     return true;
 }
 
-void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
-    par_byte* header, int headersize)
+void par_filecache_save(char const* name, uint8_t const* payload,
+    int payloadsize, uint8_t const* header, int headersize)
 {
     char qualified[PATH_MAX];
     size_t len = strlen(name);

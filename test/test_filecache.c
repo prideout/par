@@ -22,8 +22,8 @@ int main()
         }
         it("should save and load small files") {
             char const* payload = "01234";
-            par_filecache_save("small", (par_byte*) payload, 5, 0, 0);
-            par_byte* received = 0;
+            par_filecache_save("small", (uint8_t*) payload, 5, 0, 0);
+            uint8_t* received = 0;
             int nbytes = 0;
             int loaded = par_filecache_load("small", &received, &nbytes, 0, 0);
             assert_ok(loaded);
@@ -38,8 +38,8 @@ int main()
             for (int i = 0; i < 512; i++) {
                 payload[i] = rand() % 256;
             }
-            par_filecache_save("big", (par_byte*) payload, 1024, 0, 0);
-            par_byte* received = 0;
+            par_filecache_save("big", (uint8_t*) payload, 1024, 0, 0);
+            uint8_t* received = 0;
             int nbytes = 0;
             int loaded = par_filecache_load("big", &received, &nbytes, 0, 0);
             assert_ok(loaded);
@@ -50,10 +50,10 @@ int main()
             free(payload);
         }
         it("should evict the oldest file when exceeding max size") {
-            par_byte* received = 0;
+            uint8_t* received = 0;
             int nbytes = 0;
             char* payload = calloc(1024, 1);
-            par_filecache_save("second", (par_byte*) payload, 1024, 0, 0);
+            par_filecache_save("second", (uint8_t*) payload, 1024, 0, 0);
             free(payload);
             int loaded = par_filecache_load("big", &received, &nbytes, 0, 0);
             #if ENABLE_LZ4
@@ -64,7 +64,7 @@ int main()
             #endif
         }
         it("returns false when not found") {
-            par_byte* received = 0;
+            uint8_t* received = 0;
             int nbytes = 0;
             int loaded = par_filecache_load("bar", &received, &nbytes, 0, 0);
             assert_equal(loaded, 0);
@@ -72,14 +72,14 @@ int main()
         it("supports a fixed-size header (e.g., version number)") {
             char* payload = "philip";
             char* header = "v0001";
-            par_filecache_save("versioned", (par_byte*) payload,
-                strlen(payload), (par_byte*) header, 5);
+            par_filecache_save("versioned", (uint8_t*) payload,
+                strlen(payload), (uint8_t*) header, 5);
             char* loaded_payload;
             char loaded_header[5] = {0};
             int nbytes = 0;
             int loaded = par_filecache_load("versioned",
-                (par_byte**) &loaded_payload, &nbytes,
-                (par_byte*) loaded_header, 5);
+                (uint8_t**) &loaded_payload, &nbytes,
+                (uint8_t*) loaded_header, 5);
             assert_equal(loaded, 1);
             assert_equal(nbytes, 6);
             assert_ok(!memcmp(loaded_header, header, 5));
@@ -96,8 +96,8 @@ int main()
             char loaded_header[5] = {0};
             int nbytes = 0;
             int loaded = par_filecache_load("versioned",
-                (par_byte**) &loaded_payload, &nbytes,
-                (par_byte*) loaded_header, 5);
+                (uint8_t**) &loaded_payload, &nbytes,
+                (uint8_t*) loaded_header, 5);
             assert_equal(loaded, 0);
         }
         it("is graceful when file content vanishes") {
@@ -109,8 +109,8 @@ int main()
             char loaded_header[5] = {0};
             int nbytes = 0;
             int loaded = par_filecache_load("second",
-                (par_byte**) &loaded_payload, &nbytes,
-                (par_byte*) loaded_header, 5);
+                (uint8_t**) &loaded_payload, &nbytes,
+                (uint8_t*) loaded_header, 5);
             assert_equal(loaded, 0);
         }
     }
