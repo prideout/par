@@ -88,5 +88,32 @@ int main()
         }
     }
 
+    describe("robustness") {
+        it("is graceful when files are deleted") {
+            int error = remove(PREFIX "versioned");
+            assert_equal(error, 0);
+            char* loaded_payload;
+            char loaded_header[5] = {0};
+            int nbytes = 0;
+            int loaded = par_filecache_load("versioned",
+                (par_byte**) &loaded_payload, &nbytes,
+                (par_byte*) loaded_header, 5);
+            assert_equal(loaded, 0);
+        }
+        it("is graceful when file content vanishes") {
+            int error = remove(PREFIX "second");
+            assert_equal(error, 0);
+            FILE* cachefile = fopen(PREFIX "second", "wt");
+            fclose(cachefile);
+            char* loaded_payload;
+            char loaded_header[5] = {0};
+            int nbytes = 0;
+            int loaded = par_filecache_load("second",
+                (par_byte**) &loaded_payload, &nbytes,
+                (par_byte*) loaded_header, 5);
+            assert_equal(loaded, 0);
+        }
+    }
+
     return assert_failures();
 }
