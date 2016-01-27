@@ -69,6 +69,23 @@ int main()
             int loaded = par_filecache_load("bar", &received, &nbytes, 0, 0);
             assert_equal(loaded, 0);
         }
+        it("supports a fixed-size header (e.g., version number)") {
+            char* payload = "philip";
+            char* header = "v0001";
+            par_filecache_save("versioned", (par_byte*) payload,
+                strlen(payload), (par_byte*) header, 5);
+            char* loaded_payload;
+            char loaded_header[5] = {0};
+            int nbytes = 0;
+            int loaded = par_filecache_load("versioned",
+                (par_byte**) &loaded_payload, &nbytes,
+                (par_byte*) loaded_header, 5);
+            assert_equal(loaded, 1);
+            assert_equal(nbytes, 6);
+            assert_ok(!memcmp(loaded_header, header, 5));
+            assert_ok(!memcmp(loaded_payload, payload, 6));
+            free(loaded_payload);
+        }
     }
 
     return assert_failures();
