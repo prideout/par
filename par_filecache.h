@@ -20,6 +20,7 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
+#include <stdint.h>
 #include <stdbool.h>
 
 // Initialize the filecache using the given prefix (usually a folder path with
