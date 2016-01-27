@@ -20,7 +20,9 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
-typedef unsigned char par_byte;
+#include <stdbool.h>
+
+typedef uint8_t par_byte;
 
 // Initialize the filecache using the given prefix (usually a folder path with
 // a trailing slash) and the given maximum byte count.  If items already exist
@@ -37,7 +39,7 @@ void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
 // Check if the given blob is in the cache; if not, return 0.  If so, return 1
 // and allocate new memory for payload.  The caller should free the payload.
 // The header is preallocated so the caller needs to know its size beforehand.
-int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
+bool par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     par_byte* header, int headersize);
 
 // Remove all items from the cache.
@@ -161,25 +163,25 @@ NSString* getPrefix()
 
 #endif
 
-static int par_filecache__read(void* dest, int nbytes, FILE* file)
+static bool par_filecache__read(void* dest, int nbytes, FILE* file)
 {
     int consumed = (int) fread(dest, nbytes, 1, file);
     return consumed == 1;
 }
 
-int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
+bool par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     par_byte* header, int headersize)
 {
     char qualified[PATH_MAX];
     size_t len = strlen(name);
     if (len == 0) {
-        return 0;
+        return false;
     }
     assert(len + strlen(_fileprefix) < PATH_MAX);
     strcpy(qualified, _fileprefix);
     strcat(qualified, name);
     if (access(qualified, F_OK) == -1) {
-        return 0;
+        return false;
     }
     FILE* cachefile = fopen(qualified, "rb");
     assert(cachefile && "Unable to open cache file for reading");
@@ -187,13 +189,13 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     long fsize = ftell(cachefile);
     fseek(cachefile, 0, SEEK_SET);
     if (headersize > 0 && !par_filecache__read(header, headersize, cachefile)) {
-        return 0;
+        return false;
     }
     int32_t dnbytes;
 #if ENABLE_LZ4
     long cnbytes = fsize - headersize - sizeof(dnbytes);
     if (!par_filecache__read(&dnbytes, sizeof(dnbytes), cachefile)) {
-        return 0;
+        return false;
     }
 #else
     long cnbytes = fsize - headersize;
@@ -201,7 +203,7 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
 #endif
     char* cbuff = (char*) malloc(cnbytes);
     if (!par_filecache__read(cbuff, cnbytes, cachefile)) {
-        return 0;
+        return false;
     }
 #if ENABLE_LZ4
     char* dbuff = (char*) malloc(dnbytes);
@@ -214,7 +216,7 @@ int par_filecache_load(char const* name, par_byte** payload, int* payloadsize,
     *payload = (par_byte*) dbuff;
     *payloadsize = dnbytes;
     _update_table(name, (int) cnbytes);
-    return 1;
+    return true;
 }
 
 void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
