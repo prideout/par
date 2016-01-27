@@ -88,6 +88,14 @@ par_bubbles_t* par_bubbles_cull(par_bubbles_t const* src,
 // Dump out a SVG file for diagnostic purposes.
 void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
 
+// Returns a pointer to a list of children nodes.
+void par_bubbles_get_children(par_bubbles_t const* bubbles, int node,
+    int** pchildren, int* nchildren);
+
+// Finds the height of the tree and returns one of its deepest leaves.
+void par_bubbles_get_maxdepth(par_bubbles_t const* bubbles, int* maxdepth,
+    int* leaf);
+
 #ifndef PAR_HELPERS
 #define PAR_HELPERS 1
 #define PAR_PI (3.14159265359)
@@ -713,6 +721,40 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
     }
     fputs("</g>\n</svg>", svgfile);
     fclose(svgfile);
+}
+
+void par_bubbles_get_children(par_bubbles_t const* pbubbles, int node,
+    int** pchildren, int* nchildren)
+{
+    par_bubbles__t const* bubbles = (par_bubbles__t const*) pbubbles;
+    *pchildren = bubbles->graph_children + bubbles->graph_heads[node];
+    *nchildren = bubbles->graph_tails[node] - bubbles->graph_heads[node];
+}
+
+void par_bubbles__get_maxdepth(par_bubbles__t const* bubbles, int* maxdepth,
+    int* leaf, int parent, int depth)
+{
+    if (depth > *maxdepth) {
+        *leaf = parent;
+        *maxdepth = depth;
+    }
+    int* children;
+    int nchildren;
+    par_bubbles_t const* pbubbles = (par_bubbles_t const*) bubbles;
+    par_bubbles_get_children(pbubbles, parent, &children, &nchildren);
+    for (int c = 0; c < nchildren; c++) {
+        par_bubbles__get_maxdepth(bubbles, maxdepth, leaf, children[c],
+            depth + 1);
+    }
+}
+
+void par_bubbles_get_maxdepth(par_bubbles_t const* pbubbles, int* maxdepth,
+    int* leaf)
+{
+    par_bubbles__t const* bubbles = (par_bubbles__t const*) pbubbles;
+    *maxdepth = -1;
+    *leaf = -1;
+    return par_bubbles__get_maxdepth(bubbles, maxdepth, leaf, 0, 0);
 }
 
 #endif // PAR_BUBBLES_IMPLEMENTATION
