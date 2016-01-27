@@ -26,3 +26,5 @@ script:
     - cmake --build build
     - build/test_bubbles
     - build/test_shapes
+    - build/test_filecache
+    - build/test_filecache_lz4

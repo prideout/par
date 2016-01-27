@@ -49,6 +49,10 @@ void par_filecache_evict_all();
 #define ENABLE_LZ4 0
 #endif
 
+#ifndef PAR_FILECACHE_VERBOSE
+#define PAR_FILECACHE_VERBOSE 0
+#endif
+
 #ifndef PAR_HELPERS
 #define PAR_HELPERS 1
 #define PAR_PI (3.14159265359)
@@ -254,7 +258,9 @@ void par_filecache_save(char const* name, par_byte* payload, int payloadsize,
 
 void par_filecache_evict_all()
 {
+    #if PAR_FILECACHE_VERBOSE
     printf("Evicting all.\n");
+    #endif
     char qualified[PATH_MAX];
     if (!_table) {
         _read_or_create_tablefile();
@@ -263,7 +269,9 @@ void par_filecache_evict_all()
     for (int i = 0; i < _table->nentries; i++, entry++) {
         strcpy(qualified, _fileprefix);
         strcat(qualified, entry->name);
+        #if PAR_FILECACHE_VERBOSE
         printf("Evicting %s\n", qualified);
+        #endif
         remove(qualified);
     }
     _table->nentries = 0;
@@ -381,7 +389,9 @@ static void _evict_lru()
         assert(len + strlen(_fileprefix) < PATH_MAX);
         strcpy(qualified, _fileprefix);
         strcat(qualified, entry->name);
+        #if PAR_FILECACHE_VERBOSE
         printf("Evicting %s\n", entry->name);
+        #endif
         remove(qualified);
         _table->totalbytes -= entry->nbytes;
         if (_table->nentries-- > 1) {

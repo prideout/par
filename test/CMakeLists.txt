@@ -6,7 +6,7 @@ pkg_search_module(CURL REQUIRED libcurl)
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-std=c11 -Wall")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-Wvla -Wall")
 
-include_directories(.. ${CURL_INCLUDE_DIRS})
+include_directories(.. . ${CURL_INCLUDE_DIRS})
 
 add_executable(
     test_msquares
@@ -46,3 +46,15 @@ add_executable(
     test_bubbles.c
     console-colors.c)
 target_link_libraries(test_bubbles m)
+
+add_executable(
+    test_filecache
+    test_filecache.c
+    console-colors.c)
+target_link_libraries(test_filecache)
+
+add_executable(
+    test_filecache_lz4
+    test_filecache_lz4.c
+    console-colors.c)
+target_link_libraries(test_filecache_lz4)
