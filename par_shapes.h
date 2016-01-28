@@ -293,7 +293,7 @@ static void par_shapes__compute_welded_normals(par_shapes_mesh* m)
         pdst[1] = pnormal[1];
         pdst[2] = pnormal[2];
     }
-    free(weldmap);
+    PAR_FREE(weldmap);
     par_shapes_free_mesh(welded);
 }
 
@@ -434,11 +434,11 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn fn,
 
 void par_shapes_free_mesh(par_shapes_mesh* mesh)
 {
-    free(mesh->points);
-    free(mesh->triangles);
-    free(mesh->normals);
-    free(mesh->tcoords);
-    free(mesh);
+    PAR_FREE(mesh->points);
+    PAR_FREE(mesh->triangles);
+    PAR_FREE(mesh->normals);
+    PAR_FREE(mesh->tcoords);
+    PAR_FREE(mesh);
 }
 
 void par_shapes_export(par_shapes_mesh const* mesh, char const* filename)
@@ -1087,7 +1087,7 @@ static void par_shapes__connect(par_shapes_mesh* scene,
     float* newpts = points + scene->npoints * 3;
     memcpy(newpts, cylinder->points + (slices + 1) * 3,
         sizeof(float) * (slices + 1) * 3);
-    free(scene->points);
+    PAR_FREE(scene->points);
     scene->points = points;
 
     // Create the new triangle list.
@@ -1108,7 +1108,7 @@ static void par_shapes__connect(par_shapes_mesh* scene,
         }
         v += slices + 1;
     }
-    free(scene->triangles);
+    PAR_FREE(scene->triangles);
     scene->triangles = triangles;
 
     scene->npoints = npoints;
@@ -1299,10 +1299,10 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
             }
         }
     }
-    free(stack);
-    free(program);
-    free(rules);
-    free(commands);
+    PAR_FREE(stack);
+    PAR_FREE(program);
+    PAR_FREE(rules);
+    PAR_FREE(commands);
     return scene;
 }
 
@@ -1318,7 +1318,7 @@ void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices)
         *dst++ = src[1];
         *dst++ = src[2];
     }
-    free(mesh->points);
+    PAR_FREE(mesh->points);
     mesh->points = points;
     mesh->npoints = npoints;
     if (create_indices) {
@@ -1327,14 +1327,14 @@ void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices)
         for (int i = 0; i < mesh->ntriangles * 3; i++) {
             *index++ = i;
         }
-        free(mesh->triangles);
+        PAR_FREE(mesh->triangles);
         mesh->triangles = tris;
     }
 }
 
 void par_shapes_compute_normals(par_shapes_mesh* m)
 {
-    free(m->normals);
+    PAR_FREE(m->normals);
     m->normals = PAR_CALLOC(float, m->npoints * 3);
     PAR_SHAPES_T const* triangle = m->triangles;
     float next[3], prev[3], cp[3];
@@ -1395,7 +1395,7 @@ static void par_shapes__subdivide(par_shapes_mesh* mesh)
         par_shapes__add3(dpoint += 3, p1);
         par_shapes__add3(dpoint += 3, c);
     }
-    free(mesh->points);
+    PAR_FREE(mesh->points);
     mesh->points = points;
     mesh->npoints = npoints;
     mesh->ntriangles = ntriangles;
@@ -1405,7 +1405,7 @@ par_shapes_mesh* par_shapes_create_subdivided_sphere(int nsubd)
 {
     par_shapes_mesh* mesh = par_shapes_create_icosahedron();
     par_shapes_unweld(mesh, false);
-    free(mesh->triangles);
+    PAR_FREE(mesh->triangles);
     mesh->triangles = 0;
     while (nsubd--) {
         par_shapes__subdivide(mesh);
@@ -1528,7 +1528,7 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize,
         *dstpt++ = *srcpt++;
         *dstpt++ = *srcpt++;
     }
-    free(mesh->points);
+    PAR_FREE(mesh->points);
     mesh->points = newpts;
 
     // Apply the inverse reorder mapping to the triangle indices.
@@ -1538,12 +1538,12 @@ static void par_shapes__sort_points(par_shapes_mesh* mesh, int gridsize,
     for (int i = 0; i < mesh->ntriangles * 3; i++) {
         *dstind++ = invmap[*srcind++];
     }
-    free(mesh->triangles);
+    PAR_FREE(mesh->triangles);
     mesh->triangles = newinds;
 
     // Cleanup.
     memcpy(sortmap, invmap, sizeof(PAR_SHAPES_T) * mesh->npoints);
-    free(invmap);
+    PAR_FREE(invmap);
 }
 
 static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
@@ -1637,7 +1637,7 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
             }
         }
     }
-    free(bins);
+    PAR_FREE(bins);
 
     // Apply the weldmap to the vertices.
     int npoints = mesh->npoints - nremoved;
@@ -1659,9 +1659,9 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
         }
     }
     assert(ci == npoints);
-    free(mesh->points);
+    PAR_FREE(mesh->points);
     memcpy(weldmap, condensed_map, mesh->npoints * sizeof(PAR_SHAPES_T));
-    free(condensed_map);
+    PAR_FREE(condensed_map);
     mesh->points = newpts;
     mesh->npoints = npoints;
 
@@ -1710,16 +1710,16 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const* mesh, float epsilon,
     }
     par_shapes__weld_points(clone, gridsize, epsilon, weldmap);
     if (owner) {
-        free(weldmap);
+        PAR_FREE(weldmap);
     } else {
         PAR_SHAPES_T* newmap = PAR_MALLOC(PAR_SHAPES_T, mesh->npoints);
         for (int i = 0; i < mesh->npoints; i++) {
             newmap[i] = weldmap[sortmap[i]];
         }
         memcpy(weldmap, newmap, sizeof(PAR_SHAPES_T) * mesh->npoints);
-        free(newmap);
+        PAR_FREE(newmap);
     }
-    free(sortmap);
+    PAR_FREE(sortmap);
     par_shapes_scale(clone, 1.0 / scale[0], 1.0 / scale[1], 1.0 / scale[2]);
     par_shapes_translate(clone, aabb[0], aabb[1], aabb[2]);
     return clone;
@@ -1836,7 +1836,7 @@ static int par__simplex_noise(int64_t seed, struct osn_context** ctx)
     (*ctx)->permGradIndex3D = NULL;
     rc = allocate_perm(*ctx, 256, 256);
     if (rc) {
-        free(*ctx);
+        PAR_FREE(*ctx);
         return rc;
     }
     perm = (*ctx)->perm;
@@ -1865,14 +1865,14 @@ static void par__simplex_noise_free(struct osn_context* ctx)
     if (!ctx)
         return;
     if (ctx->perm) {
-        free(ctx->perm);
+        PAR_FREE(ctx->perm);
         ctx->perm = NULL;
     }
     if (ctx->permGradIndex3D) {
-        free(ctx->permGradIndex3D);
+        PAR_FREE(ctx->permGradIndex3D);
         ctx->permGradIndex3D = NULL;
     }
-    free(ctx);
+    PAR_FREE(ctx);
 }
 
 static double par__simplex_noise2(struct osn_context* ctx, double x, double y)
@@ -2018,7 +2018,7 @@ void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float mintriarea)
         }
     }
     mesh->ntriangles = ntriangles;
-    free(mesh->triangles);
+    PAR_FREE(mesh->triangles);
     mesh->triangles = triangles;
 }
 
