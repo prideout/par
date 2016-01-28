@@ -1317,13 +1317,13 @@ void par_shapes_unweld(par_shapes_mesh* mesh, bool create_indices)
     mesh->points = points;
     mesh->npoints = npoints;
     if (create_indices) {
-        PAR_SHAPES_T* triangles = PAR_MALLOC(PAR_SHAPES_T, 3 * mesh->ntriangles);
-        PAR_SHAPES_T* index = triangles;
+        PAR_SHAPES_T* tris = PAR_MALLOC(PAR_SHAPES_T, 3 * mesh->ntriangles);
+        PAR_SHAPES_T* index = tris;
         for (int i = 0; i < mesh->ntriangles * 3; i++) {
             *index++ = i;
         }
         free(mesh->triangles);
-        mesh->triangles = triangles;
+        mesh->triangles = tris;
     }
 }
 
