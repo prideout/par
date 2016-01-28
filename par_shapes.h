@@ -36,9 +36,9 @@
 
 typedef struct par_shapes_mesh_s {
     float* points;           // Flat list of 3-tuples (X Y Z X Y Z...)
-    int npoints;             // Number of points (not the number of floats).
+    int npoints;             // Number of points
     PAR_SHAPES_T* triangles; // Flat list of 3-tuples (I J K I J K...)
-    int ntriangles;          // Number of triangles (not the number of indices).
+    int ntriangles;          // Number of triangles
     float* normals;          // Optional list of 3-tuples (X Y Z X Y Z...)
     float* tcoords;          // Optional list of 2-tuples (U V U V U V...)
 } par_shapes_mesh;
@@ -79,11 +79,11 @@ par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn, int slices,
     int stacks, void* userdata);
 
 // Generate points for a 20-sided polyhedron that fits in the unit sphere.
-// Texture coordinates and normals are not provided.
+// Texture coordinates and normals are not generated.
 par_shapes_mesh* par_shapes_create_icosahedron();
 
 // Generate points for a 12-sided polyhedron that fits in the unit sphere.
-// Again, texture coordinates and normals are not provided.
+// Again, texture coordinates and normals are not generated.
 par_shapes_mesh* par_shapes_create_dodecahedron();
 
 // More platonic solids.
@@ -106,7 +106,7 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
 
 // Create trees or vegetation by executing a recursive turtle graphics program.
 // The program is a list of command-argument pairs.  See the unit test for
-// an example.
+// an example.  Texture coordinates and normals are not generated.
 par_shapes_mesh* par_shapes_create_lsystem(char const* program, int slices,
     int maxdepth);
 
@@ -1198,6 +1198,13 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
     par_shapes_mesh* tube = par_shapes_create_cylinder(slices, 1);
     par_shapes_mesh* turtle = par_shapes__create_turtle();
 
+    // We're not attempting to support texture coordinates and normals
+    // with L-systems, so remove them from the template shape.
+    PAR_FREE(tube->normals);
+    PAR_FREE(tube->tcoords);
+    tube->normals = 0;
+    tube->tcoords = 0;
+
     const float xaxis[] = {1, 0, 0};
     const float yaxis[] = {0, 1, 0};
     const float zaxis[] = {0, 0, 1};
@@ -1211,13 +1218,11 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
     stack[0].rule = &rules[0];
     par_shapes__copy3(stack[0].scale, units);
     while (stackptr >= 0) {
-
         par_shapes__stackframe* frame = &stack[stackptr];
         par_shapes__rule* rule = frame->rule;
         par_shapes_mesh* turtle = frame->orientation;
         float* position = frame->position;
         float* scale = frame->scale;
-
         if (frame->pc >= rule->ncommands) {
             par_shapes_free_mesh(turtle);
             stackptr--;
