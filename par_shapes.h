@@ -333,6 +333,7 @@ par_shapes_mesh* par_shapes_create_torus(int slices, int stacks, float radius)
     if (slices < 3 || stacks < 3) {
         return 0;
     }
+    assert(radius <= 1.0 && "Use smaller radius to prevent self-intersection.");
     void* userdata = (void*) &radius;
     return par_shapes_create_parametric(par_shapes__torus, slices,
         stacks, userdata);
@@ -1657,7 +1658,6 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
             *dst++ = src[2];
             *cmap++ = ci++;
         } else {
-            assert(weldmap[p] < p);
             *cmap++ = condensed_map[weldmap[p]];
         }
     }
