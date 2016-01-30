@@ -36,6 +36,16 @@ add_executable(
 target_link_libraries(test_cpp ${CURL_LIBRARIES})
 
 add_executable(
+    test_linkage
+    test_linkage.cpp
+    test_linkage.c
+    lz4.cpp
+    lodepng.c
+    sds.c
+    whereami.c)
+target_link_libraries(test_linkage ${CURL_LIBRARIES})
+
+add_executable(
     test_shapes
     test_shapes.c
     console-colors.c)
