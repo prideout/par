@@ -363,8 +363,10 @@ par_shapes_mesh* par_shapes_create_trefoil_knot(int slices, int stacks,
     if (slices < 3 || stacks < 3) {
         return 0;
     }
-    return par_shapes_create_parametric(
-        par_shapes__trefoil, slices, stacks, 0);
+    assert(radius <= 3.0 && "Use smaller radius to prevent self-intersection.");
+    void* userdata = (void*) &radius;
+    return par_shapes_create_parametric(par_shapes__trefoil, slices,
+        stacks, userdata);
 }
 
 par_shapes_mesh* par_shapes_create_plane(int slices, int stacks)
@@ -569,10 +571,11 @@ static void par_shapes__torus(float const* uv, float* xyz, void* userdata)
 
 static void par_shapes__trefoil(float const* uv, float* xyz, void* userdata)
 {
+    float minor = *((float*) userdata);
     const float a = 0.5f;
     const float b = 0.3f;
     const float c = 0.5f;
-    const float d = 0.1f;
+    const float d = minor * 0.1f;
     const float u = (1 - uv[0]) * 4 * PAR_PI;
     const float v = uv[1] * 2 * PAR_PI;
     const float r = a + b * cos(1.5f * u);
