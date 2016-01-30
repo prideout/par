@@ -55,7 +55,7 @@ int main()
         it("should generate an OBJ file") {
             par_shapes_mesh* m;
 
-            m = par_shapes_create_torus(7, 10, 0.1);
+            m = par_shapes_create_torus(7, 10, 0.5);
             par_shapes_export(m, "build/test_shapes_torus.obj");
             par_shapes_free_mesh(m);
 
@@ -67,7 +67,7 @@ int main()
             par_shapes_export(m, "build/test_shapes_klein.obj");
             par_shapes_free_mesh(m);
 
-            m = par_shapes_create_trefoil_knot(20, 100, 0.2);
+            m = par_shapes_create_trefoil_knot(20, 100, 0.5);
             par_shapes_export(m, "build/test_shapes_trefoil.obj");
             par_shapes_free_mesh(m);
 
