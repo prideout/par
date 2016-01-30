@@ -114,7 +114,7 @@ par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 #define PAR_MAX(a, b) (a > b ? a : b)
 #define PAR_CLAMP(v, lo, hi) PAR_MAX(lo, PAR_MIN(hi, v))
 #define PAR_SWAP(T, A, B) { T tmp = B; B = A; A = tmp; }
-#define PAR_SQR(a) (a * a)
+#define PAR_SQR(a) ((a) * (a))
 #endif
 
 #ifndef PAR_MALLOC
