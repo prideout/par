@@ -11,6 +11,13 @@
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
 
+#ifndef PAR_MSQUARES_H
+#define PAR_MSQUARES_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 // -----------------------------------------------------------------------------
@@ -117,12 +124,16 @@ par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 #define PAR_FREE(BUF) free(BUF)
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+#endif // PAR_MSQUARES_H
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
 
 #ifdef PAR_MSQUARES_IMPLEMENTATION
-
 #include <stdlib.h>
 #include <assert.h>
 #include <float.h>
@@ -2103,4 +2114,4 @@ par_msquares_boundary* par_msquares_extract_boundary(
     return result;
 }
 
-#endif
+#endif // PAR_MSQUARES_IMPLEMENTATION

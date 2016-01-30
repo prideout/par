@@ -20,6 +20,13 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
+#ifndef PAR_FILECACHE_H
+#define PAR_FILECACHE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -70,12 +77,16 @@ void par_filecache_evict_all();
 #define PAR_FREE(BUF) free(BUF)
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+#endif // PAR_FILECACHE_H
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
 
 #ifdef PAR_FILECACHE_IMPLEMENTATION
-
 #include <limits.h>
 #include <string.h>
 #include <assert.h>
@@ -423,4 +434,4 @@ static uint64_t _hash(char const* name)
 }
 
 #undef PAR_MAX_ENTRIES
-#endif
+#endif // PAR_FILECACHE_IMPLEMENTATION

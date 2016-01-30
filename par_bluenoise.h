@@ -34,6 +34,13 @@
 //     par_bluenoise_free(ctx);
 //
 
+#ifndef PAR_BLUENOISE_H
+#define PAR_BLUENOISE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // -----------------------------------------------------------------------------
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
@@ -117,12 +124,16 @@ void par_bluenoise_sort_by_rank(float* pts, int npts);
 #define PAR_FREE(BUF) free(BUF)
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+#endif // PAR_BLUENOISE_H
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
 
 #ifdef PAR_BLUENOISE_IMPLEMENTATION
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -526,4 +537,4 @@ float* par_bluenoise_generate_exact(
 #undef PAR_MINI
 #undef PAR_MAXI
 
-#endif
+#endif // PAR_BLUENOISE_IMPLEMENTATION

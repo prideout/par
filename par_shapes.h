@@ -27,6 +27,10 @@
 #ifndef PAR_SHAPES_H
 #define PAR_SHAPES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -170,14 +174,16 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 #define PAR_FREE(BUF) free(BUF)
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+#endif // PAR_SHAPES_H
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
 
-#endif // PAR_SHAPES_H
-
 #ifdef PAR_SHAPES_IMPLEMENTATION
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>

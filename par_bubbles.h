@@ -23,6 +23,10 @@
 #ifndef PAR_BUBBLES_H
 #define PAR_BUBBLES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 
 // Enclosing / Touching --------------------------------------------------------
@@ -112,11 +116,14 @@ void par_bubbles_get_maxdepth(par_bubbles_t const* bubbles, int* maxdepth,
 #define PAR_FREE(BUF) free(BUF)
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+#endif // PAR_BUBBLES_H
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
-
-#endif // PAR_BUBBLES_H
 
 #ifdef PAR_BUBBLES_IMPLEMENTATION
 

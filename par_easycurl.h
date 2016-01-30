@@ -8,6 +8,13 @@
 // BEGIN PUBLIC API
 // -----------------------------------------------------------------------------
 
+#ifndef PAR_EASYCURL_H
+#define PAR_EASYCURL_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef unsigned char par_byte;
 
 // Call this before calling any other easycurl function.  The flags are
@@ -24,12 +31,16 @@ int par_easycurl_to_memory(char const* url, par_byte** data, int* nbytes);
 // success and 0 otherwise.
 int par_easycurl_to_file(char const* srcurl, char const* dstpath);
 
+#ifdef __cplusplus
+}
+#endif
+#endif // PAR_EASYCURL_H
+
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
 
 #ifdef PAR_EASYCURL_IMPLEMENTATION
-
 #include <strings.h>
 #include <string.h>
 #include <stdlib.h>
@@ -186,4 +197,4 @@ int par_easycurl_to_file(char const* srcurl, char const* dstpath)
     return 1;
 }
 
-#endif
+#endif // PAR_EASYCURL_IMPLEMENTATION
