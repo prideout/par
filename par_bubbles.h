@@ -35,7 +35,8 @@ extern "C" {
 #define PAR_BUBBLES_INT int32_t
 #endif
 
-// This must be "float" or "double" or "long double".
+// This must be "float" or "double" or "long double". Note that you should not
+// need high precision if you use the relative coordinate systems API.
 #ifndef PAR_BUBBLES_FLT
 #define PAR_BUBBLES_FLT double
 #endif
@@ -542,8 +543,8 @@ par_bubbles_t* par_bubbles_pack(PARFLT const* radiuses, PARINT nradiuses)
     return (par_bubbles_t*) bubbles;
 }
 
-// TODO: use a stack instead of recursion
-void par_bubbles__compute_radius(par_bubbles__t* bubbles,
+// Assigns a radius to every node according to its number of descendants.
+void par_bubbles__generate_radii(par_bubbles__t* bubbles,
     par_bubbles__t* worker, PARINT parent)
 {
     PARINT head = bubbles->graph_heads[parent];
@@ -556,14 +557,16 @@ void par_bubbles__compute_radius(par_bubbles__t* bubbles,
     }
     for (PARINT cindex = head; cindex != tail; cindex++) {
         PARINT child = bubbles->graph_children[cindex];
-        par_bubbles__compute_radius(bubbles, worker, child);
+        par_bubbles__generate_radii(bubbles, worker, child);
         bubbles->xyr[pr] += bubbles->xyr[child * 3 + 2];
     }
+    // The following square root seems to produce a nicer, more space-filling,
+    // distribution of radiuses  in randomly-generated trees.
     bubbles->xyr[pr] = sqrtf(bubbles->xyr[pr]);
 }
 
 void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
-    PARINT parent)
+    PARINT parent, bool local)
 {
     PARINT head = bubbles->graph_heads[parent];
     PARINT tail = bubbles->graph_tails[parent];
@@ -582,8 +585,8 @@ void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
     PARFLT px = bubbles->xyr[parent * 3 + 0];
     PARFLT py = bubbles->xyr[parent * 3 + 1];
     PARFLT pr = bubbles->xyr[parent * 3 + 2];
-    const PARFLT PAR_HPACK_PADDING1 = 0.1;
-    const PARFLT PAR_HPACK_PADDING2 = 0.05;
+    const PARFLT PAR_HPACK_PADDING1 = 0.15;
+    const PARFLT PAR_HPACK_PADDING2 = 0.025;
     PARFLT scaled_padding = 0.0;
     while (1) {
         worker->npacked = 0;
@@ -624,25 +627,31 @@ void par_bubbles__hpack(par_bubbles__t* bubbles, par_bubbles__t* worker,
     PARFLT cx = enclosure[0], cy = enclosure[1], cr = enclosure[2];
     scaled_padding *= cr;
     cr += PAR_HPACK_PADDING2 * cr;
-    if (nchildren == 1) {
-        cr *= 2;
-    }
 
-    // Transform the children to fit nicely into their parent.
-    PARINT c = 0;
-    pr /= cr;
-    for (PARINT cindex = head; cindex != tail; cindex++) {
-        PARINT child = bubbles->graph_children[cindex];
-        bubbles->xyr[child * 3 + 0] = px + pr * (worker->xyr[c * 3 + 0] - cx);
-        bubbles->xyr[child * 3 + 1] = py + pr * (worker->xyr[c * 3 + 1] - cy);
-        bubbles->xyr[child * 3 + 2] -= scaled_padding;
-        bubbles->xyr[child * 3 + 2] *= pr;
-        c++;
+    // Transform the children to fit nicely into either (a) the unit circle,
+    // or (b) their parent.  The former is used if "local" is true.
+    PARFLT scale, tx, ty;
+    if (local) {
+        scale = 1.0 / cr;
+        tx = 0;
+        ty = 0;
+    } else {
+        scale = pr / cr;
+        tx = px;
+        ty = py;
+    }
+    PARFLT const* src = worker->xyr;
+    for (PARINT cindex = head; cindex != tail; cindex++, src += 3) {
+        PARFLT* dst = bubbles->xyr + 3 * bubbles->graph_children[cindex];
+        dst[0] = tx + scale * (src[0] - cx);
+        dst[1] = ty + scale * (src[1] - cy);
+        dst[2] = scale * (src[2] - scaled_padding);
     }
 
     // Recursion.  TODO: It might be better to use our own stack here.
     for (PARINT cindex = head; cindex != tail; cindex++) {
-        par_bubbles__hpack(bubbles, worker, bubbles->graph_children[cindex]);
+        par_bubbles__hpack(bubbles, worker, bubbles->graph_children[cindex],
+            local);
     }
 }
 
@@ -660,11 +669,11 @@ par_bubbles_t* par_bubbles_hpack_circle(PARINT* nodes, PARINT nnodes,
         worker->radiuses = PAR_MALLOC(PARFLT, bubbles->maxwidth);
         worker->chain = PAR_MALLOC(par_bubbles__node, bubbles->maxwidth);
         worker->xyr = PAR_MALLOC(PARFLT, 3 * bubbles->maxwidth);
-        par_bubbles__compute_radius(bubbles, worker, 0);
+        par_bubbles__generate_radii(bubbles, worker, 0);
         bubbles->xyr[0] = 0;
         bubbles->xyr[1] = 0;
         bubbles->xyr[2] = radius;
-        par_bubbles__hpack(bubbles, worker, 0);
+        par_bubbles__hpack(bubbles, worker, 0, false);
         par_bubbles_free_result((par_bubbles_t*) worker);
     }
     return (par_bubbles_t*) bubbles;
@@ -768,7 +777,7 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
     PARFLT padding = 0.05 * maxextent;
     FILE* svgfile = fopen(filename, "wt");
     fprintf(svgfile,
-        "<svg viewBox='%f %f %f %f' width='700px' height='700px' "
+        "<svg viewBox='%f %f %f %f' width='640px' height='640px' "
         "version='1.1' "
         "xmlns='http://www.w3.org/2000/svg'>\n"
         "<g stroke-width='0.5' stroke-opacity='0.5' stroke='black' "
@@ -851,29 +860,106 @@ void par_bubbles_compute_aabb_for_node(par_bubbles_t const* bubbles,
 void par_bubbles_export_local(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT idx, char const* filename)
 {
-    PAR_BUBBLES_FLT aabb[4];
-    par_bubbles_compute_aabb_for_node(bubbles, idx, aabb);
-    PARFLT maxextent = PAR_MAX(aabb[2] - aabb[0], aabb[3] - aabb[1]);
-    PARFLT padding = 0.05 * maxextent;
+    par_bubbles_t* clone = par_bubbles_cull_local(bubbles, idx, 0, 0);
     FILE* svgfile = fopen(filename, "wt");
     fprintf(svgfile,
-        "<svg viewBox='%f %f %f %f' width='700px' height='700px' "
+        "<svg viewBox='%f %f %f %f' width='640px' height='640px' "
         "version='1.1' "
         "xmlns='http://www.w3.org/2000/svg'>\n"
         "<g stroke-width='0.5' stroke-opacity='0.5' stroke='black' "
         "fill-opacity='0.2' fill='#2A8BB6'>\n"
-        "<rect fill-opacity='0.1' stroke='none' fill='#2A8BB6' x='%f' y='%f' "
+        "<rect fill-opacity='0.1' stroke='none' fill='#2AB68B' x='%f' y='%f' "
         "width='100%%' height='100%%'/>\n",
-        aabb[0] - padding, aabb[1] - padding,
-        aabb[2] - aabb[0] + 2 * padding, aabb[3] - aabb[1] + 2 * padding,
-        aabb[0] - padding, aabb[1] - padding);
-    PARFLT const* xyr = bubbles->xyr;
-    for (PARINT i = 0; i < bubbles->count; i++, xyr += 3) {
+        -1.0, -1.0, 2.0, 2.0, -1.0, -1.0);
+    PARFLT const* xyr = clone->xyr;
+    for (PARINT i = 0; i < clone->count; i++, xyr += 3) {
         fprintf(svgfile, "<circle stroke-width='%f' cx='%f' cy='%f' r='%f'/>\n",
             xyr[2] * 0.01, xyr[0], xyr[1], xyr[2]);
     }
     fputs("</g>\n</svg>", svgfile);
     fclose(svgfile);
+    par_bubbles_free_result(clone);
+}
+
+static void par_bubbles__copy_disk_local(par_bubbles__t const* src,
+    par_bubbles__t* dst, PARINT parent, PARFLT const* xform)
+{
+    PARINT i = dst->count++;
+    if (dst->capacity < dst->count) {
+        dst->capacity = PAR_MAX(16, dst->capacity) * 2;
+        dst->xyr = PAR_REALLOC(PARFLT, dst->xyr, 3 * dst->capacity);
+        dst->ids = PAR_REALLOC(PARINT, dst->ids, dst->capacity);
+    }
+    PARFLT const* xyr = src->xyr + parent * 3;
+    dst->xyr[i * 3] = xyr[0] * xform[2] + xform[0];
+    dst->xyr[i * 3 + 1] = xyr[1] * xform[2] + xform[1];
+    dst->xyr[i * 3 + 2] = xyr[2] * xform[2];
+    dst->ids[i] = parent;
+}
+
+static void par_bubbles__cull_local(par_bubbles__t const* src,
+    PARFLT const* xform, PARFLT minradius, par_bubbles__t* dst, PARINT parent)
+{
+    PARFLT const* xyr = src->xyr + parent * 3;
+    if (xyr[2] < minradius) {
+        return;
+    }
+    PARFLT child_xform[3] = {
+        xform[0] + xform[2] * xyr[0],
+        xform[1] + xform[2] * xyr[1],
+        xform[2] * xyr[2]
+    };
+    minradius *= xyr[2];
+    par_bubbles__copy_disk_local(src, dst, parent, xform);
+    xform = child_xform;
+    PARINT head = src->graph_heads[parent];
+    PARINT tail = src->graph_tails[parent];
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        par_bubbles__cull_local(src, xform, minradius, dst, child);
+    }
+}
+
+par_bubbles_t* par_bubbles_cull_local(par_bubbles_t const* psrc,
+    PAR_BUBBLES_INT root, PAR_BUBBLES_FLT minradius, par_bubbles_t* pdst)
+{
+    par_bubbles__t const* src = (par_bubbles__t const*) psrc;
+    par_bubbles__t* dst = (par_bubbles__t*) pdst;
+    if (!dst) {
+        dst = PAR_CALLOC(par_bubbles__t, 1);
+        pdst = (par_bubbles_t*) dst;
+    } else {
+        dst->count = 0;
+    }
+    if (src->count == 0) {
+        return pdst;
+    }
+    PARFLT xform[3] = {0, 0, 1};
+    par_bubbles__cull_local(src, xform, minradius, dst, root);
+    return pdst;
+}
+
+par_bubbles_t* par_bubbles_hpack_local(PARINT* nodes, PARINT nnodes)
+{
+    par_bubbles__t* bubbles = PAR_CALLOC(par_bubbles__t, 1);
+    if (nnodes > 0) {
+        bubbles->graph_parents = nodes;
+        bubbles->count = nnodes;
+        bubbles->chain = PAR_MALLOC(par_bubbles__node, nnodes);
+        bubbles->xyr = PAR_MALLOC(PARFLT, 3 * nnodes);
+        par_bubbles__initgraph(bubbles);
+        par_bubbles__t* worker = PAR_CALLOC(par_bubbles__t, 1);
+        worker->radiuses = PAR_MALLOC(PARFLT, bubbles->maxwidth);
+        worker->chain = PAR_MALLOC(par_bubbles__node, bubbles->maxwidth);
+        worker->xyr = PAR_MALLOC(PARFLT, 3 * bubbles->maxwidth);
+        par_bubbles__generate_radii(bubbles, worker, 0);
+        bubbles->xyr[0] = 0;
+        bubbles->xyr[1] = 0;
+        bubbles->xyr[2] = 1;
+        par_bubbles__hpack(bubbles, worker, 0, true);
+        par_bubbles_free_result((par_bubbles_t*) worker);
+    }
+    return (par_bubbles_t*) bubbles;
 }
 
 #undef PARINT

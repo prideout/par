@@ -147,6 +147,13 @@ int main()
 
     describe("precision") {
 
+        it("supports relative coordinate systems") {
+            bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
+            par_bubbles_export_local(bubbles, 0,
+                "build/test_bubbles_hpack_local1.svg");
+            par_bubbles_free_result(bubbles);
+        }
+
         it("look reasonable with deep nesting") {
             static int hierarchy[20] = {0};
             for (int i = 1; i < 10; i++) {
@@ -157,7 +164,7 @@ int main()
             }
             bubbles = par_bubbles_hpack_circle(hierarchy, 20, 1);
             par_bubbles_export_local(bubbles, 9,
-                "build/test_bubbles_hpack_circle3.svg");
+                "build/test_bubbles_hpack_local2.svg");
             par_bubbles_free_result(bubbles);
         }
 
