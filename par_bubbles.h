@@ -110,6 +110,8 @@ par_bubbles_t* par_bubbles_cull(par_bubbles_t const* src,
 
 // Dump out a SVG file for diagnostic purposes.
 void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
+void par_bubbles_export_local(par_bubbles_t const* bubbles,
+    PAR_BUBBLES_INT idx, char const* filename);
 
 // Returns a pointer to a list of children nodes.
 void par_bubbles_get_children(par_bubbles_t const* bubbles, PAR_BUBBLES_INT idx,
@@ -675,7 +677,7 @@ void par_bubbles_compute_aabb(par_bubbles_t const* bubbles, PARFLT* aabb)
     if (bubbles->count == 0) {
         return;
     }
-    PARFLT* xyr = bubbles->xyr;
+    PARFLT const* xyr = bubbles->xyr;
     aabb[0] = aabb[2] = xyr[0];
     aabb[1] = aabb[3] = xyr[1];
     for (PARINT i = 0; i < bubbles->count; i++, xyr += 3) {
@@ -742,13 +744,11 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
         "version='1.1' "
         "xmlns='http://www.w3.org/2000/svg'>\n"
         "<g stroke-width='0.5' stroke-opacity='0.5' stroke='black' "
-        "fill-opacity='0.2' fill='#2A8BB6' "
-        "transform='scale(1 -1) transform(0 %f)'>\n"
+        "fill-opacity='0.2' fill='#2A8BB6'>\n"
         "<rect fill-opacity='0.1' stroke='none' fill='#2A8BB6' x='%f' y='%f' "
         "width='100%%' height='100%%'/>\n",
         aabb[0] - padding, aabb[1] - padding,
         aabb[2] - aabb[0] + 2 * padding, aabb[3] - aabb[1] + 2 * padding,
-        aabb[1] - padding,
         aabb[0] - padding, aabb[1] - padding);
     PARFLT const* xyr = bubbles->xyr;
     for (PARINT i = 0; i < bubbles->count; i++, xyr += 3) {
@@ -811,7 +811,41 @@ PARINT par_bubbles_get_depth(par_bubbles_t const* pbubbles, PARINT node)
 void par_bubbles_compute_aabb_for_node(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT node, PAR_BUBBLES_FLT* aabb)
 {
-    // TODO
+    PARFLT const* xyr = bubbles->xyr + 3 * node;
+    aabb[0] = aabb[2] = xyr[0];
+    aabb[1] = aabb[3] = xyr[1];
+    aabb[0] = PAR_MIN(xyr[0] - xyr[2], aabb[0]);
+    aabb[1] = PAR_MIN(xyr[1] - xyr[2], aabb[1]);
+    aabb[2] = PAR_MAX(xyr[0] + xyr[2], aabb[2]);
+    aabb[3] = PAR_MAX(xyr[1] + xyr[2], aabb[3]);
+}
+
+void par_bubbles_export_local(par_bubbles_t const* bubbles,
+    PAR_BUBBLES_INT idx, char const* filename)
+{
+    PAR_BUBBLES_FLT aabb[4];
+    par_bubbles_compute_aabb_for_node(bubbles, idx, aabb);
+    PARFLT maxextent = PAR_MAX(aabb[2] - aabb[0], aabb[3] - aabb[1]);
+    PARFLT padding = 0.05 * maxextent;
+    FILE* svgfile = fopen(filename, "wt");
+    fprintf(svgfile,
+        "<svg viewBox='%f %f %f %f' width='700px' height='700px' "
+        "version='1.1' "
+        "xmlns='http://www.w3.org/2000/svg'>\n"
+        "<g stroke-width='0.5' stroke-opacity='0.5' stroke='black' "
+        "fill-opacity='0.2' fill='#2A8BB6'>\n"
+        "<rect fill-opacity='0.1' stroke='none' fill='#2A8BB6' x='%f' y='%f' "
+        "width='100%%' height='100%%'/>\n",
+        aabb[0] - padding, aabb[1] - padding,
+        aabb[2] - aabb[0] + 2 * padding, aabb[3] - aabb[1] + 2 * padding,
+        aabb[0] - padding, aabb[1] - padding);
+    PARFLT const* xyr = bubbles->xyr;
+    for (PARINT i = 0; i < bubbles->count; i++, xyr += 3) {
+        fprintf(svgfile, "<circle stroke-width='%f' cx='%f' cy='%f' r='%f'/>\n",
+            xyr[2] * 0.01, xyr[0], xyr[1], xyr[2]);
+    }
+    fputs("</g>\n</svg>", svgfile);
+    fclose(svgfile);
 }
 
 #undef PARINT

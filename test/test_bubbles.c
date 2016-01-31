@@ -145,5 +145,24 @@ int main()
 
     }
 
+    describe("precision") {
+
+        it("look reasonable with deep nesting") {
+            static int hierarchy[20] = {0};
+            for (int i = 1; i < 10; i++) {
+                hierarchy[i] = i - 1;
+            }
+            for (int i = 10; i < 20; i++) {
+                hierarchy[i] = 9;
+            }
+            bubbles = par_bubbles_hpack_circle(hierarchy, 20, 1);
+            par_bubbles_export_local(bubbles, 9,
+                "build/test_bubbles_hpack_circle3.svg");
+            par_bubbles_free_result(bubbles);
+        }
+
+    }
+
+
     return assert_failures();
 }
