@@ -151,21 +151,46 @@ int main()
             bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
             par_bubbles_export_local(bubbles, 0,
                 "build/test_bubbles_hpack_local1.svg");
+            par_bubbles_export_local(bubbles, 158,
+                "build/test_bubbles_hpack_local2.svg");
             par_bubbles_free_result(bubbles);
         }
 
-        it("look reasonable with deep nesting") {
-            static int hierarchy[20] = {0};
-            for (int i = 1; i < 10; i++) {
+        it("deep nesting with non-local packing") {
+            const int H1 = 10;
+            const int H2 = 20;
+            static int hierarchy[H2] = {0};
+            for (int i = 1; i < H1; i++) {
                 hierarchy[i] = i - 1;
             }
-            for (int i = 10; i < 20; i++) {
-                hierarchy[i] = 9;
+            for (int i = H1; i < H2; i++) {
+                hierarchy[i] = H1 - 1;
             }
-            bubbles = par_bubbles_hpack_circle(hierarchy, 20, 1);
-            par_bubbles_export_local(bubbles, 9,
-                "build/test_bubbles_hpack_local2.svg");
+            bubbles = par_bubbles_hpack_circle(hierarchy, H2, 1);
+            par_bubbles_export_local(bubbles, H1 - 1,
+                "build/test_bubbles_hpack_local3.svg");
             par_bubbles_free_result(bubbles);
+        }
+
+        it("deep nesting with local packing") {
+            const int H1 = 10;
+            const int H2 = 20;
+            static int hierarchy[H2] = {0};
+            for (int i = 1; i < H1; i++) {
+                hierarchy[i] = i - 1;
+            }
+            for (int i = H1; i < H2; i++) {
+                hierarchy[i] = H1 - 1;
+            }
+            bubbles = par_bubbles_hpack_local(hierarchy, H2);
+            par_bubbles_export_local(bubbles, H1 - 1,
+                "build/test_bubbles_hpack_local4.svg");
+            par_bubbles_free_result(bubbles);
+        }
+
+        it("find a good viewbox") {
+            // par_bubbles_find_local
+            // par_bubbles_pick_local
         }
 
     }

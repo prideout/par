@@ -935,7 +935,15 @@ par_bubbles_t* par_bubbles_cull_local(par_bubbles_t const* psrc,
         return pdst;
     }
     PARFLT xform[3] = {0, 0, 1};
-    par_bubbles__cull_local(src, xform, minradius, dst, root);
+    par_bubbles__copy_disk_local(src, dst, root, xform);
+    dst->xyr[0] = dst->xyr[1] = 0;
+    dst->xyr[2] = 1;
+    PARINT head = src->graph_heads[root];
+    PARINT tail = src->graph_tails[root];
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        par_bubbles__cull_local(src, xform, minradius, dst, child);
+    }
     return pdst;
 }
 
