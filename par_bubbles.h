@@ -28,13 +28,14 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
+#include <stdint.h>
 
 // This can be any signed integer type.
 #ifndef PAR_BUBBLES_INT
 #define PAR_BUBBLES_INT int32_t
 #endif
 
-// This must be either "float" or "double".
+// This must be "float" or "double" or "long double".
 #ifndef PAR_BUBBLES_FLT
 #define PAR_BUBBLES_FLT double
 #endif
@@ -121,6 +122,10 @@ void par_bubbles_get_maxdepth(par_bubbles_t const* bubbles,
 // Finds the height of the tree at a certain node.
 PAR_BUBBLES_INT par_bubbles_get_depth(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT node);
+
+// Returns a 4-tuple (min xy, max xy) for the given node.
+void par_bubbles_compute_aabb_for_node(par_bubbles_t const* bubbles,
+    PAR_BUBBLES_INT node, PAR_BUBBLES_FLT* aabb);
 
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
@@ -801,6 +806,12 @@ PARINT par_bubbles_get_depth(par_bubbles_t const* pbubbles, PARINT node)
         depth++;
     }
     return depth;
+}
+
+void par_bubbles_compute_aabb_for_node(par_bubbles_t const* bubbles,
+    PAR_BUBBLES_INT node, PAR_BUBBLES_FLT* aabb)
+{
+    // TODO
 }
 
 #undef PARINT
