@@ -970,6 +970,112 @@ par_bubbles_t* par_bubbles_hpack_local(PARINT* nodes, PARINT nnodes)
     return (par_bubbles_t*) bubbles;
 }
 
+static bool par_bubbles__disk_encloses_aabb(PAR_BUBBLES_FLT cx,
+    PAR_BUBBLES_FLT cy, PAR_BUBBLES_FLT r, PAR_BUBBLES_FLT const* aabb)
+{
+    PAR_BUBBLES_FLT x, y;
+    PAR_BUBBLES_FLT r2 = r * r;
+    x = aabb[0]; y = aabb[1];
+    if (PAR_SQR(x - cx) + PAR_SQR(y - cy) > r2) {
+        return false;
+    }
+    x = aabb[2]; y = aabb[1];
+    if (PAR_SQR(x - cx) + PAR_SQR(y - cy) > r2) {
+        return false;
+    }
+    x = aabb[0]; y = aabb[3];
+    if (PAR_SQR(x - cx) + PAR_SQR(y - cy) > r2) {
+        return false;
+    }
+    x = aabb[2]; y = aabb[3];
+    return PAR_SQR(x - cx) + PAR_SQR(y - cy) <= r2;
+}
+
+PARINT par_bubbles__find_local(par_bubbles__t const* src,
+    PARFLT const* xform, PARFLT const* aabb, PARINT parent)
+{
+    PARFLT const* xyr = src->xyr + parent * 3;
+    PARFLT child_xform[3] = {
+        xform[0] + xform[2] * xyr[0],
+        xform[1] + xform[2] * xyr[1],
+        xform[2] * xyr[2]
+    };
+    xform = child_xform;
+    if (!par_bubbles__disk_encloses_aabb(xform[0], xform[1], xform[2], aabb)) {
+        return -1;
+    }
+    PARINT result = parent;
+    PARINT head = src->graph_heads[parent];
+    PARINT tail = src->graph_tails[parent];
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        PARINT cresult = par_bubbles__find_local(src, xform, aabb, child);
+        if (cresult > -1) {
+            result = cresult;
+            break;
+        }
+    }
+    return result;
+}
+
+// This finds the deepest node that completely encloses the box.
+PARINT par_bubbles_find_local(par_bubbles_t const* bubbles, PARFLT const* aabb,
+    PARINT root)
+{
+    // Since the aabb is expressed in the coordinate system of the given root,
+    // we can do a trivial rejection right away, using the unit circle.
+    if (!par_bubbles__disk_encloses_aabb(0, 0, 1, aabb)) {
+        return -1;
+    }
+
+    par_bubbles__t const* src = (par_bubbles__t const*) bubbles;
+    PARFLT xform[3] = {0, 0, 1};
+    PARINT head = src->graph_heads[root];
+    PARINT tail = src->graph_tails[root];
+    PARINT result = root;
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        PARINT cresult = par_bubbles__find_local(src, xform, aabb, child);
+        if (cresult > -1) {
+            result = cresult;
+            break;
+        }
+    }
+    return result;
+}
+
+// This could be implemented much more efficiently, but for now it simply
+// calls find_local with a zero-size AABB, then ensures that the result
+// has a radius that is greater than or equal to minradius.
+PARINT par_bubbles_pick_local(par_bubbles_t const* bubbles, PARFLT x, PARFLT y,
+    PARINT root, PARFLT minradius)
+{
+    par_bubbles__t const* src = (par_bubbles__t const*) bubbles;
+    PARFLT aabb[] = { x, y, x, y };
+    PARINT result = par_bubbles_find_local(bubbles, aabb, root);
+    if (result == -1) {
+        return result;
+    }
+    PARINT depth = par_bubbles_get_depth(bubbles, result);
+    PARINT* chain = PAR_MALLOC(PARINT, depth);
+    PARINT node = result;
+    for (PARINT i = depth - 1; i >= 0; i--) {
+        chain[i] = node;
+        node = src->graph_parents[node];
+    }
+    PARFLT radius = 1;
+    for (PARINT i = 1; i < depth; i++) {
+        PARINT node = chain[i];
+        radius *= src->xyr[node * 3 + 2];
+        if (radius < minradius) {
+            result = chain[i - 1];
+            break;
+        }
+    }
+    PAR_FREE(chain);
+    return result;
+}
+
 #undef PARINT
 #undef PARFLT
 #endif // PAR_BUBBLES_IMPLEMENTATION

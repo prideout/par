@@ -147,7 +147,7 @@ int main()
 
     describe("precision") {
 
-        it("supports relative coordinate systems") {
+        it("works well with relative coordinate systems") {
             bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
             par_bubbles_export_local(bubbles, 0,
                 "build/test_bubbles_hpack_local1.svg");
@@ -156,7 +156,7 @@ int main()
             par_bubbles_free_result(bubbles);
         }
 
-        it("deep nesting with non-local packing") {
+        it("is poor with deep nesting and non-local packing") {
             const int H1 = 10;
             const int H2 = 20;
             static int hierarchy[H2] = {0};
@@ -172,7 +172,7 @@ int main()
             par_bubbles_free_result(bubbles);
         }
 
-        it("deep nesting with local packing") {
+        it("is great with deep nesting and local packing") {
             const int H1 = 10;
             const int H2 = 20;
             static int hierarchy[H2] = {0};
@@ -187,14 +187,46 @@ int main()
                 "build/test_bubbles_hpack_local4.svg");
             par_bubbles_free_result(bubbles);
         }
-
-        it("find a good viewbox") {
-            // par_bubbles_find_local
-            // par_bubbles_pick_local
-        }
-
     }
 
+    describe("par_bubbles_find_local") {
+
+        it("finds the smallest node that completely encloses a box") {
+            bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
+            // This aabb encloses node 158, which means node 139 is the deepest
+            // circle that encloses it.
+            double cx = 40.804406 / 100.0f;
+            double cy = -15.209295 / 100.0f;
+            double r = 8.133015 / 100.0f;
+            double aabb[4] = { cx - r, cy - r, cx + r, cy + r };
+            int node = par_bubbles_find_local(bubbles, aabb, 0);
+            par_bubbles_free_result(bubbles);
+            assert_equal(node, 139);
+        }
+
+        it("ditto, but using a non-root coordinate system") {
+            bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
+            par_bubbles_export_local(bubbles, 139,
+                "build/test_bubbles_hpack_local5.svg");
+            double cx = -0.511578, cy = 0.147831, r = 0.08;
+            double aabb[4] = { cx - r, cy - r, cx + r, cy + r };
+            int node = par_bubbles_find_local(bubbles, aabb, 139);
+            par_bubbles_free_result(bubbles);
+            assert_equal(node, 158);
+        }
+
+        it("is used by the pick_local function") {
+            bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
+            double cx = -0.654258, cy = 0.065455;
+            double minradius = 0;
+            int node = par_bubbles_pick_local(bubbles, cx, cy, 139, minradius);
+            assert_equal(node, 162);
+            minradius = 0.095;
+            node = par_bubbles_pick_local(bubbles, cx, cy, 139, minradius);
+            assert_equal(node, 158);
+            par_bubbles_free_result(bubbles);
+        }
+    }
 
     return assert_failures();
 }
