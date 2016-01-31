@@ -110,8 +110,6 @@ par_bubbles_t* par_bubbles_cull(par_bubbles_t const* src,
 
 // Dump out a SVG file for diagnostic purposes.
 void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename);
-void par_bubbles_export_local(par_bubbles_t const* bubbles,
-    PAR_BUBBLES_INT idx, char const* filename);
 
 // Returns a pointer to a list of children nodes.
 void par_bubbles_get_children(par_bubbles_t const* bubbles, PAR_BUBBLES_INT idx,
@@ -128,6 +126,36 @@ PAR_BUBBLES_INT par_bubbles_get_depth(par_bubbles_t const* bubbles,
 // Returns a 4-tuple (min xy, max xy) for the given node.
 void par_bubbles_compute_aabb_for_node(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT node, PAR_BUBBLES_FLT* aabb);
+
+// Relative Coordinate Systems -------------------------------------------------
+
+// Similar to hpack, but maintains precision by storing disk positions within
+// the local coordinate system of their parent. After calling this function,
+// clients can use cull_local to flatten the coordinate systems.
+par_bubbles_t* par_bubbles_hpack_local(PAR_BUBBLES_INT* nodes,
+    PAR_BUBBLES_INT nnodes);
+
+// Similar to par_bubbles_cull, but takes a root node rather than an AABB,
+// and returns a result within the local coordinate system of the new root.
+// In other words, the new root will have radius 1, centered at (0,0).  The
+// minradius is also expressed in this coordinate system.
+par_bubbles_t* par_bubbles_cull_local(par_bubbles_t const* src,
+    PAR_BUBBLES_INT root, PAR_BUBBLES_FLT minradius, par_bubbles_t* dst);
+
+// Finds the smallest node in the given bubble diagram that completely encloses
+// the given axis-aligned bounding box (min xy, max xy).  The AABB coordinates
+// are expressed in the local coordinate system of the given root node.
+PAR_BUBBLES_INT par_bubbles_find_local(par_bubbles_t const* src,
+    PAR_BUBBLES_FLT const* aabb, PAR_BUBBLES_INT root);
+
+// Similar to pick, but expects (x,y) to be in the coordinate system of the
+// given root node.
+PAR_BUBBLES_INT par_bubbles_pick_local(par_bubbles_t const*, PAR_BUBBLES_FLT x,
+    PAR_BUBBLES_FLT y, PAR_BUBBLES_INT root, PAR_BUBBLES_FLT minradius);
+
+// Dump out a SVG file for diagnostic purposes.
+void par_bubbles_export_local(par_bubbles_t const* bubbles,
+    PAR_BUBBLES_INT idx, char const* filename);
 
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
