@@ -147,6 +147,9 @@ int main()
 
     describe("precision") {
 
+        #define H1 10
+        #define H2 20
+
         it("works well with relative coordinate systems") {
             bubbles = par_bubbles_hpack_local(hierarchy, NNODES);
             par_bubbles_export_local(bubbles, 0,
@@ -157,8 +160,6 @@ int main()
         }
 
         it("is poor with deep nesting and non-local packing") {
-            const int H1 = 10;
-            const int H2 = 20;
             static int hierarchy[H2] = {0};
             for (int i = 1; i < H1; i++) {
                 hierarchy[i] = i - 1;
@@ -173,8 +174,6 @@ int main()
         }
 
         it("is great with deep nesting and local packing") {
-            const int H1 = 10;
-            const int H2 = 20;
             static int hierarchy[H2] = {0};
             for (int i = 1; i < H1; i++) {
                 hierarchy[i] = i - 1;
@@ -187,6 +186,9 @@ int main()
                 "build/test_bubbles_hpack_local4.svg");
             par_bubbles_free_result(bubbles);
         }
+
+        #undef H1
+        #undef H2
     }
 
     describe("par_bubbles_find_local") {
