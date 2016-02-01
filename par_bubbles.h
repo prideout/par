@@ -154,6 +154,13 @@ PAR_BUBBLES_INT par_bubbles_find_local(par_bubbles_t const* src,
 PAR_BUBBLES_INT par_bubbles_pick_local(par_bubbles_t const*, PAR_BUBBLES_FLT x,
     PAR_BUBBLES_FLT y, PAR_BUBBLES_INT root, PAR_BUBBLES_FLT minradius);
 
+// Obtains the scale and translation (which should be applied in that order)
+// that can move a point from the node0 coord system to the node1 coord system.
+// The "xform" argument should point to three floats, which will be populated
+// with: x translation, y translation, and scale.
+bool par_bubbles_transform_local(par_bubbles_t const* bubbles,
+    PAR_BUBBLES_FLT* xform, PAR_BUBBLES_INT node0, PAR_BUBBLES_INT node1);
+
 // Dump out a SVG file for diagnostic purposes.
 void par_bubbles_export_local(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT idx, char const* filename);
@@ -901,15 +908,14 @@ static void par_bubbles__cull_local(par_bubbles__t const* src,
     PARFLT const* xform, PARFLT minradius, par_bubbles__t* dst, PARINT parent)
 {
     PARFLT const* xyr = src->xyr + parent * 3;
-    if (xyr[2] < minradius) {
-        return;
-    }
     PARFLT child_xform[3] = {
         xform[0] + xform[2] * xyr[0],
         xform[1] + xform[2] * xyr[1],
         xform[2] * xyr[2]
     };
-    minradius *= xyr[2];
+    if (child_xform[2] < minradius) {
+        return;
+    }
     par_bubbles__copy_disk_local(src, dst, parent, xform);
     xform = child_xform;
     PARINT head = src->graph_heads[parent];
@@ -996,8 +1002,8 @@ PARINT par_bubbles__find_local(par_bubbles__t const* src,
 {
     PARFLT const* xyr = src->xyr + parent * 3;
     PARFLT child_xform[3] = {
-        xform[0] + xform[2] * xyr[0],
-        xform[1] + xform[2] * xyr[1],
+        xform[2] * xyr[0] + xform[0],
+        xform[2] * xyr[1] + xform[1],
         xform[2] * xyr[2]
     };
     xform = child_xform;
@@ -1074,6 +1080,75 @@ PARINT par_bubbles_pick_local(par_bubbles_t const* bubbles, PARFLT x, PARFLT y,
     }
     PAR_FREE(chain);
     return result;
+}
+
+static bool par_bubbles__get_local(par_bubbles__t const* src, PARFLT* xform,
+    PARINT parent, PARINT node)
+{
+    PARFLT const* xyr = src->xyr + parent * 3;
+    PARFLT child_xform[3] = {
+        xform[2] * xyr[0] + xform[0],
+        xform[2] * xyr[1] + xform[1],
+        xform[2] * xyr[2]
+    };
+    if (parent == node) {
+        xform[0] = child_xform[0];
+        xform[1] = child_xform[1];
+        xform[2] = child_xform[2];
+        return true;
+    }
+    PARINT head = src->graph_heads[parent];
+    PARINT tail = src->graph_tails[parent];
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        if (par_bubbles__get_local(src, child_xform, child, node)) {
+            xform[0] = child_xform[0];
+            xform[1] = child_xform[1];
+            xform[2] = child_xform[2];
+            return true;
+        }
+    }
+    return false;
+}
+
+// Obtains the scale and translation (which should be applied in that order)
+// that can move a point from the node0 coord system to the node1 coord system.
+// The "xform" argument should point to three floats, which will be populated
+// with: x translation, y translation, and scale.
+bool par_bubbles_transform_local(par_bubbles_t const* bubbles, PARFLT* xform,
+    PARINT node0, PARINT node1)
+{
+    par_bubbles__t const* src = (par_bubbles__t const*) bubbles;
+    xform[0] = 0;
+    xform[1] = 0;
+    xform[2] = 1;
+
+    // First try the case where node1 is a descendant of node0
+    PARINT head = src->graph_heads[node0];
+    PARINT tail = src->graph_tails[node0];
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        if (par_bubbles__get_local(src, xform, child, node1)) {
+            float tx = xform[0];
+            float ty = xform[1];
+            float s = xform[2];
+            xform[0] = -tx / s;
+            xform[1] = -ty / s;
+            xform[2] = 1.0 / s;
+            return true;
+        }
+    }
+
+    // Next, try the case where node0 is a descendant of node1
+    head = src->graph_heads[node1];
+    tail = src->graph_tails[node1];
+    for (PARINT cindex = head; cindex != tail; cindex++) {
+        PARINT child = src->graph_children[cindex];
+        if (par_bubbles__get_local(src, xform, child, node0)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 #undef PARINT
