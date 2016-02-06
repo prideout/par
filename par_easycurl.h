@@ -34,7 +34,6 @@ int par_easycurl_to_file(char const* srcurl, char const* dstpath);
 #ifdef __cplusplus
 }
 #endif
-#endif // PAR_EASYCURL_H
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -198,3 +197,4 @@ int par_easycurl_to_file(char const* srcurl, char const* dstpath)
 }
 
 #endif // PAR_EASYCURL_IMPLEMENTATION
+#endif // PAR_EASYCURL_H

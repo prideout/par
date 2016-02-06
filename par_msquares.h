@@ -127,7 +127,6 @@ par_msquares_boundary* par_msquares_extract_boundary(par_msquares_mesh const* );
 #ifdef __cplusplus
 }
 #endif
-#endif // PAR_MSQUARES_H
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -2115,3 +2114,4 @@ par_msquares_boundary* par_msquares_extract_boundary(
 }
 
 #endif // PAR_MSQUARES_IMPLEMENTATION
+#endif // PAR_MSQUARES_H

@@ -177,7 +177,6 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 #ifdef __cplusplus
 }
 #endif
-#endif // PAR_SHAPES_H
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -2034,3 +2033,4 @@ void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float mintriarea)
 }
 
 #endif // PAR_SHAPES_IMPLEMENTATION
+#endif // PAR_SHAPES_H

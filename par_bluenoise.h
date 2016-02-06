@@ -127,7 +127,6 @@ void par_bluenoise_sort_by_rank(float* pts, int npts);
 #ifdef __cplusplus
 }
 #endif
-#endif // PAR_BLUENOISE_H
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -538,3 +537,4 @@ float* par_bluenoise_generate_exact(
 #undef PAR_MAXI
 
 #endif // PAR_BLUENOISE_IMPLEMENTATION
+#endif // PAR_BLUENOISE_H

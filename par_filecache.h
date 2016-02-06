@@ -80,7 +80,6 @@ void par_filecache_evict_all();
 #ifdef __cplusplus
 }
 #endif
-#endif // PAR_FILECACHE_H
 
 // -----------------------------------------------------------------------------
 // END PUBLIC API
@@ -435,3 +434,4 @@ static uint64_t _hash(char const* name)
 
 #undef PAR_MAX_ENTRIES
 #endif // PAR_FILECACHE_IMPLEMENTATION
+#endif // PAR_FILECACHE_H
