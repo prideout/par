@@ -174,6 +174,27 @@ bool par_bubbles_transform_local(par_bubbles_t const* bubbles,
 void par_bubbles_export_local(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT idx, char const* filename);
 
+typedef enum {
+    PAR_BUBBLES_FILTER_DEFAULT,
+    PAR_BUBBLES_FILTER_DISCARD_LAST_CHILD,
+    PAR_BUBBLES_FILTER_KEEP_ONLY_LAST_CHILD
+} par_bubbles_filter;
+
+// Special-case function that affects the behavior of subsequent calls to
+// cull_local.  Allows clients to filter the children list of each non-leaf
+// node, which is especially useful when using placeholder bubbles for labels.
+void par_bubbles_set_filter(par_bubbles_t* src, par_bubbles_filter f);
+
+typedef enum {
+    PAR_BUBBLES_HORIZONTAL,
+    PAR_BUBBLES_VERTICAL
+} par_bubbles_orientation;
+
+// Sets some global state that affect subsequent calls to hpack. The first two
+// children can either be placed horizontally (default) or vertically.  The
+// effect of this is subtle, since overall layout is obviously circular.
+void par_bubbles_set_orientation(par_bubbles_orientation );
+
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
 #define PAR_MIN(a, b) (a > b ? b : a)
@@ -208,17 +229,19 @@ void par_bubbles_export_local(par_bubbles_t const* bubbles,
 #include <float.h>
 #include <assert.h>
 
+static par_bubbles_orientation par_bubbles__ostate = PAR_BUBBLES_HORIZONTAL;
+
 typedef struct {
     PARINT prev;
     PARINT next;
 } par_bubbles__node;
 
 typedef struct {
-    PARFLT* xyr;              // results array
+    PARFLT* xyr;                 // results array
     PARINT count;                // client-provided count
     PARINT* ids;                 // populated by par_bubbles_cull
-    PARFLT const* radiuses;   // client-provided radius list
-    par_bubbles__node* chain; // counterclockwise enveloping chain
+    PARFLT const* radiuses;      // client-provided radius list
+    par_bubbles__node* chain;    // counterclockwise enveloping chain
     PARINT const* graph_parents; // client-provided parent indices
     PARINT* graph_children;      // flat list of children indices
     PARINT* graph_heads;         // list of "pointers" to first child
@@ -226,6 +249,7 @@ typedef struct {
     PARINT npacked;
     PARINT maxwidth;
     PARINT capacity;
+    par_bubbles_filter filter;
 } par_bubbles__t;
 
 static PARFLT par_bubbles__len2(PARFLT const* a)
@@ -262,14 +286,26 @@ static void par_bubbles__initflat(par_bubbles__t* bubbles)
     PARFLT* xyr = bubbles->xyr;
     PARFLT const* radii = bubbles->radiuses;
     par_bubbles__node* chain = bubbles->chain;
-    *xyr++ = -*radii;
-    *xyr++ = 0;
+    PARFLT x0, y0, x1, y1;
+    if (par_bubbles__ostate == PAR_BUBBLES_HORIZONTAL) {
+        x0 = -radii[0];
+        y0 = 0;
+        x1 = radii[1];
+        y1 = 0;
+    } else {
+        x0 = 0;
+        y0 = -radii[0];
+        x1 = 0;
+        y1 = radii[1];
+    }
+    *xyr++ = x0;
+    *xyr++ = y0;
     *xyr++ = *radii++;
     if (bubbles->count == ++bubbles->npacked) {
         return;
     }
-    *xyr++ = *radii;
-    *xyr++ = 0;
+    *xyr++ = x1;
+    *xyr++ = y1;
     *xyr++ = *radii++;
     if (bubbles->count == ++bubbles->npacked) {
         return;
@@ -933,6 +969,12 @@ void par_bubbles_export_local(par_bubbles_t const* bubbles,
     par_bubbles_free_result(clone);
 }
 
+void par_bubbles_set_filter(par_bubbles_t* bubbles, par_bubbles_filter f)
+{
+    par_bubbles__t* src = (par_bubbles__t*) bubbles;
+    src->filter = f;
+}
+
 static void par_bubbles__copy_disk_local(par_bubbles__t const* src,
     par_bubbles__t* dst, PARINT parent, PARFLT const* xform)
 {
@@ -969,7 +1011,12 @@ static void par_bubbles__cull_local(par_bubbles__t const* src,
     xform = child_xform;
     PARINT head = src->graph_heads[parent];
     PARINT tail = src->graph_tails[parent];
-    for (PARINT cindex = head; cindex != tail; cindex++) {
+    if (src->filter == PAR_BUBBLES_FILTER_DISCARD_LAST_CHILD) {
+        tail--;
+    } else if (src->filter == PAR_BUBBLES_FILTER_KEEP_ONLY_LAST_CHILD) {
+        head = PAR_MAX(head, tail - 1);
+    }
+    for (PARINT cindex = head; cindex < tail; cindex++) {
         PARINT child = src->graph_children[cindex];
         par_bubbles__cull_local(src, aabb, xform, minradius, dst, child);
     }
@@ -996,7 +1043,12 @@ par_bubbles_t* par_bubbles_cull_local(par_bubbles_t const* psrc,
     dst->xyr[2] = 1;
     PARINT head = src->graph_heads[root];
     PARINT tail = src->graph_tails[root];
-    for (PARINT cindex = head; cindex != tail; cindex++) {
+    if (src->filter == PAR_BUBBLES_FILTER_DISCARD_LAST_CHILD) {
+        tail--;
+    } else if (src->filter == PAR_BUBBLES_FILTER_KEEP_ONLY_LAST_CHILD) {
+        head = PAR_MAX(head, tail - 1);
+    }
+    for (PARINT cindex = head; cindex < tail; cindex++) {
         PARINT child = src->graph_children[cindex];
         par_bubbles__cull_local(src, aabb, xform, minradius, dst, child);
     }
@@ -1278,6 +1330,11 @@ bool par_bubbles_transform_local(par_bubbles_t const* bubbles, PARFLT* xform,
     xform[1] += xform2[1];
 
     return false;
+}
+
+void par_bubbles_set_orientation(par_bubbles_orientation ostate)
+{
+    par_bubbles__ostate = ostate;
 }
 
 #undef PARINT
