@@ -207,7 +207,7 @@ void par_bubbles_set_orientation(par_bubbles_orientation );
 #ifndef PAR_MALLOC
 #define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 #define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * (N)))
 #define PAR_FREE(BUF) free(BUF)
 #endif
 

@@ -61,10 +61,13 @@ add_executable(
     test_filecache
     test_filecache.c
     console-colors.c)
-target_link_libraries(test_filecache)
 
 add_executable(
     test_filecache_lz4
     test_filecache_lz4.c
     console-colors.c)
-target_link_libraries(test_filecache_lz4)
+
+add_executable(
+    test_sprune
+    test_sprune.c
+    console-colors.c)

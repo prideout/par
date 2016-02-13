@@ -16,6 +16,9 @@
 #define PAR_BUBBLES_IMPLEMENTATION
 #include "par_bubbles.h"
 
+#define PAR_SPRUNE_IMPLEMENTATION
+#include "par_sprune.h"
+
 int main(int argc, char* argv[])
 {
     return 0;

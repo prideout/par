@@ -170,7 +170,7 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 #ifndef PAR_MALLOC
 #define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 #define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * N))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * (N)))
 #define PAR_FREE(BUF) free(BUF)
 #endif
 
