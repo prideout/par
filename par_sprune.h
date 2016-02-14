@@ -128,14 +128,14 @@ static void* pa___growf(void* arr, int increment, int itemsize)
 typedef struct {
 
     // Public:
-    PAR_SPRUNE_INT* collision_pairs;
-    PAR_SPRUNE_INT ncollision_pairs;
+    PARINT* collision_pairs;
+    PARINT ncollision_pairs;
     PARINT* culled;
     PARINT nculled;
 
     // Private:
-    PAR_SPRUNE_FLT const* aabbs;
-    PAR_SPRUNE_INT naabbs;
+    PARFLT const* aabbs;
+    PARINT naabbs;
     PARINT* sorted_indices[2];
     bool* overlap_flags[2];
 
@@ -228,6 +228,23 @@ void par_sprune_free_context(par_sprune_context* context)
     PAR_FREE(ctx);
 }
 
+typedef struct {
+    PARFLT const* aabbs;
+} par__sprune_sorter;
+
+int par__xcmp(const void* pa, const void* pb, void* psorter)
+{
+    PARINT a = *((const PARINT*) pa);
+    PARINT b = *((const PARINT*) pb);
+    par__sprune_sorter* sorter = (par__sprune_sorter*) psorter;
+    PARFLT const* aabbs = sorter->aabbs;
+    PARFLT vala = aabbs[a];
+    PARFLT valb = aabbs[b];
+    if (vala > valb) return 1;
+    if (vala < valb) return -1;
+    return 0;
+}
+
 par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     par_sprune_context* previous)
 {
@@ -251,6 +268,17 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
         ctx->overlap_flags[0][i] = false;
         ctx->overlap_flags[1][i] = false;
     }
+    par__sprune_sorter sorter;
+    sorter.aabbs = ctx->aabbs;
+    par_qsort(ctx->sorted_indices[0], naabbs * 2, sizeof(PARINT), par__xcmp,
+        &sorter);
+    for (PARINT i = 0; i < naabbs; i++) {
+        int a = ctx->sorted_indices[0][i * 2 + 0];
+        int b = ctx->sorted_indices[0][i * 2 + 1];
+        printf("%d %.2f\n", a, aabbs[a]);
+        printf("%d %.2f\n", b, aabbs[b]);
+    }
+    puts("");
     return (par_sprune_context*) ctx;
 }
 
