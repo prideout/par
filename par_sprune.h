@@ -106,6 +106,7 @@ void par_sprune_cull(par_sprune_context* context);
 #define pa___maybegrow(a, n) (pa___needgrow(a, (n)) ? pa___grow(a, n) : 0)
 #define pa___grow(a, n) (*((void**)& (a)) = pa___growf((void*) (a), (n), \
         sizeof(*(a))))
+
 static void* pa___growf(void* arr, int increment, int itemsize)
 {
     int dbl_cur = arr ? 2 * pa___m(arr) : 0;
@@ -232,7 +233,7 @@ typedef struct {
     PARFLT const* aabbs;
 } par__sprune_sorter;
 
-int par__xcmp(const void* pa, const void* pb, void* psorter)
+int par__cmp(const void* pa, const void* pb, void* psorter)
 {
     PARINT a = *((const PARINT*) pa);
     PARINT b = *((const PARINT*) pb);
@@ -242,7 +243,24 @@ int par__xcmp(const void* pa, const void* pb, void* psorter)
     PARFLT valb = aabbs[b];
     if (vala > valb) return 1;
     if (vala < valb) return -1;
+    if (a > b) return 1;
+    if (a < b) return -1;
     return 0;
+}
+
+static void par_sprune__remove(PARINT* arr, PARINT val)
+{
+    int i = pa_count(arr) - 1;
+    for (; i >= 0; i--) {
+        if (arr[i] == val) {
+            break;
+        }
+    }
+    assert(i >= 0);
+    for (++i; i < pa_count(arr); i++) {
+        PAR_SWAP(PARINT, arr[i - 1], arr[i]);
+    }
+    pa___n(arr)--;
 }
 
 par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
@@ -270,15 +288,60 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     }
     par__sprune_sorter sorter;
     sorter.aabbs = ctx->aabbs;
-    par_qsort(ctx->sorted_indices[0], naabbs * 2, sizeof(PARINT), par__xcmp,
-        &sorter);
-    for (PARINT i = 0; i < naabbs; i++) {
-        int a = ctx->sorted_indices[0][i * 2 + 0];
-        int b = ctx->sorted_indices[0][i * 2 + 1];
-        printf("%d %.2f\n", a, aabbs[a]);
-        printf("%d %.2f\n", b, aabbs[b]);
+
+    PARINT* active = 0;
+    PARINT* pairs[2] = {0};
+
+    for (int axis = 0; axis < 2; axis++) {
+        PARINT* indices = ctx->sorted_indices[axis];
+        par_qsort(indices, naabbs * 2, sizeof(PARINT), par__cmp, &sorter);
+
+        // for (PARINT i = 0; i < naabbs; i++) {
+        //     int a = indices[i * 2 + 0];
+        //     int b = indices[i * 2 + 1];
+        //     printf("%2d %2d %.2f\n", a, a / 4, aabbs[a]);
+        //     printf("%2d %2d %.2f\n", b, a / 4, aabbs[b]);
+        // }
+        // puts("");
+
+        pa_clear(active);
+        for (PARINT i = 0; i < naabbs * 2; i++) {
+            PARINT fltindex = indices[i];
+            PARINT boxindex = fltindex / 4;
+            bool ismin = ((fltindex - axis) % 4) == 0;
+            if (ismin) {
+                for (int j = 0; j < pa_count(active); j++) {
+                    PARINT a = PAR_MIN(active[j], boxindex);
+                    PARINT b = PAR_MAX(active[j], boxindex);
+                    pa_push(pairs[axis], a);
+                    pa_push(pairs[axis], b);
+                }
+                pa_push(active, boxindex);
+                // printf("pushing %d\n", boxindex);
+            } else {
+                // printf("removing %d\n", boxindex);
+                par_sprune__remove(active, boxindex);
+            }
+        }
+
+        // for (PARINT i = 0; i < pa_count(pairs); i += 2) {
+        //     PARINT a = pairs[i + 0];
+        //     PARINT b = pairs[i + 1];
+        //     printf("COLLIDE %d %2d %2d\n", axis, a, b);
+        // }
+        // puts("");
     }
-    puts("");
+
+    pa_free(active);
+
+    // TODO sort in groups of two: pairs[0] and pairs[2]
+
+    // TODO construct a new pair list by finding all pairs in pairs[0] that are
+    //      also in pairs[1] (write par_bsearch for this)
+
+    pa_free(pairs[0]);
+    pa_free(pairs[1]);
+
     return (par_sprune_context*) ctx;
 }
 
