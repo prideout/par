@@ -1,7 +1,6 @@
-#include "describe.h"
-
 #define PAR_SPRUNE_IMPLEMENTATION
 #include "par_sprune.h"
+#include "describe.h"
 
 static par_sprune_context* context;
 
@@ -12,7 +11,7 @@ static float boxes20[20 * 4] = {
     0.31, 0.19, 0.62, 0.38,
     0.3, 0.1, 0.34, 0.15,
     0.23, 0.34, 0.23, 0.34,
-    0.58, 0.22, 0.82, 0.61,
+    0.58, 0.22, 0.82, 0.61, // 6
     0.18, 0.71, 0.27, 0.72,
     0.69, 0.34, 0.81, 0.55,
     0.53, 0.1, 0.56, 0.17,
@@ -22,7 +21,7 @@ static float boxes20[20 * 4] = {
     0.69, 0.63, 0.79, 0.68,
     0.7, 0.51, 0.77, 0.53,
     0.17, 0.79, 0.79, 0.81,
-    0.66, 0.49, 0.67, 0.5,
+    0.66, 0.49, 0.67, 0.5, // 16
     0.36, 0.49, 0.41, 0.5,
     0.58, 0.53, 0.58, 0.54,
     0.25, 0.81, 0.51, 0.85,
@@ -83,6 +82,11 @@ int main()
             export_svg("build/test_sprune_overlap_20.svg", "#2AB68B",
                 boxes20, 20);
             par_sprune_overlap(boxes10, 10, context);
+            for (int i = 0; i < context->ncollision_pairs * 2; i += 2) {
+                printf("%d %d\n", context->collision_pairs[i],
+                    context->collision_pairs[i + 1]);
+            }
+            puts("");
             export_svg("build/test_sprune_overlap_10.svg", "#8B2AB6",
                 boxes10, 10);
             par_sprune_free_context(context);

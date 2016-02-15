@@ -1,5 +1,5 @@
 // SPRUNE :: https://github.com/prideout/par
-// Sweep and Prune library for detecting axis-aligned box collision in 2D.
+// Sweep and Prune library for detecting axis-aligned box collisions in 2D.
 //
 // In addition to the comment block above each function declaration, the API
 // has informal documentation here:
@@ -31,29 +31,29 @@ extern "C" {
 // -----------------------------------------------------------------------------
 
 typedef struct {
-    PAR_SPRUNE_INT const* const collision_pairs;
-    PAR_SPRUNE_INT const ncollision_pairs;
-    PAR_SPRUNE_INT const* const culled;
-    PAR_SPRUNE_INT const nculled;
+    PAR_SPRUNE_INT const* const collision_pairs; // list of two-tuples
+    PAR_SPRUNE_INT const ncollision_pairs;       // number of two-tuples
+    PAR_SPRUNE_INT const* const culled;          // filled by par_sprune_cull
+    PAR_SPRUNE_INT const nculled;                // set by par_sprune_cull
 } par_sprune_context;
 
 void par_sprune_free_context(par_sprune_context* context);
 
-// Takes an array of 4-tuples (minx miny maxx maxy) and performs SAP. Populates
-// "collisions" and "ncollisions".  Optionally takes an existing context to
-// avoid memory churn; pass NULL for initial construction.
+// Takes an array of 4-tuples (minx miny maxx maxy) and performs SaP. Populates
+// "collision_pairs" and "ncollision_pairs".  Optionally takes an existing
+// context to avoid memory churn; pass NULL for initial construction.
 par_sprune_context* par_sprune_overlap(PAR_SPRUNE_FLT const* aabbs,
     PAR_SPRUNE_INT naabbs, par_sprune_context* previous);
 
 // Reads new aabb data from the same pointer that was passed to the overlap
-// function and refreshes the "collisions" and "ncollisions" fields.  This
-// exploits temporal coherence so it's very efficient for animation.
+// function and refreshes the "collision_pairs" field.  Exploits temporal
+// coherence so it's very efficient for animation.
 void par_sprune_update(par_sprune_context* ctx);
 
 // Examines all collision groups and creates a culling set such that no
 // boxes would overlap if the culled boxes are removed.  This function
 // populates the "culled" and "nculled" fields in par_sprune_context.
-// Useful for culling cartographic labels.
+// This is useful for hiding labels in GIS applications.
 void par_sprune_cull(par_sprune_context* context);
 
 // -----------------------------------------------------------------------------
@@ -68,10 +68,7 @@ void par_sprune_cull(par_sprune_context* context);
 #define PARINT PAR_SPRUNE_INT
 #define PARFLT PAR_SPRUNE_FLT
 
-#include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <float.h>
 #include <assert.h>
 #include <stdbool.h>
 
@@ -226,26 +223,8 @@ void par_sprune_free_context(par_sprune_context* context)
     pa_free(ctx->sorted_indices[1]);
     pa_free(ctx->overlap_flags[0]);
     pa_free(ctx->overlap_flags[1]);
+    pa_free(ctx->collision_pairs);
     PAR_FREE(ctx);
-}
-
-typedef struct {
-    PARFLT const* aabbs;
-} par__sprune_sorter;
-
-int par__cmp(const void* pa, const void* pb, void* psorter)
-{
-    PARINT a = *((const PARINT*) pa);
-    PARINT b = *((const PARINT*) pb);
-    par__sprune_sorter* sorter = (par__sprune_sorter*) psorter;
-    PARFLT const* aabbs = sorter->aabbs;
-    PARFLT vala = aabbs[a];
-    PARFLT valb = aabbs[b];
-    if (vala > valb) return 1;
-    if (vala < valb) return -1;
-    if (a > b) return 1;
-    if (a < b) return -1;
-    return 0;
 }
 
 static void par_sprune__remove(PARINT* arr, PARINT val)
@@ -261,6 +240,51 @@ static void par_sprune__remove(PARINT* arr, PARINT val)
         PAR_SWAP(PARINT, arr[i - 1], arr[i]);
     }
     pa___n(arr)--;
+}
+
+typedef struct {
+    PARFLT const* aabbs;
+} par__sprune_sorter;
+
+int par__cmpinds(const void* pa, const void* pb, void* psorter)
+{
+    PARINT a = *((const PARINT*) pa);
+    PARINT b = *((const PARINT*) pb);
+    par__sprune_sorter* sorter = (par__sprune_sorter*) psorter;
+    PARFLT const* aabbs = sorter->aabbs;
+    PARFLT vala = aabbs[a];
+    PARFLT valb = aabbs[b];
+    if (vala > valb) return 1;
+    if (vala < valb) return -1;
+    if (a > b) return 1;
+    if (a < b) return -1;
+    return 0;
+}
+
+int par__cmppairs(const void* pa, const void* pb, void* unused)
+{
+    PARINT a = *((const PARINT*) pa);
+    PARINT b = *((const PARINT*) pb);
+    if (a > b) return 1;
+    if (a < b) return -1;
+    a = *(1 + (const PARINT*) pa);
+    b = *(1 + (const PARINT*) pb);
+    if (a > b) return 1;
+    if (a < b) return -1;
+    return 0;
+}
+
+int par__cmpfind(const void* pa, const void* pb)
+{
+    PARINT a = *((const PARINT*) pa);
+    PARINT b = *((const PARINT*) pb);
+    if (a > b) return 1;
+    if (a < b) return -1;
+    a = *(1 + (const PARINT*) pa);
+    b = *(1 + (const PARINT*) pb);
+    if (a > b) return 1;
+    if (a < b) return -1;
+    return 0;
 }
 
 par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
@@ -288,13 +312,12 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     }
     par__sprune_sorter sorter;
     sorter.aabbs = ctx->aabbs;
-
     PARINT* active = 0;
     PARINT* pairs[2] = {0};
 
     for (int axis = 0; axis < 2; axis++) {
         PARINT* indices = ctx->sorted_indices[axis];
-        par_qsort(indices, naabbs * 2, sizeof(PARINT), par__cmp, &sorter);
+        par_qsort(indices, naabbs * 2, sizeof(PARINT), par__cmpinds, &sorter);
 
         // for (PARINT i = 0; i < naabbs; i++) {
         //     int a = indices[i * 2 + 0];
@@ -323,25 +346,36 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
                 par_sprune__remove(active, boxindex);
             }
         }
-
-        // for (PARINT i = 0; i < pa_count(pairs); i += 2) {
-        //     PARINT a = pairs[i + 0];
-        //     PARINT b = pairs[i + 1];
-        //     printf("COLLIDE %d %2d %2d\n", axis, a, b);
-        // }
-        // puts("");
     }
 
     pa_free(active);
+    par_qsort(pairs[0], pa_count(pairs[0]) / 2, 2 * sizeof(PARINT),
+        par__cmppairs, 0);
+    par_qsort(pairs[1], pa_count(pairs[1]) / 2, 2 * sizeof(PARINT),
+        par__cmppairs, 0);
 
-    // TODO sort in groups of two: pairs[0] and pairs[2]
+    // for (int axis = 0; axis < 2; axis++) {
+    //     for (PARINT i = 0; i < pa_count(pairs[axis]); i += 2) {
+    //         PARINT a = pairs[axis][i + 0];
+    //         PARINT b = pairs[axis][i + 1];
+    //         printf("COLLIDE %d %2d %2d\n", axis, a, b);
+    //     }
+    //     puts("");
+    // }
 
-    // TODO construct a new pair list by finding all pairs in pairs[0] that are
-    //      also in pairs[1] (write par_bsearch for this)
-
+    pa_clear(ctx->collision_pairs);
+    for (int i = 0; i < pa_count(pairs[0]); i += 2) {
+        PARINT* key = pairs[0] + i;
+        void* found = bsearch(key, pairs[1], pa_count(pairs[1]) / 2,
+            sizeof(PARINT) * 2, par__cmpfind);
+        if (found) {
+            pa_push(ctx->collision_pairs, key[0]);
+            pa_push(ctx->collision_pairs, key[1]);
+        }
+    }
+    ctx->ncollision_pairs = pa_count(ctx->collision_pairs) / 2;
     pa_free(pairs[0]);
     pa_free(pairs[1]);
-
     return (par_sprune_context*) ctx;
 }
 
