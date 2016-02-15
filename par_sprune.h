@@ -4,7 +4,7 @@
 // In addition to the comment block above each function declaration, the API
 // has informal documentation here:
 //
-//     http://github.prideout.net/sweep-and-prune/
+//     http://github.prideout.net/work-in-progress/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
@@ -318,15 +318,6 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     for (int axis = 0; axis < 2; axis++) {
         PARINT* indices = ctx->sorted_indices[axis];
         par_qsort(indices, naabbs * 2, sizeof(PARINT), par__cmpinds, &sorter);
-
-        // for (PARINT i = 0; i < naabbs; i++) {
-        //     int a = indices[i * 2 + 0];
-        //     int b = indices[i * 2 + 1];
-        //     printf("%2d %2d %.2f\n", a, a / 4, aabbs[a]);
-        //     printf("%2d %2d %.2f\n", b, a / 4, aabbs[b]);
-        // }
-        // puts("");
-
         pa_clear(active);
         for (PARINT i = 0; i < naabbs * 2; i++) {
             PARINT fltindex = indices[i];
@@ -340,9 +331,7 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
                     pa_push(pairs[axis], b);
                 }
                 pa_push(active, boxindex);
-                // printf("pushing %d\n", boxindex);
             } else {
-                // printf("removing %d\n", boxindex);
                 par_sprune__remove(active, boxindex);
             }
         }
@@ -353,16 +342,6 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
         par__cmppairs, 0);
     par_qsort(pairs[1], pa_count(pairs[1]) / 2, 2 * sizeof(PARINT),
         par__cmppairs, 0);
-
-    // for (int axis = 0; axis < 2; axis++) {
-    //     for (PARINT i = 0; i < pa_count(pairs[axis]); i += 2) {
-    //         PARINT a = pairs[axis][i + 0];
-    //         PARINT b = pairs[axis][i + 1];
-    //         printf("COLLIDE %d %2d %2d\n", axis, a, b);
-    //     }
-    //     puts("");
-    // }
-
     pa_clear(ctx->collision_pairs);
     for (int i = 0; i < pa_count(pairs[0]); i += 2) {
         PARINT* key = pairs[0] + i;

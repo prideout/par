@@ -82,11 +82,6 @@ int main()
             export_svg("build/test_sprune_overlap_20.svg", "#2AB68B",
                 boxes20, 20);
             par_sprune_overlap(boxes10, 10, context);
-            for (int i = 0; i < context->ncollision_pairs * 2; i += 2) {
-                printf("%d %d\n", context->collision_pairs[i],
-                    context->collision_pairs[i + 1]);
-            }
-            puts("");
             export_svg("build/test_sprune_overlap_10.svg", "#8B2AB6",
                 boxes10, 10);
             par_sprune_free_context(context);
