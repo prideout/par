@@ -334,7 +334,7 @@ static par_bluenoise_context* par_bluenoise_create(
         fseek(fin, 0, SEEK_SET);
         buf = PAR_MALLOC(char, nbytes);
         int consumed = (int) fread(buf, nbytes, 1, fin);
-        assert(consumed == nbytes);
+        assert(consumed == 1);
         fclose(fin);
     }
 

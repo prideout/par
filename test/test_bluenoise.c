@@ -28,7 +28,13 @@ static void test_bluenoise()
     asset_get("bluenoise.trimmed.bin", &data, &nbytes);
     par_bluenoise_context* ctx;
     ctx = par_bluenoise_from_buffer(data, nbytes, MAXPTS);
+    assert(ctx);
     free(data);
+
+    // To ensure proper test coverage, free the bluenoise context and create a
+    // new one using the file API rather than the buffer API.
+    par_bluenoise_free(ctx);
+    ctx = par_bluenoise_from_file("build/cache_bluenoise.trimmed.bin", MAXPTS);
 
     // Copy the density image into the bluenoise context and free it.
     par_bluenoise_density_from_gray(ctx, pixels, dims[0], dims[1], 1);
