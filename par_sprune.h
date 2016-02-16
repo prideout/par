@@ -17,6 +17,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef PAR_SPRUNE_INT
 #define PAR_SPRUNE_INT int32_t
@@ -47,8 +48,9 @@ par_sprune_context* par_sprune_overlap(PAR_SPRUNE_FLT const* aabbs,
 
 // Reads new aabb data from the same pointer that was passed to the overlap
 // function and refreshes the "collision_pairs" field.  Exploits temporal
-// coherence so it's very efficient for animation.
-void par_sprune_update(par_sprune_context* ctx);
+// coherence so it's very efficient for animation.  If this returns false,
+// no changes to the collision set were detected.
+bool par_sprune_update(par_sprune_context* ctx);
 
 // Examines all collision groups and creates a culling set such that no
 // boxes would overlap if the culled boxes are removed.  This function
@@ -70,7 +72,6 @@ void par_sprune_cull(par_sprune_context* context);
 
 #include <stdlib.h>
 #include <assert.h>
-#include <stdbool.h>
 
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
