@@ -15,7 +15,7 @@
 // In addition to the comment block above each function declaration, the API
 // has informal documentation here:
 //
-//     http://github.prideout.net/bubbles/
+//     http://prideout.net/bubbles/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout

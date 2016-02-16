@@ -4,7 +4,7 @@
 // In addition to the comment block above each function declaration, the API
 // has informal documentation here:
 //
-//     http://github.prideout.net/work-in-progress/
+//     http://prideout.net/work-in-progress/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
