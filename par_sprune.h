@@ -359,6 +359,13 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     return (par_sprune_context*) ctx;
 }
 
+bool par_sprune_update(par_sprune_context* context)
+{
+    par_sprune__context* ctx = (par_sprune__context*) context;
+    // TODO
+    return false;
+}
+
 #undef PARINT
 #undef PARFLT
 #endif // PAR_SPRUNE_IMPLEMENTATION

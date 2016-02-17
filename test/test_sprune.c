@@ -84,6 +84,21 @@ int main()
             par_sprune_overlap(boxes10, 10, context);
             export_svg("build/test_sprune_overlap_10.svg", "#8B2AB6",
                 boxes10, 10);
+            assert_equal(context->ncollision_pairs, 4);
+
+            boxes10[5] -= 0.1;
+            boxes10[7] -= 0.1;
+            export_svg("build/test_sprune_overlap_10b.svg", "#8B2AB6",
+                boxes10, 10);
+            par_sprune_overlap(boxes10, 10, context);
+            assert_equal(context->ncollision_pairs, 3);
+
+            boxes10[5] += 0.1;
+            boxes10[7] += 0.1;
+            bool changed = par_sprune_update(context);
+            assert_equal(context->ncollision_pairs, 4);
+            assert_equal(changed, true);
+
             par_sprune_free_context(context);
         }
 
