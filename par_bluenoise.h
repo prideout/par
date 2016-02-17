@@ -6,8 +6,8 @@
 // by referencing the point sequence from the first tile for all 8 tiles. This
 // obviously produces poor results, but in many contexts, it isn't noticeable.
 //
-//     http://prideout.net/assets/bluenoise.bin
-//     http://prideout.net/assets/bluenoise.trimmed.bin
+//     http://github.prideout.net/assets/bluenoise.bin
+//     http://github.prideout.net/assets/bluenoise.trimmed.bin
 //
 // The code herein is an implementation of the algorithm described in:
 //

@@ -13,7 +13,7 @@ static sds _baseurl = 0;
 static void asset_init()
 {
     par_easycurl_init(0);
-    _baseurl = sdsnew("http://prideout.net/assets/");
+    _baseurl = sdsnew("http://github.prideout.net/assets/");
     int length = wai_getExecutablePath(0, 0, 0);
     _exedir = sdsnewlen("", length);
     int dirlen;
