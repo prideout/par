@@ -136,7 +136,7 @@ typedef struct {
     PARFLT const* aabbs;
     PARINT naabbs;
     PARINT* sorted_indices[2];
-    bool* overlap_flags[2];
+    PARINT* pairs[2];
 
 } par_sprune__context;
 
@@ -222,8 +222,8 @@ void par_sprune_free_context(par_sprune_context* context)
     par_sprune__context* ctx = (par_sprune__context*) context;
     pa_free(ctx->sorted_indices[0]);
     pa_free(ctx->sorted_indices[1]);
-    pa_free(ctx->overlap_flags[0]);
-    pa_free(ctx->overlap_flags[1]);
+    pa_free(ctx->pairs[0]);
+    pa_free(ctx->pairs[1]);
     pa_free(ctx->collision_pairs);
     PAR_FREE(ctx);
 }
@@ -300,8 +300,7 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     for (int axis = 0; axis < 2; axis++) {
         pa_clear(ctx->sorted_indices[axis]);
         pa_add(ctx->sorted_indices[axis], naabbs * 2);
-        pa_clear(ctx->overlap_flags[axis]);
-        pa_add(ctx->overlap_flags[axis], naabbs * 2);
+        pa_clear(ctx->pairs[axis]);
     }
     for (PARINT i = 0; i < naabbs; i++) {
         ctx->sorted_indices[0][i * 2 + 0] = i * 4 + 0;
@@ -312,26 +311,24 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     par__sprune_sorter sorter;
     sorter.aabbs = ctx->aabbs;
     PARINT* active = 0;
-    PARINT* pairs[2] = {0};
 
     // Sweep a plane first across the X-axis, then down through the Y-axis.
 
     for (int axis = 0; axis < 2; axis++) {
+        PARINT** pairs = &ctx->pairs[axis];
         PARINT* indices = ctx->sorted_indices[axis];
-        bool* flags = ctx->overlap_flags[axis];
         par_qsort(indices, naabbs * 2, sizeof(PARINT), par__cmpinds, &sorter);
         pa_clear(active);
         for (PARINT i = 0; i < naabbs * 2; i++) {
             PARINT fltindex = indices[i];
             PARINT boxindex = fltindex / 4;
             bool ismin = ((fltindex - axis) % 4) == 0;
-            flags[i] = ismin && (pa_count(active) > 0);
             if (ismin) {
                 for (int j = 0; j < pa_count(active); j++) {
-                    PARINT a = PAR_MIN(active[j], boxindex);
-                    PARINT b = PAR_MAX(active[j], boxindex);
-                    pa_push(pairs[axis], a);
-                    pa_push(pairs[axis], b);
+                    pa_push(*pairs, active[j]);
+                    pa_push(*pairs, boxindex);
+                    pa_push(*pairs, boxindex);
+                    pa_push(*pairs, active[j]);
                 }
                 pa_push(active, boxindex);
             } else {
@@ -340,31 +337,31 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
         }
     }
 
-    // Sort the X-axis collision pairs and Y-axis collision pairs, only so
-    // that it easier to find their intersection.
+    // Sort the Y-axis collision pairs to make it easier to intersect it
+    // with the set of X-axis collision pairs.
 
+    PARINT* xpairs = ctx->pairs[0];
+    PARINT* ypairs = ctx->pairs[1];
+    int nypairs = pa_count(ypairs) / 2;
+    int pairsize = 2 * sizeof(PARINT);
     pa_free(active);
-    par_qsort(pairs[0], pa_count(pairs[0]) / 2, 2 * sizeof(PARINT),
-        par__cmppairs, 0);
-    par_qsort(pairs[1], pa_count(pairs[1]) / 2, 2 * sizeof(PARINT),
-        par__cmppairs, 0);
+    par_qsort(ypairs, nypairs, pairsize, par__cmppairs, 0);
     pa_clear(ctx->collision_pairs);
 
-    // Find the intersection of X-axis collisions (pairs[0]) and Y-axis
-    // collisions (pairs[1].
+    // Find the intersection of X-axis overlaps and Y-axis overlaps.
 
-    for (int i = 0; i < pa_count(pairs[0]); i += 2) {
-        PARINT* key = pairs[0] + i;
-        void* found = bsearch(key, pairs[1], pa_count(pairs[1]) / 2,
-            sizeof(PARINT) * 2, par__cmpfind);
+    for (int i = 0; i < pa_count(xpairs); i += 2) {
+        PARINT* key = xpairs + i;
+        if (key[1] < key[0]) {
+            continue;
+        }
+        void* found = bsearch(key, ypairs, nypairs, pairsize, par__cmpfind);
         if (found) {
             pa_push(ctx->collision_pairs, key[0]);
             pa_push(ctx->collision_pairs, key[1]);
         }
     }
     ctx->ncollision_pairs = pa_count(ctx->collision_pairs) / 2;
-    pa_free(pairs[0]);
-    pa_free(pairs[1]);
     return (par_sprune_context*) ctx;
 }
 
