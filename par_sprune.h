@@ -308,22 +308,24 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
         ctx->sorted_indices[1][i * 2 + 0] = i * 4 + 1;
         ctx->sorted_indices[0][i * 2 + 1] = i * 4 + 2;
         ctx->sorted_indices[1][i * 2 + 1] = i * 4 + 3;
-        ctx->overlap_flags[0][i] = false;
-        ctx->overlap_flags[1][i] = false;
     }
     par__sprune_sorter sorter;
     sorter.aabbs = ctx->aabbs;
     PARINT* active = 0;
     PARINT* pairs[2] = {0};
 
+    // Sweep a plane first across the X-axis, then down through the Y-axis.
+
     for (int axis = 0; axis < 2; axis++) {
         PARINT* indices = ctx->sorted_indices[axis];
+        bool* flags = ctx->overlap_flags[axis];
         par_qsort(indices, naabbs * 2, sizeof(PARINT), par__cmpinds, &sorter);
         pa_clear(active);
         for (PARINT i = 0; i < naabbs * 2; i++) {
             PARINT fltindex = indices[i];
             PARINT boxindex = fltindex / 4;
             bool ismin = ((fltindex - axis) % 4) == 0;
+            flags[i] = ismin && (pa_count(active) > 0);
             if (ismin) {
                 for (int j = 0; j < pa_count(active); j++) {
                     PARINT a = PAR_MIN(active[j], boxindex);
@@ -338,12 +340,19 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
         }
     }
 
+    // Sort the X-axis collision pairs and Y-axis collision pairs, only so
+    // that it easier to find their intersection.
+
     pa_free(active);
     par_qsort(pairs[0], pa_count(pairs[0]) / 2, 2 * sizeof(PARINT),
         par__cmppairs, 0);
     par_qsort(pairs[1], pa_count(pairs[1]) / 2, 2 * sizeof(PARINT),
         par__cmppairs, 0);
     pa_clear(ctx->collision_pairs);
+
+    // Find the intersection of X-axis collisions (pairs[0]) and Y-axis
+    // collisions (pairs[1].
+
     for (int i = 0; i < pa_count(pairs[0]); i += 2) {
         PARINT* key = pairs[0] + i;
         void* found = bsearch(key, pairs[1], pa_count(pairs[1]) / 2,
