@@ -92,13 +92,21 @@ int main()
                 boxes10, 10);
             par_sprune_overlap(boxes10, 10, context);
             assert_equal(context->ncollision_pairs, 3);
+            int const* pairs = context->collision_pairs;
+            assert_ok(pairs[0] == 0 && pairs[1] == 4);
+            assert_ok(pairs[2] == 2 && pairs[3] == 3);
+            assert_ok(pairs[4] == 6 && pairs[5] == 9);
 
             boxes10[5] += 0.1;
             boxes10[7] += 0.1;
             bool changed = par_sprune_update(context);
             assert_equal(context->ncollision_pairs, 4);
             assert_equal(changed, true);
-
+            pairs = context->collision_pairs;
+            assert_ok(pairs[0] == 0 && pairs[1] == 4);
+            assert_ok(pairs[2] == 1 && pairs[3] == 4);
+            assert_ok(pairs[4] == 2 && pairs[5] == 3);
+            assert_ok(pairs[6] == 6 && pairs[7] == 9);
             par_sprune_free_context(context);
         }
 

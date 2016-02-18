@@ -338,13 +338,16 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     }
 
     // Sort the Y-axis collision pairs to make it easier to intersect it
-    // with the set of X-axis collision pairs.
+    // with the set of X-axis collision pairs.  We also sort the X-axis
+    // pairs because it's required for subsequent calls to par_sprune_update.
 
     PARINT* xpairs = ctx->pairs[0];
     PARINT* ypairs = ctx->pairs[1];
+    int nxpairs = pa_count(xpairs) / 2;
     int nypairs = pa_count(ypairs) / 2;
     int pairsize = 2 * sizeof(PARINT);
     pa_free(active);
+    par_qsort(xpairs, nxpairs, pairsize, par__cmppairs, 0);
     par_qsort(ypairs, nypairs, pairsize, par__cmppairs, 0);
     pa_clear(ctx->collision_pairs);
 
@@ -365,11 +368,95 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     return (par_sprune_context*) ctx;
 }
 
+void par_sprune__insert_pair(PARINT** pairs, PARINT a, PARINT b)
+{
+    PARINT key[2] = {a, b};
+    int npairs = pa_count(*pairs) / 2;
+    int pairsize = 2 * sizeof(PARINT);
+    void* found = bsearch(key, *pairs, npairs, pairsize, par__cmpfind);
+    if (found) {
+        puts("Does this ever get hit? If not, remove the bsearch");
+        return;
+    }
+    pa_push(*pairs, a);
+    pa_push(*pairs, b);
+    pa_push(*pairs, b);
+    pa_push(*pairs, a);
+    // TODO insertion sort here
+}
+
+void par_sprune__remove_pair(PARINT** pairs, PARINT a, PARINT b)
+{
+    // TODO March two cursors through...
+    // Start Swapping when encountering AB or BA
+}
+
 bool par_sprune_update(par_sprune_context* context)
 {
     par_sprune__context* ctx = (par_sprune__context*) context;
-    // TODO
-    return false;
+    PARINT naabbs = ctx->naabbs;
+    PARFLT const* aabbs = ctx->aabbs;
+
+    // Since the intervals are "almost sorted" (temporal coherence), use
+    // a simple insertion sort rather than quicksort.
+
+    bool dirty = false;
+    for (int axis = 0; axis < 2; axis++) {
+        PARINT** pairs = &ctx->pairs[axis];
+        PARINT* indices = ctx->sorted_indices[axis];
+        for (int i = 1; i < naabbs * 2; i++) {
+            int j = i;
+            while (j > 0) {
+                PARFLT valj = aabbs[indices[j]];
+                PARFLT valprev = aabbs[indices[j - 1]];
+                if (valprev <= valj) {
+                    break;
+                }
+
+                PARINT fltindexj = indices[j];
+                PARINT boxindexj = fltindexj / 4;
+                bool isminj = ((fltindexj - axis) % 4) == 0;
+
+                PARINT fltindexjm1 = indices[j - 1];
+                PARINT boxindexjm1 = fltindexjm1 / 4;
+                bool isminjm1 = ((fltindexjm1 - axis) % 4) == 0;
+
+                if (isminj && !isminjm1){
+                    par_sprune__insert_pair(pairs, boxindexj, boxindexjm1);
+                    dirty = true;
+                } else if (!isminj && isminjm1){
+                    par_sprune__remove_pair(pairs, boxindexj, boxindexjm1);
+                    dirty = true;
+                }
+
+                PAR_SWAP(PARINT, indices[j], indices[j - 1]);
+                j--;
+            }
+        }
+    }
+
+    PARINT* xpairs = ctx->pairs[0];
+    PARINT* ypairs = ctx->pairs[1];
+    int nypairs = pa_count(ypairs) / 2;
+    int pairsize = 2 * sizeof(PARINT);
+    pa_clear(ctx->collision_pairs);
+
+    // Find the intersection of X-axis overlaps and Y-axis overlaps.
+
+    for (int i = 0; i < pa_count(xpairs); i += 2) {
+        PARINT* key = xpairs + i;
+        if (key[1] < key[0]) {
+            continue;
+        }
+        void* found = bsearch(key, ypairs, nypairs, pairsize, par__cmpfind);
+        if (found) {
+            pa_push(ctx->collision_pairs, key[0]);
+            pa_push(ctx->collision_pairs, key[1]);
+        }
+    }
+    ctx->ncollision_pairs = pa_count(ctx->collision_pairs) / 2;
+
+    return dirty;
 }
 
 #undef PARINT
