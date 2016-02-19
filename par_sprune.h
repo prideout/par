@@ -1,10 +1,9 @@
 // SPRUNE :: https://github.com/prideout/par
 // Sweep and Prune library for detecting axis-aligned box collisions in 2D.
 //
-// In addition to the comment block above each function declaration, the API
-// has informal documentation here:
+// For an emscripten demo of this library, take a look at the following link.
 //
-//     http://github.prideout.net/work-in-progress/
+//     http://github.prideout.net/d3cpp/
 //
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
@@ -47,7 +46,7 @@ par_sprune_context* par_sprune_overlap(PAR_SPRUNE_FLT const* aabbs,
     PAR_SPRUNE_INT naabbs, par_sprune_context* previous);
 
 // Reads new aabb data from the same pointer that was passed to the overlap
-// function and refreshes the "collision_pairs" field.  This function should
+// function and refreshes the two relevant fields.  This function should
 // only be used when the number of aabbs remains constant. If this returns
 // false, no changes to the collision set were detected.
 bool par_sprune_update(par_sprune_context* ctx);
