@@ -47,9 +47,9 @@ par_sprune_context* par_sprune_overlap(PAR_SPRUNE_FLT const* aabbs,
     PAR_SPRUNE_INT naabbs, par_sprune_context* previous);
 
 // Reads new aabb data from the same pointer that was passed to the overlap
-// function and refreshes the "collision_pairs" field.  Exploits temporal
-// coherence so it's very efficient for animation.  If this returns false,
-// no changes to the collision set were detected.
+// function and refreshes the "collision_pairs" field.  This function should
+// only be used when the number of aabbs remains constant. If this returns
+// false, no changes to the collision set were detected.
 bool par_sprune_update(par_sprune_context* ctx);
 
 // Examines all collision groups and creates a culling set such that no
@@ -367,122 +367,27 @@ par_sprune_context* par_sprune_overlap(PARFLT const* aabbs, PARINT naabbs,
     ctx->ncollision_pairs = pa_count(ctx->collision_pairs) / 2;
     return (par_sprune_context*) ctx;
 }
-// #include <stdio.h>
-void par_sprune__insert_pair(PARINT** pairs, PARINT a, PARINT b)
-{
-    // PARINT key[2] = {a, b};
-    int npairs = pa_count(*pairs) / 2;
-    // int pairsize = 2 * sizeof(PARINT);
-    // void* found = bsearch(key, *pairs, npairs, pairsize, par__cmpfind);
-    // if (found) {
-    //     puts("Does this ever get hit? If not, remove the bsearch");
-    //     return;
-    // }
-    pa_push(*pairs, a);
-    pa_push(*pairs, b);
-    pa_push(*pairs, b);
-    pa_push(*pairs, a);
-
-    // Run insertion sort over the pair list, since it's "mostly sorted".
-    for (int i = PAR_MAX(1, npairs); i < npairs + 2; i++) {
-        int j = i;
-        while (j > 0) {
-            PARINT* a = (*pairs) + (j - 1) * 2;
-            PARINT* b = (*pairs) + j * 2;
-            int cmp = par__cmppairs(a, b, 0);
-            if (cmp != 1) {
-                break;
-            }
-            PAR_SWAP(PARINT, a[0], b[0]);
-            PAR_SWAP(PARINT, a[1], b[1]);
-            j--;
-        }
-    }
-}
-
-void par_sprune__remove_pair(PARINT** pairs, PARINT a, PARINT b)
-{
-    PARINT* ptr0 = *pairs;
-    PARINT* ptr1 = *pairs;
-    int npairs = pa_count(*pairs) / 2;
-    int count = 0;
-    for (int i = 0; i < npairs; i++, ptr1 += 2) {
-        if ((ptr1[0] == a && ptr1[1] == b) ||
-            (ptr1[0] == b && ptr1[1] == a)) {
-            count++;
-        } else {
-            ptr0[0] = ptr1[0];
-            ptr0[1] = ptr1[1];
-            ptr0 += 2;
-        }
-    }
-    pa___n(*pairs) -= count * 2;
-}
 
 bool par_sprune_update(par_sprune_context* context)
 {
     par_sprune__context* ctx = (par_sprune__context*) context;
-    PARINT naabbs = ctx->naabbs;
-    PARFLT const* aabbs = ctx->aabbs;
-
-    // Since the intervals are "almost sorted" (temporal coherence), use
-    // a simple insertion sort rather than quicksort.
-
-    bool dirty = false;
-    for (int axis = 0; axis < 2; axis++) {
-        PARINT** pairs = &ctx->pairs[axis];
-        PARINT* indices = ctx->sorted_indices[axis];
-        for (int i = 1; i < naabbs * 2; i++) {
-            int j = i;
-            while (j > 0) {
-                PARFLT valj = aabbs[indices[j]];
-                PARFLT valprev = aabbs[indices[j - 1]];
-                if (valprev <= valj) {
-                    break;
-                }
-
-                PARINT fltindexj = indices[j];
-                PARINT boxindexj = fltindexj / 4;
-                bool isminj = ((fltindexj - axis) % 4) == 0;
-
-                PARINT fltindexjm1 = indices[j - 1];
-                PARINT boxindexjm1 = fltindexjm1 / 4;
-                bool isminjm1 = ((fltindexjm1 - axis) % 4) == 0;
-
-                if (isminj && !isminjm1){
-                    par_sprune__insert_pair(pairs, boxindexj, boxindexjm1);
-                    dirty = true;
-                } else if (!isminj && isminjm1){
-                    par_sprune__remove_pair(pairs, boxindexj, boxindexjm1);
-                    dirty = true;
-                }
-
-                PAR_SWAP(PARINT, indices[j], indices[j - 1]);
-                j--;
+    PARINT* collision_pairs = ctx->collision_pairs;
+    PARINT ncollision_pairs = ctx->ncollision_pairs;
+    ctx->collision_pairs = 0;
+    par_sprune_overlap(ctx->aabbs, ctx->naabbs, context);
+    bool dirty = ncollision_pairs != ctx->ncollision_pairs;
+    if (!dirty) {
+        int pairsize = 2 * sizeof(PARINT);
+        for (int i = 0; i < ctx->ncollision_pairs; i += 2) {
+            PARINT* key = ctx->collision_pairs + i;
+            if (!bsearch(key, collision_pairs, ncollision_pairs,
+                pairsize, par__cmpfind)) {
+                dirty = true;
+                break;
             }
         }
     }
-
-    PARINT* xpairs = ctx->pairs[0];
-    PARINT* ypairs = ctx->pairs[1];
-    int nypairs = pa_count(ypairs) / 2;
-    int pairsize = 2 * sizeof(PARINT);
-    pa_clear(ctx->collision_pairs);
-
-    // Find the intersection of X-axis overlaps and Y-axis overlaps.
-
-    for (int i = 0; i < pa_count(xpairs); i += 2) {
-        PARINT* key = xpairs + i;
-        if (key[1] < key[0]) {
-            continue;
-        }
-        void* found = bsearch(key, ypairs, nypairs, pairsize, par__cmpfind);
-        if (found) {
-            pa_push(ctx->collision_pairs, key[0]);
-            pa_push(ctx->collision_pairs, key[1]);
-        }
-    }
-    ctx->ncollision_pairs = pa_count(ctx->collision_pairs) / 2;
+    pa_free(collision_pairs);
     return dirty;
 }
 
