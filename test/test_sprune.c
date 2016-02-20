@@ -76,6 +76,27 @@ int main()
 {
     describe("par_sprune_overlap") {
 
+        it("should have a usage example") {
+            float boxes[] = {
+                0.1, 0.1, 0.3, 0.3, // box0
+                0.2, 0.2, 0.4, 0.4, // box1
+                0.6, 0.15, 0.7, 0.25, // box2
+            };
+            int nboxes = sizeof(boxes) / sizeof(float) / 4;
+            par_sprune_context* c = par_sprune_overlap(boxes, nboxes, 0);
+            int const* pairs = c->collision_pairs;
+            for (int i = 0; i < c->ncollision_pairs * 2; i += 2) {
+                printf("box%d collides with box%d\n", pairs[i], pairs[i + 1]);
+            }
+            boxes[8] -= 0.45; boxes[10] -= 0.45; // Move box2 leftward.
+            bool changed = par_sprune_update(c);
+            if (changed) {
+                printf("There are now %d collisions.\n", c->ncollision_pairs);
+            }
+            export_svg("build/test_sprune_usage.svg", "#2AB68B", boxes, nboxes);
+            par_sprune_free_context(c);
+        }
+
         it("should pass a simple smoke test") {
             context = par_sprune_overlap(boxes20, 20, 0);
             assert_ok(context);

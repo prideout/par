@@ -5,6 +5,23 @@
 //
 //     http://github.prideout.net/d3cpp/
 //
+// The axis-aligned bounding boxes are specified by (minx, miny, maxx, maxy).
+// Simple usage example:
+//
+//     float boxes[] = {
+//         0.10, 0.10, 0.30, 0.30, // box 0
+//         0.20, 0.20, 0.40, 0.40, // box 1
+//         0.60, 0.15, 0.70, 0.25, // box 2
+//     };
+//     int nboxes = 3;
+//     par_sprune_context* ctx = par_sprune_overlap(boxes, nboxes, 0);
+//     int const* pairs = ctx->collision_pairs;
+//     for (int i = 0; i < ctx->ncollision_pairs * 2; i += 2) {
+//         printf("box %d overlaps box %d\n", pairs[i], pairs[i + 1]);
+//     }
+//     par_sprune_free_context(ctx);
+//
+//
 // The MIT License
 // Copyright (c) 2015 Philip Rideout
 
