@@ -53,9 +53,9 @@ bool par_sprune_update(par_sprune_context* ctx);
 
 // Examines all collision groups and creates a culling set such that no boxes
 // would overlap if the culled boxes are removed.  When two boxes collide, the
-// box that occurs later in the list is more likely to be culled. This function
-// populates the "culled" and "nculled" fields in par_sprune_context. This is
-// useful for hiding labels in GIS applications.
+// box that occurs earlier in the list is more likely to be culled. Populates
+// the "culled" and "nculled" fields in par_sprune_context. This is useful for
+// hiding labels in GIS applications.
 void par_sprune_cull(par_sprune_context* context);
 
 // -----------------------------------------------------------------------------
@@ -247,7 +247,7 @@ typedef struct {
     PARFLT const* aabbs;
 } par__sprune_sorter;
 
-int par__cmpinds(const void* pa, const void* pb, void* psorter)
+static int par__cmpinds(const void* pa, const void* pb, void* psorter)
 {
     PARINT a = *((const PARINT*) pa);
     PARINT b = *((const PARINT*) pb);
@@ -262,7 +262,7 @@ int par__cmpinds(const void* pa, const void* pb, void* psorter)
     return 0;
 }
 
-int par__cmppairs(const void* pa, const void* pb, void* unused)
+static int par__cmppairs(const void* pa, const void* pb, void* unused)
 {
     PARINT a = *((const PARINT*) pa);
     PARINT b = *((const PARINT*) pb);
@@ -275,7 +275,7 @@ int par__cmppairs(const void* pa, const void* pb, void* unused)
     return 0;
 }
 
-int par__cmpfind(const void* pa, const void* pb)
+static int par__cmpfind(const void* pa, const void* pb)
 {
     PARINT a = *((const PARINT*) pa);
     PARINT b = *((const PARINT*) pb);
@@ -401,16 +401,31 @@ bool par_sprune__is_culled(par_sprune__context* ctx, PARINT key)
     return false;
 }
 
+static int par__cmpfindsingle(const void* pa, const void* pb)
+{
+    PARINT a = *((const PARINT*) pa);
+    PARINT b = *((const PARINT*) pb);
+    if (a > b) return 1;
+    if (a < b) return -1;
+    return 0;
+}
+
 void par_sprune_cull(par_sprune_context* context)
 {
     par_sprune__context* ctx = (par_sprune__context*) context;
     pa_clear(ctx->culled);
-    for (int i = 0; i < ctx->ncollision_pairs * 2; i += 2) {
-        PARINT* key = ctx->collision_pairs + i;
-        if (!par_sprune__is_culled(ctx, key[0]) &&
-            !par_sprune__is_culled(ctx, key[1])) {
-            PARINT culled_box = PAR_MAX(key[0], key[1]);
-            pa_push(ctx->culled, culled_box);
+    PARINT* collision_pairs = ctx->collision_pairs;
+    PARINT ncollision_pairs = ctx->ncollision_pairs;
+    int pairsize = 2 * sizeof(PARINT);
+    for (int i = 0; i < ctx->naabbs; i++) {
+        PARINT* found = bsearch(&i, collision_pairs, ncollision_pairs,
+            pairsize, par__cmpfindsingle);
+        if (!found) {
+            continue;
+        }
+        if (!par_sprune__is_culled(ctx, found[0]) &&
+            !par_sprune__is_culled(ctx, found[1])) {
+            pa_push(ctx->culled, found[0]);
         }
     }
     ctx->nculled = pa_count(ctx->culled);
