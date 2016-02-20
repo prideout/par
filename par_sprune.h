@@ -418,7 +418,7 @@ void par_sprune_cull(par_sprune_context* context)
     PARINT ncollision_pairs = ctx->ncollision_pairs;
     int pairsize = 2 * sizeof(PARINT);
     for (int i = 0; i < ctx->naabbs; i++) {
-        PARINT* found = bsearch(&i, collision_pairs, ncollision_pairs,
+        PARINT* found = (PARINT*) bsearch(&i, collision_pairs, ncollision_pairs,
             pairsize, par__cmpfindsingle);
         if (!found) {
             continue;
