@@ -122,6 +122,9 @@ int main()
             assert_equal(context->ncollision_pairs, 3);
             assert_equal(changed, false);
 
+            par_sprune_cull(context);
+            assert_equal(context->nculled, 2);
+
             par_sprune_free_context(context);
         }
     }

@@ -51,10 +51,11 @@ par_sprune_context* par_sprune_overlap(PAR_SPRUNE_FLT const* aabbs,
 // false, no changes to the collision set were detected.
 bool par_sprune_update(par_sprune_context* ctx);
 
-// Examines all collision groups and creates a culling set such that no
-// boxes would overlap if the culled boxes are removed.  This function
-// populates the "culled" and "nculled" fields in par_sprune_context.
-// This is useful for hiding labels in GIS applications.
+// Examines all collision groups and creates a culling set such that no boxes
+// would overlap if the culled boxes are removed.  When two boxes collide, the
+// box that occurs later in the list is more likely to be culled. This function
+// populates the "culled" and "nculled" fields in par_sprune_context. This is
+// useful for hiding labels in GIS applications.
 void par_sprune_cull(par_sprune_context* context);
 
 // -----------------------------------------------------------------------------
@@ -388,6 +389,31 @@ bool par_sprune_update(par_sprune_context* context)
     }
     pa_free(collision_pairs);
     return dirty;
+}
+
+bool par_sprune__is_culled(par_sprune__context* ctx, PARINT key)
+{
+    for (int i = 0; i < pa_count(ctx->culled); i++) {
+        if (key == ctx->culled[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void par_sprune_cull(par_sprune_context* context)
+{
+    par_sprune__context* ctx = (par_sprune__context*) context;
+    pa_clear(ctx->culled);
+    for (int i = 0; i < ctx->ncollision_pairs * 2; i += 2) {
+        PARINT* key = ctx->collision_pairs + i;
+        if (!par_sprune__is_culled(ctx, key[0]) &&
+            !par_sprune__is_culled(ctx, key[1])) {
+            PARINT culled_box = PAR_MAX(key[0], key[1]);
+            pa_push(ctx->culled, culled_box);
+        }
+    }
+    ctx->nculled = pa_count(ctx->culled);
 }
 
 #undef PARINT
