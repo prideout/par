@@ -123,7 +123,7 @@ int main()
             assert_equal(changed, false);
 
             par_sprune_cull(context);
-            assert_equal(context->nculled, 2);
+            assert_equal(context->nculled, 3);
 
             par_sprune_free_context(context);
         }
