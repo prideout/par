@@ -4,6 +4,7 @@
 #include "par_easycurl.h"
 #include "par_filecache.h"
 #include "par_bubbles.h"
+#include "par_sprune.h"
 
 int main(int argc, char* argv[])
 {
