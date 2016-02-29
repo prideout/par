@@ -51,6 +51,17 @@ int main()
         }
     }
 
+    describe("par_shapes_create_plane") {
+        it("should not have NaN's") {
+            par_shapes_mesh* m = par_shapes_create_plane(5, 6);
+            for (int i = 0; i < m->npoints * 3; i++) {
+                assert_ok(m->points[i] == m->points[i]);
+                assert_ok(m->normals[i] == m->normals[i]);
+            }
+            par_shapes_free_mesh(m);
+        }
+    }
+
     describe("par_shapes_export") {
         it("should generate an OBJ file") {
             par_shapes_mesh* m;
@@ -73,10 +84,6 @@ int main()
 
             m = par_shapes_create_hemisphere(5, 6);
             par_shapes_export(m, "build/test_shapes_hemisphere.obj");
-            par_shapes_free_mesh(m);
-
-            m = par_shapes_create_plane(5, 6);
-            par_shapes_export(m, "build/test_shapes_plane.obj");
             par_shapes_free_mesh(m);
 
             m = par_shapes_create_icosahedron();
