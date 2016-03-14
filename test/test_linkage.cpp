@@ -5,6 +5,7 @@
 #include "par_filecache.h"
 #include "par_bubbles.h"
 #include "par_sprune.h"
+#include "par_easings.h"
 
 int main(int argc, char* argv[])
 {

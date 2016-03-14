@@ -18,3 +18,6 @@
 
 #define PAR_SPRUNE_IMPLEMENTATION
 #include "par_sprune.h"
+
+#define PAR_EASINGS_IMPLEMENTATION
+#include "par_easings.h"
