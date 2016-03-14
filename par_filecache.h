@@ -213,7 +213,7 @@ bool par_filecache_load(char const* name, uint8_t** payload, int* payloadsize,
     dnbytes = (int32_t) cnbytes;
 #endif
     char* cbuff = (char*) malloc(cnbytes);
-    if (!par_filecache__read(cbuff, cnbytes, cachefile)) {
+    if (!par_filecache__read(cbuff, (int) cnbytes, cachefile)) {
         return false;
     }
 #if ENABLE_LZ4
