@@ -13,6 +13,7 @@ library    | description  | link
 **par_sprune.h** | efficient broad-phase collision detection in 2D | [web demo](http://github.prideout.net/d3cpp/)
 **par_easycurl.h** | simple HTTP requests using libcurl |
 **par_filecache.h** | LRU caching on your device's filesystem |
+**par_easings.h** | Robert Penner's easing functions |
 
 ## tests
 
