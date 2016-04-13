@@ -1,10 +1,12 @@
 // BUBBLES :: https://github.com/prideout/par
 // Simple C library for packing circles into hierarchical (or flat) diagrams.
 //
-// Based on "Visualization of Large Hierarchical Data by Circle Packing" by
+// Implements "Visualization of Large Hierarchical Data by Circle Packing" from
 // Wang et al (2006).
 //
-// Also implements Emo Welzl's "Smallest enclosing disks" algorithm (1991).
+// Also contains an implementation of Emo Welzl's "Smallest enclosing disks"
+// algorithm (1991) for enclosing points with circles, and a related method
+// from Mike Bostock for enclosing circles with the smallest possible circle.
 //
 // The API is divided into three sections:
 //
@@ -61,6 +63,12 @@ void par_bubbles_touch_three_points(PAR_BUBBLES_FLT const* xy,
 // All three arguments are pointers to three-tuples (x,y,radius).
 void par_bubbles_touch_two_disks(PAR_BUBBLES_FLT* c, PAR_BUBBLES_FLT const* a,
     PAR_BUBBLES_FLT const* b);
+
+// Returns the smallest circle that intersects the three specified circles.
+// This is the problem of Problem of Apollonius!
+void par_bubbles_touch_three_disks(PAR_BUBBLES_FLT const* xyr1,
+    PAR_BUBBLES_FLT const* xyr2, PAR_BUBBLES_FLT const* xyr3,
+    PAR_BUBBLES_FLT* result);
 
 // Packing ---------------------------------------------------------------------
 
@@ -418,7 +426,7 @@ static void par_bubbles__packflat(par_bubbles__t* bubbles)
     bubbles->npacked = bubbles->count;
 }
 
-static void par__disk_from_two(PARFLT const* xy1, PARFLT const* xy2,
+static void par__disk_from_two_points(PARFLT const* xy1, PARFLT const* xy2,
     PARFLT* result)
 {
     PARFLT dx = xy1[0] - xy2[0];
@@ -428,14 +436,15 @@ static void par__disk_from_two(PARFLT const* xy1, PARFLT const* xy2,
     result[2] = sqrt(dx * dx + dy * dy) / 2.0;
 }
 
-static PARINT par__disk_contains(PARFLT const* xyr, PARFLT const* xy)
+static PARINT par__disk_contains_point(PARFLT const* xyr, PARFLT const* xy)
 {
     PARFLT dx = xyr[0] - xy[0];
     PARFLT dy = xyr[1] - xy[1];
     return dx * dx + dy * dy <= PAR_SQR(xyr[2]);
 }
 
-static void par__easydisk(PARFLT* disk, PARFLT const* edgepts, PARINT nedgepts)
+static void par__easydisk_from_points(PARFLT* disk, PARFLT const* edgepts,
+    PARINT nedgepts)
 {
     if (nedgepts == 0) {
         disk[0] = 0;
@@ -449,31 +458,31 @@ static void par__easydisk(PARFLT* disk, PARFLT const* edgepts, PARINT nedgepts)
         disk[2] = 0;
         return;
     }
-    par__disk_from_two(edgepts, edgepts + 2, disk);
-    if (nedgepts == 2 || par__disk_contains(disk, edgepts + 4)) {
+    par__disk_from_two_points(edgepts, edgepts + 2, disk);
+    if (nedgepts == 2 || par__disk_contains_point(disk, edgepts + 4)) {
         return;
     }
-    par__disk_from_two(edgepts, edgepts + 4, disk);
-    if (par__disk_contains(disk, edgepts + 2)) {
+    par__disk_from_two_points(edgepts, edgepts + 4, disk);
+    if (par__disk_contains_point(disk, edgepts + 2)) {
         return;
     }
-    par__disk_from_two(edgepts + 2, edgepts + 4, disk);
-    if (par__disk_contains(disk, edgepts)) {
+    par__disk_from_two_points(edgepts + 2, edgepts + 4, disk);
+    if (par__disk_contains_point(disk, edgepts)) {
         return;
     }
     par_bubbles_touch_three_points(edgepts, disk);
 }
 
-static void par__minidisk(PARFLT* disk, PARFLT const* pts, PARINT npts,
+static void par__minidisk_points(PARFLT* disk, PARFLT const* pts, PARINT npts,
     PARFLT const* edgepts, PARINT nedgepts)
 {
     if (npts == 0 || nedgepts == 3) {
-        par__easydisk(disk, edgepts, nedgepts);
+        par__easydisk_from_points(disk, edgepts, nedgepts);
         return;
     }
     PARFLT const* pt = pts + (--npts) * 2;
-    par__minidisk(disk, pts, npts, edgepts, nedgepts);
-    if (!par__disk_contains(disk, pt)) {
+    par__minidisk_points(disk, pts, npts, edgepts, nedgepts);
+    if (!par__disk_contains_point(disk, pt)) {
         PARFLT edgepts1[6];
         for (PARINT i = 0; i < nedgepts * 2; i += 2) {
             edgepts1[i] = edgepts[i];
@@ -481,7 +490,75 @@ static void par__minidisk(PARFLT* disk, PARFLT const* pts, PARINT npts,
         }
         edgepts1[2 * nedgepts] = pt[0];
         edgepts1[2 * nedgepts + 1] = pt[1];
-        par__minidisk(disk, pts, npts, edgepts1, ++nedgepts);
+        par__minidisk_points(disk, pts, npts, edgepts1, ++nedgepts);
+    }
+}
+
+// Returns true if the specified circle1 contains the specified circle2.
+static bool par__disk_contains_disk(PARFLT const* xyr1, PARFLT const* xyr2)
+{
+  PARFLT xc0 = xyr1[0] - xyr2[0];
+  PARFLT yc0 = xyr1[1] - xyr2[1];
+  return sqrt(xc0 * xc0 + yc0 * yc0) < xyr1[2] - xyr2[2] + 1e-6;
+}
+
+// Returns the smallest circle that intersects the two specified circles.
+static void par__disk_from_two_disks(PARFLT const* xyr1, PARFLT const* xyr2,
+    PARFLT* result)
+{
+    PARFLT x1 = xyr1[0], y1 = xyr1[1], r1 = xyr1[2];
+    PARFLT x2 = xyr2[0], y2 = xyr2[1], r2 = xyr2[2];
+    PARFLT x12 = x2 - x1, y12 = y2 - y1, r12 = r2 - r1;
+    PARFLT l = sqrt(x12 * x12 + y12 * y12);
+    result[0] = (x1 + x2 + x12 / l * r12) / 2;
+    result[1] = (y1 + y2 + y12 / l * r12) / 2;
+    result[2] = (l + r1 + r2) / 2;
+}
+
+static void par__easydisk_from_disks(PARFLT* disk, PARFLT const* edgedisks,
+    PARINT nedgedisks)
+{
+    assert(nedgedisks <= 3);
+    if (nedgedisks == 0) {
+        disk[0] = 0;
+        disk[1] = 0;
+        disk[2] = 0;
+        return;
+    }
+    if (nedgedisks == 1) {
+        disk[0] = edgedisks[0];
+        disk[1] = edgedisks[1];
+        disk[2] = edgedisks[2];
+        return;
+    }
+    if (nedgedisks == 2) {
+        par__disk_from_two_disks(edgedisks, edgedisks + 3, disk);
+        return;
+    }
+    par_bubbles_touch_three_disks(edgedisks, edgedisks + 3, edgedisks + 6,
+        disk);
+}
+
+static void par__minidisk_disks(PARFLT* result, PARFLT const* disks,
+    PARINT ndisks, PARFLT const* edgedisks, PARINT nedgedisks)
+{
+    if (ndisks == 0 || nedgedisks == 3) {
+        par__easydisk_from_disks(result, edgedisks, nedgedisks);
+        return;
+    }
+    PARFLT const* disk = disks + (--ndisks) * 3;
+    par__minidisk_disks(result, disks, ndisks, edgedisks, nedgedisks);
+    if (!par__disk_contains_disk(result, disk)) {
+        PARFLT edgedisks1[9];
+        for (PARINT i = 0; i < nedgedisks * 3; i += 3) {
+            edgedisks1[i] = edgedisks[i];
+            edgedisks1[i + 1] = edgedisks[i + 1];
+            edgedisks1[i + 2] = edgedisks[i + 2];
+        }
+        edgedisks1[3 * nedgedisks] = disk[0];
+        edgedisks1[3 * nedgedisks + 1] = disk[1];
+        edgedisks1[3 * nedgedisks + 2] = disk[2];
+        par__minidisk_disks(result, disks, ndisks, edgedisks1, ++nedgedisks);
     }
 }
 
@@ -503,34 +580,12 @@ static void par_bubbles__copy_disk(par_bubbles__t const* src,
 
 void par_bubbles_enclose_points(PARFLT const* xy, PARINT npts, PARFLT* result)
 {
-    if (npts == 0) {
-        return;
-    }
-    par__minidisk(result, xy, npts, 0, 0);
+    par__minidisk_points(result, xy, npts, 0, 0);
 }
 
 void par_bubbles_enclose_disks(PARFLT const* xyr, PARINT ndisks, PARFLT* result)
 {
-    PARINT ngon = 8;
-    PARINT npts = ndisks * ngon;
-    PARFLT* pts = PAR_MALLOC(PARFLT, npts * 2);
-    PARFLT* ppts = pts;
-    float dtheta = PAR_PI * 2.0 / ngon;
-
-    for (PARINT i = 0; i < ndisks; i++) {
-        PARFLT cx = xyr[i * 3];
-        PARFLT cy = xyr[i * 3 + 1];
-        PARFLT cr = xyr[i * 3 + 2];
-        PARFLT a = 2.0 * cr / (1.0 + sqrt(2));
-        PARFLT r = 0.5 * sqrt(2) * a * sqrt(2 + sqrt(2));
-        float theta = 0;
-        for (PARINT j = 0; j < ngon; j++, theta += dtheta) {
-            *ppts++ = cx + r * cos(theta);
-            *ppts++ = cy + r * sin(theta);
-        }
-    }
-    par_bubbles_enclose_points(pts, npts, result);
-    PAR_FREE(pts);
+    par__minidisk_disks(result, xyr, ndisks, 0, 0);
 }
 
 void par_bubbles_touch_three_points(PARFLT const* xy, PARFLT* xyr)
@@ -567,6 +622,34 @@ void par_bubbles_touch_two_disks(PARFLT* c, PARFLT const* a, PARFLT const* b)
         c[0] = a[0] + db;
         c[1] = a[1];
     }
+}
+
+void par_bubbles_touch_three_disks(PARFLT const* xyr1, PARFLT const* xyr2,
+    PARFLT const* xyr3, PARFLT* result)
+{
+    PARFLT x1 = xyr1[0], y1 = xyr1[1], r1 = xyr1[2],
+        x2 = xyr2[0], y2 = xyr2[1], r2 = xyr2[2],
+        x3 = xyr3[0], y3 = xyr3[1], r3 = xyr3[2],
+        a2 = 2 * (x1 - x2),
+        b2 = 2 * (y1 - y2),
+        c2 = 2 * (r2 - r1),
+        d2 = x1 * x1 + y1 * y1 - r1 * r1 - x2 * x2 - y2 * y2 + r2 * r2,
+        a3 = 2 * (x1 - x3),
+        b3 = 2 * (y1 - y3),
+        c3 = 2 * (r3 - r1),
+        d3 = x1 * x1 + y1 * y1 - r1 * r1 - x3 * x3 - y3 * y3 + r3 * r3,
+        ab = a3 * b2 - a2 * b3,
+        xa = (b2 * d3 - b3 * d2) / ab - x1,
+        xb = (b3 * c2 - b2 * c3) / ab,
+        ya = (a3 * d2 - a2 * d3) / ab - y1,
+        yb = (a2 * c3 - a3 * c2) / ab,
+        A = xb * xb + yb * yb - 1,
+        B = 2 * (xa * xb + ya * yb + r1),
+        C = xa * xa + ya * ya - r1 * r1,
+        r = (-B - sqrt(B * B - 4 * A * C)) / (2 * A);
+    result[0] = xa + xb * r + x1;
+    result[1] = ya + yb * r + y1;
+    result[2] = r;
 }
 
 void par_bubbles_free_result(par_bubbles_t* pubbub)
