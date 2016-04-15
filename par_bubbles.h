@@ -8,11 +8,12 @@
 // algorithm (1991) for enclosing points with circles, and a related method
 // from Mike Bostock for enclosing circles with the smallest possible circle.
 //
-// The API is divided into three sections:
+// The API is divided into four sections:
 //
 //   - Enclosing.  Compute the smallest bounding circle for points or circles.
 //   - Packing.    Pack circles together, or into other circles.
 //   - Queries.    Given a touch point, pick a circle from a hierarchy, etc.
+//   - Deep Zoom.  Uses relative coordinate systems to support arbitrary depth.
 //
 // In addition to the comment block above each function declaration, the API
 // has informal documentation here:
@@ -143,7 +144,7 @@ void par_bubbles_compute_aabb_for_node(par_bubbles_t const* bubbles,
 PAR_BUBBLES_INT par_bubbles_lowest_common_ancestor(par_bubbles_t const* bubbles,
     PAR_BUBBLES_INT node_a, PAR_BUBBLES_INT node_b);
 
-// Relative Coordinate Systems -------------------------------------------------
+// Deep Zoom -------------------------------------------------------------------
 
 // Similar to hpack, but maintains precision by storing disk positions within
 // the local coordinate system of their parent. After calling this function,
