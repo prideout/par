@@ -50,7 +50,6 @@ void par_bubbles_enclose_points(PAR_BUBBLES_FLT const* xy, PAR_BUBBLES_INT npts,
     PAR_BUBBLES_FLT* result);
 
 // Read an array of 3-tuples (x,y,radius), write a 3-tuple (x,y,radius).
-// Internally, this approximates each disk with an enclosing octagon.
 void par_bubbles_enclose_disks(PAR_BUBBLES_FLT const* xyr,
     PAR_BUBBLES_INT ndisks, PAR_BUBBLES_FLT* result);
 
