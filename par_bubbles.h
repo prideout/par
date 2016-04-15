@@ -497,9 +497,9 @@ static void par__minidisk_points(PARFLT* disk, PARFLT const* pts, PARINT npts,
 // Returns true if the specified circle1 contains the specified circle2.
 static bool par__disk_contains_disk(PARFLT const* xyr1, PARFLT const* xyr2)
 {
-  PARFLT xc0 = xyr1[0] - xyr2[0];
-  PARFLT yc0 = xyr1[1] - xyr2[1];
-  return sqrt(xc0 * xc0 + yc0 * yc0) < xyr1[2] - xyr2[2] + 1e-6;
+    PARFLT xc0 = xyr1[0] - xyr2[0];
+    PARFLT yc0 = xyr1[1] - xyr2[1];
+    return sqrt(xc0 * xc0 + yc0 * yc0) < xyr1[2] - xyr2[2] + 1e-6;
 }
 
 // Returns the smallest circle that intersects the two specified circles.
