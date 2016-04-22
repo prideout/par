@@ -71,3 +71,8 @@ add_executable(
     test_sprune
     test_sprune.c
     console-colors.c)
+
+add_executable(
+    test_triangle
+    test_triangle.c
+    console-colors.c)

@@ -21,3 +21,6 @@
 
 #define PAR_EASINGS_IMPLEMENTATION
 #include "par_easings.h"
+
+#define PAR_TRIANGLE_IMPLEMENTATION
+#include "par_triangle.h"

@@ -6,6 +6,7 @@
 #include "par_bubbles.h"
 #include "par_sprune.h"
 #include "par_easings.h"
+#include "par_triangle.h"
 
 int main(int argc, char* argv[])
 {
