@@ -4,7 +4,7 @@
 // This implements "An improved incremental algorithm for constructing
 // restricted Delaunay triangulations" by Marc Vigo Anglada.  We might
 // eventually replace this with Shewchuk's randomized method, which is
-// supposedly much faster.
+// probably much faster.
 //
 // Here's an example that tessellates a pentagon with a triangular hole:
 //
@@ -128,6 +128,7 @@ int par_triangle_mesh_find_triangle(par_triangle_mesh const* mesh, float x,
 #ifndef pa_free
 #define pa_free(a) ((a) ? PAR_FREE(pa___raw(a)), 0 : 0)
 #define pa_push(a, v) (pa___maybegrow(a, 1), (a)[pa___n(a)++] = (v))
+#define pa_pop(a) (pa___n(a)--)
 #define pa_count(a) ((a) ? pa___n(a) : 0)
 #define pa_add(a, n) (pa___maybegrow(a, n), pa___n(a) += (n))
 #define pa_last(a) ((a)[pa___n(a) - 1])
@@ -214,13 +215,13 @@ typedef struct par_triangle__edge_t {
 
 typedef struct {
 
-    // Public
+    // Public data.
     float* points;
     int npoints;
     uint16_t* triangles;
     int ntriangles;
 
-    // Private
+    // Private data; includes a half-edge data structure.
     par_triangle__vert* verts;
     par_triangle__face* faces;
     par_triangle__edge* edges;
@@ -344,13 +345,143 @@ static void par_triangle__mesh_transform(par_triangle__mesh* mesh,
     }
 }
 
+static void par_triangle__mesh_grow(par_triangle__mesh* mesh, int nverts,
+    int nedges, int nfaces)
+{
+    // Reallocate verts and repair all pointers to verts.
+    par_triangle__vert* verts = mesh->verts;
+    pa_add(mesh->verts, nverts);
+    if (verts != mesh->verts) {
+        par_triangle__edge* edge = mesh->edges;
+        for (int i = 0; i < pa_count(mesh->edges); i++, edge++) {
+            edge->end = mesh->verts + (edge->end - verts);
+        }
+    }
+
+    // Reallocate edges and repair all pointers to edges.
+    par_triangle__edge* edges = mesh->edges;
+    pa_add(mesh->edges, nedges);
+    if (edges != mesh->edges) {
+        par_triangle__edge* edge = mesh->edges;
+        for (int i = 0; i < pa_count(mesh->edges); i++, edge++) {
+            edge->next = mesh->edges + (edge->next - edges);
+            edge->pair = mesh->edges + (edge->pair - edges);
+        }
+        par_triangle__face* face = mesh->faces;
+        for (int i = 0; i < pa_count(mesh->faces); i++, face++) {
+            face->edge = mesh->edges + (face->edge - edges);
+        }
+        par_triangle__vert* vert = mesh->verts;
+        for (int i = 0; i < pa_count(mesh->verts); i++, vert++) {
+            vert->outgoing = mesh->edges + (vert->outgoing - edges);
+        }
+    }
+
+    // Reallocate faces and repair all pointers to faces.
+    par_triangle__face* faces = mesh->faces;
+    pa_add(mesh->faces, nfaces);
+    if (faces != mesh->faces) {
+        par_triangle__edge* edge = mesh->edges;
+        for (int i = 0; i < pa_count(mesh->edges); i++, edge++) {
+            edge->face = mesh->faces + (edge->face - faces);
+        }
+    }
+}
+
+// Change all edge pointer that were pointing to "from".
+static void par_triangle__mesh_remap(par_triangle__edge* from,
+    par_triangle__edge* to)
+{
+    if (from->next->next->end->outgoing == from) {
+        from->next->next->end->outgoing = to;
+    }
+    if (from->pair) {
+        from->pair->pair = to;
+    }
+    if (from->face && from->face->edge == from) {
+        from->face->edge = to;
+    }
+    if (to) {
+        *to = *from;
+    }
+}
+
+// Remove a face and its three interior half-edges.
+static void par_triangle__mesh_remove(par_triangle__mesh* mesh, int iface)
+{
+    int nedges = pa_count(mesh->edges);
+    int nfaces = pa_count(mesh->faces);
+
+    // Stash the edges that we're about to kill.
+    par_triangle__edge* edgea0 = mesh->faces[iface].edge;
+    par_triangle__edge* edgeb0 = edgea0->next;
+    par_triangle__edge* edgec0 = edgeb0->next;
+
+    // Stash the edges that we're about to move.
+    par_triangle__edge* edgea1 = mesh->edges + nedges - 3;
+    par_triangle__edge* edgeb1 = mesh->edges + nedges - 2;
+    par_triangle__edge* edgec1 = mesh->edges + nedges - 1;
+
+    // Move the last face into the slot currently occupied by the dead face.
+    par_triangle__face* face0 = mesh->faces + iface;
+    par_triangle__face* face1 = mesh->faces + nfaces - 1;
+    face1->edge->face = face0;
+    face1->edge->next->face = face0;
+    face1->edge->next->next->face = face0;
+    face0->edge = face1->edge;
+    pa___n(mesh->faces) -= 1;
+
+    // Remap all edge pointers appropriately.
+    par_triangle__mesh_remap(edgea0, 0);
+    par_triangle__mesh_remap(edgeb0, 0);
+    par_triangle__mesh_remap(edgec0, 0);
+    par_triangle__mesh_remap(edgea1, edgea0);
+    par_triangle__mesh_remap(edgeb1, edgeb0);
+    par_triangle__mesh_remap(edgec1, edgec0);
+    pa___n(mesh->edges) -= 3;
+}
+
+static void par_triangle__mesh_subdivide(par_triangle__mesh* mesh, int face,
+    float const* pt)
+{
+    // Stash the three vertices for the face that we're subdividing.
+    par_triangle__edge* e = mesh->faces[face].edge;
+    par_triangle__vert* a = e->end;
+    par_triangle__vert* b = e->next->end;
+    par_triangle__vert* c = e->next->next->end;
+
+    // Remove the face and its three half-edges.
+    par_triangle__mesh_remove(mesh, face);
+
+    // Add space for 1 new vertex, 9 new edges, and 3 new triangles.
+    par_triangle__mesh_grow(mesh, 1, 9, 3);
+    int nverts = pa_count(mesh->verts);
+    int nedges = pa_count(mesh->edges);
+    int nfaces = pa_count(mesh->faces);
+
+    // TODO
+    pa___n(mesh->edges) -= 9;
+    pa___n(mesh->faces) -= 3;
+    pa___n(mesh->verts) -= 1;
+}
+
+// This is an implementation of Anglada's AddPointCDT function.
+static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
+{
+    float x = pt[0];
+    float y = pt[1];
+    par_triangle_mesh* public_mesh = (par_triangle_mesh*) mesh;
+    int tri = par_triangle_mesh_find_triangle(public_mesh, x, y);
+    par_triangle__mesh_subdivide(mesh, tri, pt);
+}
+
 par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
 {
     par_triangle__mesh* mesh = par_triangle__mesh_create();
     par_triangle_mesh* result = (par_triangle_mesh*) mesh;
     float minx = FLT_MAX, maxx = -FLT_MAX;
     float miny = FLT_MAX, maxy = -FLT_MAX;
-    float* pt = path->points;
+    float const* pt = path->points;
     for (int p = 0; p < path->npoints; p++, pt++) {
         minx = PAR_MIN(pt[0], minx);
         miny = PAR_MIN(pt[1], miny);
@@ -360,10 +491,11 @@ par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
     float width = maxx - minx;
     float height = maxy - miny;
     par_triangle__mesh_transform(mesh, width, height, minx, miny);
-
-    // TODO: Implement Anglada's algorithm
-    // int tri = par_triangle_mesh_find_triangle(result, -110.5, 0.5);
-
+    pt = path->points;
+    for (int p = 0; p < path->npoints; p++, pt++) {
+        par_triangle__mesh_addpt(mesh, pt);
+break; // TODO remove
+    }
     par_triangle__mesh_finalize(mesh);
     return result;
 }

@@ -109,6 +109,7 @@ void par_sprune_cull(par_sprune_context* context);
 #ifndef pa_free
 #define pa_free(a) ((a) ? PAR_FREE(pa___raw(a)), 0 : 0)
 #define pa_push(a, v) (pa___maybegrow(a, 1), (a)[pa___n(a)++] = (v))
+#define pa_pop(a) (pa___n(a)--)
 #define pa_count(a) ((a) ? pa___n(a) : 0)
 #define pa_add(a, n) (pa___maybegrow(a, n), pa___n(a) += (n))
 #define pa_last(a) ((a)[pa___n(a) - 1])
