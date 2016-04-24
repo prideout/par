@@ -228,9 +228,14 @@ typedef struct {
 
 } par_triangle__mesh;
 
-static float par_triangle__dot(float x1, float y1, float x2, float y2)
+// static float par_triangle__dot(float x1, float y1, float x2, float y2)
+// {
+//     return x1 * x2 + y1 * y2;
+// }
+
+static float par_triangle__cross(float x1, float y1, float x2, float y2)
 {
-    return x1 * x2 + y1 * y2;
+    return x1 * y2 - y1 * x2;
 }
 
 // Assumes CCW ordering.
@@ -238,15 +243,15 @@ static bool par_triangle__contains(float px, float py, float x1, float y1,
     float x2, float y2, float x3, float y3)
 {
     float vx1 = x2 - x1, vy1 = y2 - y1;
-    float vx2 = x3 - x2, vy2 = y3 - y2;
-    float vx3 = x1 - x3, vy3 = y1 - y3;
     float px1 = px - x1, py1 = py - y1;
+    float vx2 = x3 - x2, vy2 = y3 - y2;
     float px2 = px - x2, py2 = py - y2;
+    float vx3 = x1 - x3, vy3 = y1 - y3;
     float px3 = px - x3, py3 = py - y3;
-    float c1 = par_triangle__dot(px1, py1, vx1, vy1);
-    float c2 = par_triangle__dot(px2, py2, vx2, vy2);
-    float c3 = par_triangle__dot(px3, py3, vx3, vy3);
-    return c1 >= 0 && c2 >= 0 && c3 >= 0;
+    float c1 = par_triangle__cross(px1, py1, vx1, vy1);
+    float c2 = par_triangle__cross(px2, py2, vx2, vy2);
+    float c3 = par_triangle__cross(px3, py3, vx3, vy3);
+    return c1 <= 0 && c2 <= 0 && c3 <= 0;
 }
 
 int par_triangle_mesh_find_triangle(par_triangle_mesh const* m, float x,
@@ -284,20 +289,65 @@ static par_triangle__mesh* par_triangle__mesh_create()
     result->edges[0].end = result->verts + 1;
     result->edges[0].face = result->faces + 0;
     result->edges[0].next = result->edges + 1;
-    result->edges[0].pair = 0;
+    result->edges[0].pair = 0;//result->edges + 3;
     result->edges[1].end = result->verts + 2;
     result->edges[1].face = result->faces + 0;
     result->edges[1].next = result->edges + 2;
-    result->edges[1].pair = 0;
+    result->edges[1].pair = 0;//result->edges + 4;
     result->edges[2].end = result->verts + 0;
     result->edges[2].face = result->faces + 0;
     result->edges[2].next = result->edges + 0;
-    result->edges[2].pair = 0;
+    result->edges[2].pair = 0;//result->edges + 5;
     result->faces[0].edge = result->edges + 0;
     result->verts[0].outgoing = result->edges + 0;
     result->verts[1].outgoing = result->edges + 1;
     result->verts[2].outgoing = result->edges + 2;
+    // result->edges[3].end = result->verts + 0;
+    // result->edges[3].face = 0;
+    // result->edges[3].next = result->edges + 2;
+    // result->edges[3].pair = result->edges + 0;
+    // result->edges[4].end = result->verts + 1;
+    // result->edges[4].face = 0;
+    // result->edges[4].next = result->edges + 0;
+    // result->edges[4].pair = result->edges + 1;
+    // result->edges[5].end = result->verts + 2;
+    // result->edges[5].face = 0;
+    // result->edges[5].next = result->edges + 1;
+    // result->edges[5].pair = result->edges + 2;
     return result;
+}
+
+static void par_triangle__mesh_validate(par_triangle__mesh* mesh)
+{
+    int nfaces = mesh->ntriangles = pa_count(mesh->faces);
+    par_triangle__face const* face = mesh->faces;
+    for (int f = 0; f < nfaces; f++, face++) {
+        par_triangle__edge const* e = face->edge;
+        par_triangle__vert const* a = e->end;
+        par_triangle__vert const* b = e->next->end;
+        par_triangle__vert const* c = e->next->next->end;
+        float ab[2] = {b->x - a->x, b->y - a->y};
+        float ac[2] = {c->x - a->x, c->y - a->y};
+        assert(par_triangle__cross(ab[0], ab[1], ac[0], ac[1]) > 0);
+        assert(!e->pair || e->pair->pair == e);
+        assert(!e->next->pair || e->next->pair->pair == e->next);
+        assert(!e->next->next->pair ||
+            e->next->next->pair->pair == e->next->next);
+        assert(e->face == face);
+        assert(e->next->face == face);
+        assert(e->next->next->face == face);
+    }
+    int nedges = pa_count(mesh->edges);
+    int nborders = 0;
+    par_triangle__edge const* edge = mesh->edges;
+    for (int e = 0; e < nedges; e++, edge++) {
+        if (!edge->pair) {
+            nborders++;
+            continue;
+        }
+        assert(edge->next->next->end == edge->pair->end);
+    }
+    assert(nborders == 3);
 }
 
 // Consume the half-edge data structure and produce data for the public fields.
@@ -363,16 +413,18 @@ static void par_triangle__mesh_grow(par_triangle__mesh* mesh, int nverts,
     pa_add(mesh->edges, nedges);
     if (edges != mesh->edges) {
         par_triangle__edge* edge = mesh->edges;
-        for (int i = 0; i < pa_count(mesh->edges); i++, edge++) {
+        for (int i = 0; i < pa_count(mesh->edges) - nedges; i++, edge++) {
             edge->next = mesh->edges + (edge->next - edges);
-            edge->pair = mesh->edges + (edge->pair - edges);
+            if (edge->pair) {
+                edge->pair = mesh->edges + (edge->pair - edges);
+            }
         }
         par_triangle__face* face = mesh->faces;
         for (int i = 0; i < pa_count(mesh->faces); i++, face++) {
             face->edge = mesh->edges + (face->edge - edges);
         }
         par_triangle__vert* vert = mesh->verts;
-        for (int i = 0; i < pa_count(mesh->verts); i++, vert++) {
+        for (int i = 0; i < pa_count(mesh->verts) - nverts; i++, vert++) {
             vert->outgoing = mesh->edges + (vert->outgoing - edges);
         }
     }
@@ -382,13 +434,15 @@ static void par_triangle__mesh_grow(par_triangle__mesh* mesh, int nverts,
     pa_add(mesh->faces, nfaces);
     if (faces != mesh->faces) {
         par_triangle__edge* edge = mesh->edges;
-        for (int i = 0; i < pa_count(mesh->edges); i++, edge++) {
-            edge->face = mesh->faces + (edge->face - faces);
+        for (int i = 0; i < pa_count(mesh->edges) - nedges; i++, edge++) {
+            if (edge->face) {
+                edge->face = mesh->faces + (edge->face - faces);
+            }
         }
     }
 }
 
-// Change all edge pointer that were pointing to "from".
+// Change all edge pointers that were pointing to "from".
 static void par_triangle__mesh_remap(par_triangle__edge* from,
     par_triangle__edge* to)
 {
@@ -403,6 +457,7 @@ static void par_triangle__mesh_remap(par_triangle__edge* from,
     }
     if (to) {
         *to = *from;
+        from->next->next->next = to;
     }
 }
 
@@ -446,9 +501,9 @@ static void par_triangle__mesh_subdivide(par_triangle__mesh* mesh, int face,
 {
     // Stash the three vertices for the face that we're subdividing.
     par_triangle__edge* e = mesh->faces[face].edge;
-    par_triangle__vert* a = e->end;
-    par_triangle__vert* b = e->next->end;
-    par_triangle__vert* c = e->next->next->end;
+    int av = e->end - mesh->verts;
+    int bv = e->next->end - mesh->verts;
+    int cv = e->next->next->end - mesh->verts;
 
     // Remove the face and its three half-edges.
     par_triangle__mesh_remove(mesh, face);
@@ -458,11 +513,85 @@ static void par_triangle__mesh_subdivide(par_triangle__mesh* mesh, int face,
     int nverts = pa_count(mesh->verts);
     int nedges = pa_count(mesh->edges);
     int nfaces = pa_count(mesh->faces);
+    par_triangle__vert* vert = mesh->verts + nverts - 1;
+    par_triangle__edge* edges = mesh->edges + nedges - 9;
+    par_triangle__face* faces = mesh->faces + nfaces - 3;
+    par_triangle__vert* v0 = mesh->verts + av;
+    par_triangle__vert* v1 = mesh->verts + bv;
+    par_triangle__vert* v2 = mesh->verts + cv;
 
-    // TODO
-    pa___n(mesh->edges) -= 9;
-    pa___n(mesh->faces) -= 3;
-    pa___n(mesh->verts) -= 1;
+    // New vertex.
+    vert->x = pt[0];
+    vert->y = pt[1];
+    vert->outgoing = edges + 2;
+
+    // New Face 0
+    faces[0].edge = edges + 0;
+    edges[0].face = faces + 0;
+    edges[0].next = edges + 1;
+    edges[0].end = v0;
+    edges[1].face = faces + 0;
+    edges[1].next = edges + 2;
+    edges[1].end = vert;
+    edges[2].face = faces + 0;
+    edges[2].next = edges + 0;
+    edges[2].end = v2;
+    edges += 3;
+
+    // New Face 1
+    faces[1].edge = edges + 0;
+    edges[0].face = faces + 1;
+    edges[0].next = edges + 1;
+    edges[0].end = v1;
+    edges[1].face = faces + 1;
+    edges[1].next = edges + 2;
+    edges[1].end = vert;
+    edges[2].face = faces + 1;
+    edges[2].next = edges + 0;
+    edges[2].end = v0;
+    edges += 3;
+
+    // New Face 2
+    faces[2].edge = edges + 0;
+    edges[0].face = faces + 2;
+    edges[0].next = edges + 1;
+    edges[0].end = v2;
+    edges[1].face = faces + 2;
+    edges[1].next = edges + 2;
+    edges[1].end = vert;
+    edges[2].face = faces + 2;
+    edges[2].next = edges + 0;
+    edges[2].end = v1;
+    edges -= 6;
+
+    // Populate the pair pointers.
+    edges[0].pair = 0;
+    edges[1].pair = edges + 5;
+    edges[2].pair = edges + 7;
+    edges[3].pair = 0;
+    edges[4].pair = edges + 8;
+    edges[5].pair = edges + 1;
+    edges[6].pair = 0;
+    edges[7].pair = edges + 2;
+    edges[8].pair = edges + 4;
+    par_triangle__edge* edge = mesh->edges;
+    for (int i = 0; i < pa_count(mesh->edges) - 9; i++, edge++) {
+        if (edge->end == v0 && edge->next->end == v2) {
+            edge->next->pair = edges + 0;
+            edges[0].pair = edge->next;
+            continue;
+        }
+        if (edge->end == v1 && edge->next->end == v0) {
+            edge->next->pair = edges + 3;
+            edges[3].pair = edge->next;
+            continue;
+        }
+        if (edge->end == v2 && edge->next->end == v1) {
+            edge->next->pair = edges + 6;
+            edges[6].pair = edge->next;
+            continue;
+        }
+    }
 }
 
 // This is an implementation of Anglada's AddPointCDT function.
@@ -492,9 +621,9 @@ par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
     float height = maxy - miny;
     par_triangle__mesh_transform(mesh, width, height, minx, miny);
     pt = path->points;
-    for (int p = 0; p < path->npoints; p++, pt++) {
+    for (int p = 0; p < path->npoints; p++, pt += 2) {
+        par_triangle__mesh_validate(mesh);
         par_triangle__mesh_addpt(mesh, pt);
-break; // TODO remove
     }
     par_triangle__mesh_finalize(mesh);
     return result;

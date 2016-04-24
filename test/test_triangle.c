@@ -10,7 +10,7 @@ static FILE* svg_begin(char const* path)
         "<svg viewBox='-1.1 -1.1 10.2 10.2' width='500px' height='500px' "
         "version='1.1' "
         "xmlns='http://www.w3.org/2000/svg'>\n"
-        "<g transform='translate(0 0) scale(1 1)'>", svgfile);
+        "<g transform='translate(1.5 1.5) scale(0.3 0.3)'>", svgfile);
     return svgfile;
 }
 
