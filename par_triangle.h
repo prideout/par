@@ -611,7 +611,7 @@ par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
     float minx = FLT_MAX, maxx = -FLT_MAX;
     float miny = FLT_MAX, maxy = -FLT_MAX;
     float const* pt = path->points;
-    for (int p = 0; p < path->npoints; p++, pt++) {
+    for (int p = 0; p < path->npoints; p++, pt += 2) {
         minx = PAR_MIN(pt[0], minx);
         miny = PAR_MIN(pt[1], miny);
         maxx = PAR_MAX(pt[0], maxx);
