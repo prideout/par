@@ -226,6 +226,9 @@ typedef struct {
     par_triangle__face* faces;
     par_triangle__edge* edges;
 
+    // Scratch space for the addpt algorithm to alleviate allocations.
+    int* stack;
+
 } par_triangle__mesh;
 
 // static float par_triangle__dot(float x1, float y1, float x2, float y2)
@@ -496,6 +499,10 @@ static void par_triangle__mesh_remove(par_triangle__mesh* mesh, int iface)
     pa___n(mesh->edges) -= 3;
 }
 
+// This implements 1-into-3 triangle subdivision according to Anglada.  First,
+// it removes the given triangle using swap-and-shrink.  Next, it adds 1 new
+// vertex, 9 new edges, and 3 new triangles.  Clients can expect all the new
+// primitives to live at the end of their respective arrays.
 static void par_triangle__mesh_subdivide(par_triangle__mesh* mesh, int face,
     float const* pt)
 {
@@ -594,6 +601,27 @@ static void par_triangle__mesh_subdivide(par_triangle__mesh* mesh, int face,
     }
 }
 
+// Find the triangle that is adjacent to the given triangle, and that does not
+// share the given vertex.
+static int par_triangle__mesh_opposed(par_triangle__mesh* mesh, int face,
+  int vertex)
+{
+    par_triangle__vert* v = mesh->verts + vertex;
+    par_triangle__edge* e0 = mesh->faces[face].edge;
+    par_triangle__edge* e1 = e0->next;
+    par_triangle__edge* e2 = e1->next;
+    if (e0->end != v && e2->end != v && e0->pair && e0->pair->face) {
+        return e0->pair->face - mesh->faces;
+    }
+    if (e1->end != v && e0->end != v && e1->pair && e1->pair->face) {
+        return e1->pair->face - mesh->faces;
+    }
+    if (e2->end != v && e1->end != v && e2->pair && e2->pair->face) {
+        return e2->pair->face - mesh->faces;
+    }
+    return -1;
+}
+
 // This is an implementation of Anglada's AddPointCDT function.
 static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
 {
@@ -602,6 +630,19 @@ static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
     par_triangle_mesh* public_mesh = (par_triangle_mesh*) mesh;
     int tri = par_triangle_mesh_find_triangle(public_mesh, x, y);
     par_triangle__mesh_subdivide(mesh, tri, pt);
+    int nfaces = pa_count(mesh->faces);
+    int new_vertex = pa_count(mesh->verts) - 1;
+    pa_push(mesh->stack, nfaces - 3);
+    pa_push(mesh->stack, nfaces - 2);
+    pa_push(mesh->stack, nfaces - 1);
+    assert(pa_count(mesh->stack) == 3);
+    while (pa_count(mesh->stack) > 0) {
+        int face = pa_last(mesh->stack);
+        int opposed = par_triangle__mesh_opposed(mesh, face, new_vertex);
+        pa_pop(mesh->stack);
+        // TODO
+        printf("HEY %d %d\n", face, opposed);
+    }
 }
 
 par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
@@ -624,6 +665,7 @@ par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
     for (int p = 0; p < path->npoints; p++, pt += 2) {
         par_triangle__mesh_validate(mesh);
         par_triangle__mesh_addpt(mesh, pt);
+  if (p == 1) break;
     }
     par_triangle__mesh_finalize(mesh);
     return result;
