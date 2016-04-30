@@ -634,6 +634,19 @@ static par_triangle__edge* par_triangle__mesh_opposed(par_triangle__mesh* mesh,
     return 0;
 }
 
+// Checks if the given point is in the circumcircle of the given edge.
+static bool par_triangle__in_circle(par_triangle__edge* edge, float x, float y)
+{
+    par_triangle__vert* v0 = edge->next->next->end;
+    par_triangle__vert* v1 = edge->end;
+    float cx = 0.5 * (v0->x + v1->x);
+    float cy = 0.5 * (v0->y + v1->y);
+    float dx = cx - v1->x;
+    float dy = cy - v1->y;
+    float r2 = dx * dx + dy * dy;
+    return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r2;
+}
+
 // This is an implementation of Anglada's AddPointCDT function.
 static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
 {
@@ -652,8 +665,9 @@ static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
         int face = pa_pop(mesh->stack);
         par_triangle__edge* opposed;
         opposed = par_triangle__mesh_opposed(mesh, face, new_vertex);
-        if (opposed && !opposed->fixed) {
-            printf("HEY %d %ld\n", face, opposed - mesh->edges);
+        if (opposed && !opposed->fixed &&
+            par_triangle__in_circle(opposed, x, y)) {
+            printf("HEY SWAP %d %ld\n", face, opposed - mesh->edges);
         }
     }
 }
