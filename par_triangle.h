@@ -128,7 +128,7 @@ int par_triangle_mesh_find_triangle(par_triangle_mesh const* mesh, float x,
 #ifndef pa_free
 #define pa_free(a) ((a) ? PAR_FREE(pa___raw(a)), 0 : 0)
 #define pa_push(a, v) (pa___maybegrow(a, 1), (a)[pa___n(a)++] = (v))
-#define pa_pop(a) (pa___n(a)--)
+#define pa_pop(a) ((a)[--pa___n(a)])
 #define pa_count(a) ((a) ? pa___n(a) : 0)
 #define pa_add(a, n) (pa___maybegrow(a, n), pa___n(a) += (n))
 #define pa_last(a) ((a)[pa___n(a) - 1])
@@ -211,6 +211,7 @@ typedef struct par_triangle__edge_t {
     struct par_triangle__face_t* face;
     struct par_triangle__edge_t* next;
     struct par_triangle__edge_t* pair;
+    bool fixed;
 } par_triangle__edge;
 
 typedef struct {
@@ -289,18 +290,25 @@ static par_triangle__mesh* par_triangle__mesh_create()
         {+0.5, +3.0, 0}
     };
     memcpy(result->verts, bigtri, sizeof(bigtri));
+
     result->edges[0].end = result->verts + 1;
     result->edges[0].face = result->faces + 0;
     result->edges[0].next = result->edges + 1;
     result->edges[0].pair = 0;//result->edges + 3;
+    result->edges[0].fixed = true;
+
     result->edges[1].end = result->verts + 2;
     result->edges[1].face = result->faces + 0;
     result->edges[1].next = result->edges + 2;
     result->edges[1].pair = 0;//result->edges + 4;
+    result->edges[1].fixed = true;
+
     result->edges[2].end = result->verts + 0;
     result->edges[2].face = result->faces + 0;
     result->edges[2].next = result->edges + 0;
     result->edges[2].pair = 0;//result->edges + 5;
+    result->edges[2].fixed = true;
+
     result->faces[0].edge = result->edges + 0;
     result->verts[0].outgoing = result->edges + 0;
     result->verts[1].outgoing = result->edges + 1;
@@ -573,53 +581,57 @@ static void par_triangle__mesh_subdivide(par_triangle__mesh* mesh, int face,
 
     // Populate the pair pointers.
     edges[0].pair = 0;
-    edges[1].pair = edges + 5;
-    edges[2].pair = edges + 7;
+    edges[1].pair = edges + 5; edges[1].fixed = edges[1].pair->fixed;
+    edges[2].pair = edges + 7; edges[2].fixed = edges[2].pair->fixed;
     edges[3].pair = 0;
-    edges[4].pair = edges + 8;
-    edges[5].pair = edges + 1;
+    edges[4].pair = edges + 8; edges[4].fixed = edges[4].pair->fixed;
+    edges[5].pair = edges + 1; edges[5].fixed = edges[5].pair->fixed;
     edges[6].pair = 0;
-    edges[7].pair = edges + 2;
-    edges[8].pair = edges + 4;
+    edges[7].pair = edges + 2; edges[7].fixed = edges[7].pair->fixed;
+    edges[8].pair = edges + 4; edges[8].fixed = edges[8].pair->fixed;
+
     par_triangle__edge* edge = mesh->edges;
     for (int i = 0; i < pa_count(mesh->edges) - 9; i++, edge++) {
         if (edge->end == v0 && edge->next->end == v2) {
             edge->next->pair = edges + 0;
             edges[0].pair = edge->next;
+            edges[0].fixed = edges[0].pair->fixed;
             continue;
         }
         if (edge->end == v1 && edge->next->end == v0) {
             edge->next->pair = edges + 3;
             edges[3].pair = edge->next;
+            edges[3].fixed = edges[3].pair->fixed;
             continue;
         }
         if (edge->end == v2 && edge->next->end == v1) {
             edge->next->pair = edges + 6;
             edges[6].pair = edge->next;
+            edges[6].fixed = edges[6].pair->fixed;
             continue;
         }
     }
 }
 
-// Find the triangle that is adjacent to the given triangle, and that does not
-// share the given vertex.
-static int par_triangle__mesh_opposed(par_triangle__mesh* mesh, int face,
-  int vertex)
+// Finds the triangle that is adjacent to the given triangle, and that does not
+// share the given vertex.  Returns the shared half-edge of the adjacent face.
+static par_triangle__edge* par_triangle__mesh_opposed(par_triangle__mesh* mesh,
+    int face, int vertex)
 {
     par_triangle__vert* v = mesh->verts + vertex;
     par_triangle__edge* e0 = mesh->faces[face].edge;
     par_triangle__edge* e1 = e0->next;
     par_triangle__edge* e2 = e1->next;
     if (e0->end != v && e2->end != v && e0->pair && e0->pair->face) {
-        return e0->pair->face - mesh->faces;
+        return e0->pair;
     }
     if (e1->end != v && e0->end != v && e1->pair && e1->pair->face) {
-        return e1->pair->face - mesh->faces;
+        return e1->pair;
     }
     if (e2->end != v && e1->end != v && e2->pair && e2->pair->face) {
-        return e2->pair->face - mesh->faces;
+        return e2->pair;
     }
-    return -1;
+    return 0;
 }
 
 // This is an implementation of Anglada's AddPointCDT function.
@@ -637,11 +649,12 @@ static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
     pa_push(mesh->stack, nfaces - 1);
     assert(pa_count(mesh->stack) == 3);
     while (pa_count(mesh->stack) > 0) {
-        int face = pa_last(mesh->stack);
-        int opposed = par_triangle__mesh_opposed(mesh, face, new_vertex);
-        pa_pop(mesh->stack);
-        // TODO
-        printf("HEY %d %d\n", face, opposed);
+        int face = pa_pop(mesh->stack);
+        par_triangle__edge* opposed;
+        opposed = par_triangle__mesh_opposed(mesh, face, new_vertex);
+        if (opposed && !opposed->fixed) {
+            printf("HEY %d %ld\n", face, opposed - mesh->edges);
+        }
     }
 }
 
