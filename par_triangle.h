@@ -635,7 +635,7 @@ static par_triangle__edge* par_triangle__mesh_opposed(par_triangle__mesh* mesh,
 }
 
 // Checks if the given point is in the circumcircle of the given edge.
-static bool par_triangle__in_circle(par_triangle__edge* edge, float x, float y)
+bool par_triangle__in_edgecircle(par_triangle__edge* edge, float x, float y)
 {
     par_triangle__vert* v0 = edge->next->next->end;
     par_triangle__vert* v1 = edge->end;
@@ -645,6 +645,91 @@ static bool par_triangle__in_circle(par_triangle__edge* edge, float x, float y)
     float dy = cy - v1->y;
     float r2 = dx * dx + dy * dy;
     return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r2;
+}
+
+// This is a copy of par_bubbles_touch_three_points, but without the sqrt.
+static void par_triangle__circumcircle(float const* xy, float* xyr)
+{
+    // Many thanks to Stephen Schmitts:
+    // http://www.abecedarical.com/zenosamples/zs_circle3pts.html
+    float p1x = xy[0], p1y = xy[1];
+    float p2x = xy[2], p2y = xy[3];
+    float p3x = xy[4], p3y = xy[5];
+    float a = p2x - p1x, b = p2y - p1y;
+    float c = p3x - p1x, d = p3y - p1y;
+    float e = a * (p2x + p1x) * 0.5 + b * (p2y + p1y) * 0.5;
+    float f = c * (p3x + p1x) * 0.5 + d * (p3y + p1y) * 0.5;
+    float det = a*d - b*c;
+    float cx = xyr[0] = (d*e - b*f) / det;
+    float cy = xyr[1] = (-c*e + a*f) / det;
+    xyr[2] = (p1x - cx) * (p1x - cx) + (p1y - cy) * (p1y - cy);
+}
+
+// Checks if the given point is in the circumcircle of the given face.
+static bool par_triangle__in_circle(par_triangle__face* face, float x, float y)
+{
+    par_triangle__edge* e0 = face->edge, *e1 = e0->next, *e2 = e1->next;
+    float xy[6] = {
+        e0->end->x, e0->end->y,
+        e1->end->x, e1->end->y,
+        e2->end->x, e2->end->y,
+    };
+    float xyr[3];
+    par_triangle__circumcircle(xy, xyr);
+    float dx = xyr[0] - x;
+    float dy = xyr[1] - y;
+    return dx * dx + dy * dy + 1e-6 < xyr[2];
+}
+
+// Take the shared edge between two adjacent triangles and flip it such that
+// it connects the opposing vertices.
+static void par_triangle__swapedge(par_triangle__edge* edge)
+{
+    par_triangle__edge* e0 = edge,
+        *e1 = e0->next,
+        *e2 = e1->next,
+        *e3 = e0->pair,
+        *e4 = e3->next,
+        *e5 = e4->next;
+    par_triangle__face* f0 = e0->face,
+        *f1 = e3->face;
+    par_triangle__vert* v0 = e2->end,
+        *v1 = e0->end,
+        *v2 = e1->end,
+        *v3 = e4->end;
+
+    assert(v0 == e3->end);
+    assert(v1 == e5->end);
+    assert(e2->face == f0 && e5->face == f1);
+    assert(e3->end == v0 && e3->pair == e0);
+    assert(f0 && f1);
+
+    e2->face = f1;
+    e5->face = f0;
+
+    e0->next = e5;
+    e5->next = e1;
+    e1->next = e0;
+
+    e3->next = e2;
+    e2->next = e4;
+    e4->next = e3;
+
+    e3->end = v2;
+    e0->end = v3;
+
+    // if (f0->edge == e2) {
+        f0->edge = e0;
+    // }
+    // if (f1->edge == e5) {
+        f1->edge = e3;
+    // }
+    // if (v0->outgoing == e0) {
+        v0->outgoing = e4;
+    // }
+    // if (v1->outgoing == e3) {
+        v1->outgoing = e1;
+    // }
 }
 
 // This is an implementation of Anglada's AddPointCDT function.
@@ -663,11 +748,14 @@ static void par_triangle__mesh_addpt(par_triangle__mesh* mesh, float const* pt)
     assert(pa_count(mesh->stack) == 3);
     while (pa_count(mesh->stack) > 0) {
         int face = pa_pop(mesh->stack);
-        par_triangle__edge* opposed;
-        opposed = par_triangle__mesh_opposed(mesh, face, new_vertex);
-        if (opposed && !opposed->fixed &&
-            par_triangle__in_circle(opposed, x, y)) {
-            printf("HEY SWAP %d %ld\n", face, opposed - mesh->edges);
+        par_triangle__edge* oppedge;
+        oppedge = par_triangle__mesh_opposed(mesh, face, new_vertex);
+        if (oppedge && !oppedge->fixed &&
+            par_triangle__in_circle(oppedge->face, x, y)) {
+            int oppface = oppedge->face - mesh->faces;
+            par_triangle__swapedge(oppedge);
+            pa_push(mesh->stack, face);
+            pa_push(mesh->stack, oppface);
         }
     }
 }
@@ -690,9 +778,8 @@ par_triangle_mesh* par_triangle_mesh_create_cdt(par_triangle_path const* path)
     par_triangle__mesh_transform(mesh, width, height, minx, miny);
     pt = path->points;
     for (int p = 0; p < path->npoints; p++, pt += 2) {
-        par_triangle__mesh_validate(mesh);
         par_triangle__mesh_addpt(mesh, pt);
-  if (p == 1) break;
+        par_triangle__mesh_validate(mesh);
     }
     par_triangle__mesh_finalize(mesh);
     return result;
