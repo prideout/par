@@ -94,8 +94,8 @@ int main()
             par_shapes_export(m, "build/test_shapes_dodecahedron.obj");
             par_shapes_free_mesh(m);
 
-            m = par_shapes_create_octohedron();
-            par_shapes_export(m, "build/test_shapes_octohedron.obj");
+            m = par_shapes_create_octahedron();
+            par_shapes_export(m, "build/test_shapes_octahedron.obj");
             par_shapes_free_mesh(m);
 
             m = par_shapes_create_tetrahedron();

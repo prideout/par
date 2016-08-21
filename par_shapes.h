@@ -101,7 +101,7 @@ par_shapes_mesh* par_shapes_create_icosahedron();
 par_shapes_mesh* par_shapes_create_dodecahedron();
 
 // More platonic solids.
-par_shapes_mesh* par_shapes_create_octohedron();
+par_shapes_mesh* par_shapes_create_octahedron();
 par_shapes_mesh* par_shapes_create_tetrahedron();
 par_shapes_mesh* par_shapes_create_cube();
 
@@ -906,7 +906,7 @@ par_shapes_mesh* par_shapes_create_dodecahedron()
     return mesh;
 }
 
-par_shapes_mesh* par_shapes_create_octohedron()
+par_shapes_mesh* par_shapes_create_octahedron()
 {
     static float verts[6 * 3] = {
         0.000, 0.000, 1.000,
