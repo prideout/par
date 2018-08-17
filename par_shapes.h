@@ -1094,7 +1094,7 @@ static par_shapes_mesh* par_shapes__apply_turtle(par_shapes_mesh* mesh,
     return m;
 }
 
-static void par_shapes__connect(par_shapes_mesh* scene,
+void par_shapes__connect(par_shapes_mesh* scene,
     par_shapes_mesh* cylinder, int slices)
 {
     int stacks = 1;
