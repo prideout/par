@@ -1106,8 +1106,8 @@ void par_shapes__connect(par_shapes_mesh* scene,
     float* points = PAR_MALLOC(float, npoints * 3);
     memcpy(points, scene->points, sizeof(float) * scene->npoints * 3);
     float* newpts = points + scene->npoints * 3;
-    memcpy(newpts, cylinder->points + (slices + 1) * 3,
-        sizeof(float) * (slices + 1) * 3);
+    //memcpy(newpts, cylinder->points + (slices + 1) * 3,sizeof(float) * (slices + 1) * 3);
+    memcpy(newpts, cylinder->points ,sizeof(float) * (slices + 1) * 3);
     PAR_FREE(scene->points);
     scene->points = points;
 
