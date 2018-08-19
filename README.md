@@ -32,11 +32,10 @@ $ cmake --build build  # Invoke the build
 
 The tests are executed by simply running the programs:
 ```bash
-$ cd build
-$ ./test_msquares
-$ ./test_bluenoise
-$ ./test_bubbles
-$ ./test_shapes
+$ build/test_msquares
+$ build/test_bluenoise
+$ build/test_bubbles
+$ build/test_shapes
 ```
 
 ## code formatting
