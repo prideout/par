@@ -6,7 +6,7 @@ from collections import defaultdict
 filename = 'msquares_color.png'
 
 if not os.path.exists(filename):
-    baseurl = 'http://github.prideout.net/assets/'
+    baseurl = 'https://prideout.net/assets/'
     url = baseurl + filename
     r = requests.get(url, stream=True)
     with open(filename, 'wb') as fd:
