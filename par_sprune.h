@@ -3,7 +3,7 @@
 //
 // For an emscripten demo of this library, take a look at the following link.
 //
-//     http://github.prideout.net/d3cpp/
+//     https://prideout.net/d3cpp
 //
 // The axis-aligned bounding boxes are specified by (minx, miny, maxx, maxy).
 // Simple usage example:
