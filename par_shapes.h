@@ -22,7 +22,7 @@
 // look elsewhere.
 //
 // The MIT License
-// Copyright (c) 2015 Philip Rideout
+// Copyright (c) 2019 Philip Rideout
 
 #ifndef PAR_SHAPES_H
 #define PAR_SHAPES_H
@@ -66,6 +66,10 @@ void par_shapes_free_mesh(par_shapes_mesh*);
 // slices, and "stacks" like a number of stacked rings.  Height and radius are
 // both 1.0, but they can easily be changed with par_shapes_scale.
 par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks);
+
+// Cone is similar to cylinder but the radius diminishes to zero as Z increases.
+// Again, height and radius are 1.0, but can be changed with par_shapes_scale.
+par_shapes_mesh* par_shapes_create_cone(int slices, int stacks);
 
 // Create a donut that sits on the Z=0 plane with the specified inner radius.
 // The outer radius can be controlled with par_shapes_scale.
@@ -206,6 +210,7 @@ static void par_shapes__hemisphere(float const* uv, float* xyz, void*);
 static void par_shapes__plane(float const* uv, float* xyz, void*);
 static void par_shapes__klein(float const* uv, float* xyz, void*);
 static void par_shapes__cylinder(float const* uv, float* xyz, void*);
+static void par_shapes__cone(float const* uv, float* xyz, void*);
 static void par_shapes__torus(float const* uv, float* xyz, void*);
 static void par_shapes__trefoil(float const* uv, float* xyz, void*);
 
@@ -318,6 +323,15 @@ par_shapes_mesh* par_shapes_create_cylinder(int slices, int stacks)
         return 0;
     }
     return par_shapes_create_parametric(par_shapes__cylinder, slices,
+        stacks, 0);
+}
+
+par_shapes_mesh* par_shapes_create_cone(int slices, int stacks)
+{
+    if (slices < 3 || stacks < 1) {
+        return 0;
+    }
+    return par_shapes_create_parametric(par_shapes__cone, slices,
         stacks, 0);
 }
 
@@ -572,6 +586,15 @@ static void par_shapes__cylinder(float const* uv, float* xyz, void* userdata)
     float theta = uv[1] * 2 * PAR_PI;
     xyz[0] = sinf(theta);
     xyz[1] = cosf(theta);
+    xyz[2] = uv[0];
+}
+
+static void par_shapes__cone(float const* uv, float* xyz, void* userdata)
+{
+    float r = 1.0f - uv[0];
+    float theta = uv[1] * 2 * PAR_PI;
+    xyz[0] = r * sinf(theta);
+    xyz[1] = r * cosf(theta);
     xyz[2] = uv[0];
 }
 
