@@ -14,6 +14,7 @@ library    | description  | link
 **par_easycurl.h** | simple HTTP requests using libcurl |
 **par_filecache.h** | LRU caching on your device's filesystem |
 **par_easings.h** | Robert Penner's easing functions |
+**par_streamlines.h** | triangulate wide lines and curves | WIP <!-- [web demo and documenation](https://prideout.net/blog/par_streamlines/) -->
 
 ## tests
 

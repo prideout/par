@@ -763,15 +763,15 @@ void par_shapes_rotate(par_shapes_mesh* mesh, float radians, float const* axis)
         p[1] = y;
         p[2] = z;
     }
-    p = mesh->normals;
-    if (p) {
-        for (int i = 0; i < mesh->npoints; i++, p += 3) {
-            float x = col0[0] * p[0] + col1[0] * p[1] + col2[0] * p[2];
-            float y = col0[1] * p[0] + col1[1] * p[1] + col2[1] * p[2];
-            float z = col0[2] * p[0] + col1[2] * p[1] + col2[2] * p[2];
-            p[0] = x;
-            p[1] = y;
-            p[2] = z;
+    float* n = mesh->normals;
+    if (n) {
+        for (int i = 0; i < mesh->npoints; i++, n += 3) {
+            float x = col0[0] * n[0] + col1[0] * n[1] + col2[0] * n[2];
+            float y = col0[1] * n[0] + col1[1] * n[1] + col2[1] * n[2];
+            float z = col0[2] * n[0] + col1[2] * n[1] + col2[2] * n[2];
+            n[0] = x;
+            n[1] = y;
+            n[2] = z;
         }
     }
 }
@@ -783,6 +783,18 @@ void par_shapes_scale(par_shapes_mesh* m, float x, float y, float z)
         *points++ *= x;
         *points++ *= y;
         *points++ *= z;
+    }
+    float* n = m->normals;
+    if (n && (x != y || x != z || y != z)) {
+        x = 1.0f / x;
+        y = 1.0f / y;
+        z = 1.0f / z;
+        for (int i = 0; i < m->npoints; i++, n += 3) {
+            n[0] *= x;
+            n[1] *= y;
+            n[2] *= z;
+            par_shapes__normalize3(n);
+        }
     }
 }
 
