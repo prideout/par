@@ -139,7 +139,7 @@ par_streamlines_mesh* par_streamlines_draw_streamlines(
 #define pa___needgrow(a, n) ((a) == 0 || pa___n(a) + (n) >= pa___m(a))
 #define pa___maybegrow(a, n) (pa___needgrow(a, (n)) ? pa___grow(a, n) : 0)
 #define pa___grow(a, n) (*((void**)& (a)) = pa___growf((void*) (a), (n), \
-        sizeof(*(a))))
+    sizeof(*(a))))
 
 static void* pa___growf(void* arr, int increment, int itemsize)
 {
@@ -348,7 +348,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
     assert(dst_annotations - mesh->vertex_annotations == mesh->num_vertices);
     assert(dst_positions - mesh->vertex_positions == mesh->num_vertices);
     assert(dst_indices - mesh->triangle_indices ==
-            mesh->num_triangles * ind_per_tri);
+        mesh->num_triangles * ind_per_tri);
 
     return mesh;
 }
