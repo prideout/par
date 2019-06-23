@@ -39,7 +39,20 @@ typedef struct {
     float y;
 } par_streamlines_position;
 
-// TODO: change this to u v direction_x direction_y
+typedef struct {
+    float u_along_curve;   // normalized distance along the curve
+    float v_across_curve;  // either + or - depending on the side
+    float spine_to_edge_x; // normalized vector from spine to edge
+    float spine_to_edge_y; // normalized vector from spine to edge
+} par_streamlines_annotationv2;
+
+typedef enum {
+    PAR_U_MODE_NORMALIZED_DISTANCE, // this is the default
+    PAR_U_MODE_DISTANCE,            // non-normalized distance along the curve
+    PAR_U_MODE_SEGMENT_INDEX,       // starts at zero for each curve, counts up
+    PAR_U_MODE_SEGMENT_FRACTION,    // 0.0, 1.0 / COUNT, 2.0 / COUNT, etc...
+} par_streamlines_u_mode;
+
 typedef struct {
     float distance_along_spine;       // non-normalized distance along the curve
     float spine_length;               // the length of the entire curve
@@ -188,7 +201,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
     typedef par_streamlines_annotation Annotation;
 
     par_streamlines_mesh* mesh = &context->result;
-    const float extent = context->config.thickness / 2.0f;
+    const float thickness = context->config.thickness;
     const bool closed = spines.closed;
     const bool wireframe = context->config.wireframe;
     const uint32_t ind_per_tri = wireframe ? 4 : 3;
@@ -229,30 +242,38 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         const float nx = -dy / segment_length;
         const float ny = dx / segment_length;
 
-        float pnx = nx;
-        float pny = ny;
-
         const Position first_src_position = src_position[0];
         const Position last_src_position = src_position[spine_length - 1];
+
+        float ex = nx * thickness / 2;
+        float ey = ny * thickness / 2;
 
         if (closed) {
             const float dx = src_position[0].x - last_src_position.x;
             const float dy = src_position[0].y - last_src_position.y;
             const float segment_length = sqrtf(dx * dx + dy * dy);
-            const float nx = -dy / segment_length;
-            const float ny = dx / segment_length;
+            const float pnx = -dy / segment_length;
+            const float pny = dx / segment_length;
 
-            pnx += nx;
-            pny += ny;
-            const float invlen = 1.0f / sqrtf(pnx * pnx + pny * pny);
-            pnx *= invlen;
-            pny *= invlen;
+            // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
+            const float phi = acos(pnx * nx + pny * ny) / 2;
+            const float theta = M_PI / 2 - phi;
+            const float extent = 0.5 * thickness / sin(theta);
+
+            ex = pnx + nx;
+            ey = pny + ny;
+            const float invlen = 1.0f / sqrtf(ex * ex + ey * ey);
+            ex *= invlen * extent;
+            ey *= invlen * extent;
         }
 
-        dst_positions[0].x = src_position[0].x + pnx * extent;
-        dst_positions[0].y = src_position[0].y + pny * extent;
-        dst_positions[1].x = src_position[0].x - pnx * extent;
-        dst_positions[1].y = src_position[0].y - pny * extent;
+        dst_positions[0].x = src_position[0].x + ex;
+        dst_positions[0].y = src_position[0].y + ey;
+        dst_positions[1].x = src_position[0].x - ex;
+        dst_positions[1].y = src_position[0].y - ey;
+
+        float pnx = nx;
+        float pny = ny;
 
         const Position first_dst_positions[2] = {
             dst_positions[0],
@@ -263,11 +284,11 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         dst_positions += 2;
 
         dst_annotations[0].distance_along_spine = 0;
-        dst_annotations[0].signed_distance_from_spine = extent;
+        dst_annotations[0].signed_distance_from_spine = 1;
         dst_annotations[0].spine_index = (uint16_t) spine;
         dst_annotations[0].segment_index = 0;
         dst_annotations[1] = dst_annotations[0];
-        dst_annotations[1].signed_distance_from_spine = -extent;
+        dst_annotations[1].signed_distance_from_spine = -1;
         dst_annotations += 2;
 
         float distance_along_spine = segment_length;
@@ -281,25 +302,33 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             const float nx = -dy / segment_length;
             const float ny = dx / segment_length;
 
-            pnx += nx;
-            pny += ny;
-            const float invlen = 1.0f / sqrtf(pnx * pnx + pny * pny);
-            pnx *= invlen;
-            pny *= invlen;
+            // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
+            const float phi = acos(pnx * nx + pny * ny) / 2;
+            const float theta = M_PI / 2 - phi;
+            const float extent = 0.5 * thickness / sin(theta);
 
-            dst_positions[0].x = src_position[0].x + pnx * extent;
-            dst_positions[0].y = src_position[0].y + pny * extent;
-            dst_positions[1].x = src_position[0].x - pnx * extent;
-            dst_positions[1].y = src_position[0].y - pny * extent;
+            float ex = pnx + nx;
+            float ey = pny + ny;
+            const float invlen = 1.0f / sqrtf(ex * ex + ey * ey);
+            ex *= invlen * extent;
+            ey *= invlen * extent;
+
+            dst_positions[0].x = src_position[0].x + ex;
+            dst_positions[0].y = src_position[0].y + ey;
+            dst_positions[1].x = src_position[0].x - ex;
+            dst_positions[1].y = src_position[0].y - ey;
             src_position++;
             dst_positions += 2;
 
+            pnx = nx;
+            pny = ny;
+
             dst_annotations[0].distance_along_spine = distance_along_spine;
-            dst_annotations[0].signed_distance_from_spine = extent;
+            dst_annotations[0].signed_distance_from_spine = 1;
             dst_annotations[0].spine_index = (uint16_t) spine;
             dst_annotations[0].segment_index = segment_index;
             dst_annotations[1] = dst_annotations[0];
-            dst_annotations[1].signed_distance_from_spine = -extent;
+            dst_annotations[1].signed_distance_from_spine = -1;
             dst_annotations += 2;
             distance_along_spine += segment_length;
 
@@ -326,6 +355,9 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             }
         }
 
+        ex = pnx * thickness / 2;
+        ey = pny * thickness / 2;
+
         if (closed) {
             const float dx = first_src_position.x - src_position[0].x;
             const float dy = first_src_position.y - src_position[0].y;
@@ -333,26 +365,34 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             const float nx = -dy / segment_length;
             const float ny = dx / segment_length;
 
-            pnx += nx;
-            pny += ny;
-            const float invlen = 1.0f / sqrtf(pnx * pnx + pny * pny);
-            pnx *= invlen;
-            pny *= invlen;
+            // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
+            const float phi = acos(pnx * nx + pny * ny) / 2;
+            const float theta = M_PI / 2 - phi;
+            const float extent = 0.5 * thickness / sin(theta);
+
+            ex = pnx + nx;
+            ey = pny + ny;
+            const float invlen = 1.0f / sqrtf(ex * ex + ey * ey);
+            ex *= invlen * extent;
+            ey *= invlen * extent;
         }
 
-        dst_positions[0].x = src_position[0].x + pnx * extent;
-        dst_positions[0].y = src_position[0].y + pny * extent;
-        dst_positions[1].x = src_position[0].x - pnx * extent;
-        dst_positions[1].y = src_position[0].y - pny * extent;
+        dst_positions[0].x = src_position[0].x + ex;
+        dst_positions[0].y = src_position[0].y + ey;
+        dst_positions[1].x = src_position[0].x - ex;
+        dst_positions[1].y = src_position[0].y - ey;
         src_position++;
         dst_positions += 2;
 
+        pnx = nx;
+        pny = ny;
+
         dst_annotations[0].distance_along_spine = distance_along_spine;
-        dst_annotations[0].signed_distance_from_spine = extent;
+        dst_annotations[0].signed_distance_from_spine = 1;
         dst_annotations[0].spine_index = (uint16_t) spine;
         dst_annotations[0].segment_index = segment_index;
         dst_annotations[1] = dst_annotations[0];
-        dst_annotations[1].signed_distance_from_spine = -extent;
+        dst_annotations[1].signed_distance_from_spine = -1;
         dst_annotations += 2;
         distance_along_spine += segment_length;
 
@@ -386,11 +426,11 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             dst_positions += 2;
 
             dst_annotations[0].distance_along_spine = distance_along_spine;
-            dst_annotations[0].signed_distance_from_spine = extent;
+            dst_annotations[0].signed_distance_from_spine = 1;
             dst_annotations[0].spine_index = (uint16_t) spine;
             dst_annotations[0].segment_index = segment_index;
             dst_annotations[1] = dst_annotations[0];
-            dst_annotations[1].signed_distance_from_spine = -extent;
+            dst_annotations[1].signed_distance_from_spine = -1;
             dst_annotations += 2;
             distance_along_spine += segment_length;
 
