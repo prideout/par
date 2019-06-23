@@ -363,7 +363,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         if (closed) {
             const float dx = first_src_position.x - src_position[0].x;
             const float dy = first_src_position.y - src_position[0].y;
-            const float segment_length = sqrtf(dx * dx + dy * dy);
+            segment_length = sqrtf(dx * dx + dy * dy);
             const float nx = -dy / segment_length;
             const float ny = dx / segment_length;
 
@@ -423,6 +423,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
 
         if (closed) {
             segment_index++;
+            distance_along_spine += segment_length;
 
             dst_positions[0] = first_dst_positions[0];
             dst_positions[1] = first_dst_positions[1];
@@ -437,7 +438,6 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             dst_annotations[0].spine_to_edge_y = ey;
             dst_annotations[1].spine_to_edge_y = -ey;
             dst_annotations += 2;
-            distance_along_spine += segment_length;
 
             if (wireframe) {
                 dst_indices[0] = base_index + (segment_index - 1) * 2;
