@@ -39,13 +39,6 @@ typedef struct {
     float y;
 } par_streamlines_position;
 
-typedef struct {
-    float u_along_curve;   // normalized distance along the curve
-    float v_across_curve;  // either + or - depending on the side
-    float spine_to_edge_x; // normalized vector from spine to edge
-    float spine_to_edge_y; // normalized vector from spine to edge
-} par_streamlines_annotationv2;
-
 typedef enum {
     PAR_U_MODE_NORMALIZED_DISTANCE, // this is the default
     PAR_U_MODE_DISTANCE,            // non-normalized distance along the curve
@@ -54,11 +47,10 @@ typedef enum {
 } par_streamlines_u_mode;
 
 typedef struct {
-    float distance_along_spine;       // non-normalized distance along the curve
-    float spine_length;               // the length of the entire curve
-    float signed_distance_from_spine; // either + or - depending on the side
-    uint16_t spine_index;             // tells which curve this vertex lives in
-    uint16_t segment_index;           // note that this might be interpolated
+    float u_along_curve;   // normalized distance along the curve
+    float v_across_curve;  // either + or - depending on the side
+    float spine_to_edge_x; // normalized vector from spine to edge
+    float spine_to_edge_y; // normalized vector from spine to edge
 } par_streamlines_annotation;
 
 typedef struct {
@@ -283,12 +275,14 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         src_position++;
         dst_positions += 2;
 
-        dst_annotations[0].distance_along_spine = 0;
-        dst_annotations[0].signed_distance_from_spine = 1;
-        dst_annotations[0].spine_index = (uint16_t) spine;
-        dst_annotations[0].segment_index = 0;
-        dst_annotations[1] = dst_annotations[0];
-        dst_annotations[1].signed_distance_from_spine = -1;
+        dst_annotations[0].u_along_curve = 0;
+        dst_annotations[1].u_along_curve = 0;
+        dst_annotations[0].v_across_curve = 1;
+        dst_annotations[1].v_across_curve = -1;
+        dst_annotations[0].spine_to_edge_x = ex;
+        dst_annotations[1].spine_to_edge_x = -ex;
+        dst_annotations[0].spine_to_edge_y = ey;
+        dst_annotations[1].spine_to_edge_y = -ey;
         dst_annotations += 2;
 
         float distance_along_spine = segment_length;
@@ -323,12 +317,14 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             pnx = nx;
             pny = ny;
 
-            dst_annotations[0].distance_along_spine = distance_along_spine;
-            dst_annotations[0].signed_distance_from_spine = 1;
-            dst_annotations[0].spine_index = (uint16_t) spine;
-            dst_annotations[0].segment_index = segment_index;
-            dst_annotations[1] = dst_annotations[0];
-            dst_annotations[1].signed_distance_from_spine = -1;
+            dst_annotations[0].u_along_curve = distance_along_spine;
+            dst_annotations[1].u_along_curve = distance_along_spine;
+            dst_annotations[0].v_across_curve = 1;
+            dst_annotations[1].v_across_curve = -1;
+            dst_annotations[0].spine_to_edge_x = ex;
+            dst_annotations[1].spine_to_edge_x = -ex;
+            dst_annotations[0].spine_to_edge_y = ey;
+            dst_annotations[1].spine_to_edge_y = -ey;
             dst_annotations += 2;
             distance_along_spine += segment_length;
 
@@ -387,12 +383,14 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         pnx = nx;
         pny = ny;
 
-        dst_annotations[0].distance_along_spine = distance_along_spine;
-        dst_annotations[0].signed_distance_from_spine = 1;
-        dst_annotations[0].spine_index = (uint16_t) spine;
-        dst_annotations[0].segment_index = segment_index;
-        dst_annotations[1] = dst_annotations[0];
-        dst_annotations[1].signed_distance_from_spine = -1;
+        dst_annotations[0].u_along_curve = distance_along_spine;
+        dst_annotations[1].u_along_curve = distance_along_spine;
+        dst_annotations[0].v_across_curve = 1;
+        dst_annotations[1].v_across_curve = -1;
+        dst_annotations[0].spine_to_edge_x = ex;
+        dst_annotations[1].spine_to_edge_x = -ex;
+        dst_annotations[0].spine_to_edge_y = ey;
+        dst_annotations[1].spine_to_edge_y = -ey;
         dst_annotations += 2;
         distance_along_spine += segment_length;
 
@@ -425,12 +423,14 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             dst_positions[1] = first_dst_positions[1];
             dst_positions += 2;
 
-            dst_annotations[0].distance_along_spine = distance_along_spine;
-            dst_annotations[0].signed_distance_from_spine = 1;
-            dst_annotations[0].spine_index = (uint16_t) spine;
-            dst_annotations[0].segment_index = segment_index;
-            dst_annotations[1] = dst_annotations[0];
-            dst_annotations[1].signed_distance_from_spine = -1;
+            dst_annotations[0].u_along_curve = distance_along_spine;
+            dst_annotations[1].u_along_curve = distance_along_spine;
+            dst_annotations[0].v_across_curve = 1;
+            dst_annotations[1].v_across_curve = -1;
+            dst_annotations[0].spine_to_edge_x = ex;
+            dst_annotations[1].spine_to_edge_x = -ex;
+            dst_annotations[0].spine_to_edge_y = ey;
+            dst_annotations[1].spine_to_edge_y = -ey;
             dst_annotations += 2;
             distance_along_spine += segment_length;
 
@@ -456,19 +456,26 @@ par_streamlines_mesh* par_streamlines_draw_lines(
                 dst_indices += 6;
             }
 
-            dst_annotations -= 2 + spine_length * 2;
-            for (uint16_t i = 0; i < spine_length + 1; i++) {
-                dst_annotations[0].spine_length = distance_along_spine;
-                dst_annotations[1].spine_length = distance_along_spine;
-                dst_annotations += 2;
+            if (true) {
+                dst_annotations -= 2 + spine_length * 2;
+                const float invlength = 1.0f / distance_along_spine;
+                for (uint16_t i = 0; i < spine_length + 1; i++) {
+                    dst_annotations[0].u_along_curve *= invlength;
+                    dst_annotations[1].u_along_curve *= invlength;
+                    dst_annotations += 2;
+                }
             }
+
             base_index += 2 + spine_length * 2;
         } else {
-            dst_annotations -= spine_length * 2;
-            for (uint16_t i = 0; i < spine_length; i++) {
-                dst_annotations[0].spine_length = distance_along_spine;
-                dst_annotations[1].spine_length = distance_along_spine;
-                dst_annotations += 2;
+            if (true) {
+                dst_annotations -= spine_length * 2;
+                const float invlength = 1.0f / distance_along_spine;
+                for (uint16_t i = 0; i < spine_length; i++) {
+                    dst_annotations[0].u_along_curve *= invlength;
+                    dst_annotations[1].u_along_curve *= invlength;
+                    dst_annotations += 2;
+                }
             }
             base_index += spine_length * 2;
         }
