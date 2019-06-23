@@ -39,6 +39,7 @@ typedef struct {
     float y;
 } par_streamlines_position;
 
+// TODO: change this to u v direction_x direction_y
 typedef struct {
     float distance_along_spine;       // non-normalized distance along the curve
     float spine_length;               // the length of the entire curve
@@ -188,6 +189,9 @@ par_streamlines_mesh* par_streamlines_draw_lines(
 
     par_streamlines_mesh* mesh = &context->result;
     const float extent = context->config.thickness / 2.0f;
+    const bool closed = spines.closed;
+    const bool wireframe = context->config.wireframe;
+    const uint32_t ind_per_tri = wireframe ? 4 : 3;
 
     mesh->num_vertices = 0;
     mesh->num_triangles = 0;
@@ -196,13 +200,15 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         assert(spines.spine_lengths[spine] > 1);
         mesh->num_vertices += 2 * spines.spine_lengths[spine];
         mesh->num_triangles += 2 * (spines.spine_lengths[spine] - 1);
+        if (closed) {
+            mesh->num_vertices += 2;
+            mesh->num_triangles += 2;
+        }
     }
 
     pa_clear(mesh->vertex_annotations);
     pa_clear(mesh->vertex_positions);
     pa_clear(mesh->triangle_indices);
-
-    const uint32_t ind_per_tri = context->config.wireframe ? 4 : 3;
 
     pa_add(mesh->vertex_annotations, mesh->num_vertices);
     pa_add(mesh->vertex_positions, mesh->num_vertices);
@@ -223,10 +229,36 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         const float nx = -dy / segment_length;
         const float ny = dx / segment_length;
 
-        dst_positions[0].x = src_position[0].x + nx * extent;
-        dst_positions[0].y = src_position[0].y + ny * extent;
-        dst_positions[1].x = src_position[0].x - nx * extent;
-        dst_positions[1].y = src_position[0].y - ny * extent;
+        float pnx = nx;
+        float pny = ny;
+
+        const Position first_src_position = src_position[0];
+        const Position last_src_position = src_position[spine_length - 1];
+
+        if (closed) {
+            const float dx = src_position[0].x - last_src_position.x;
+            const float dy = src_position[0].y - last_src_position.y;
+            const float segment_length = sqrtf(dx * dx + dy * dy);
+            const float nx = -dy / segment_length;
+            const float ny = dx / segment_length;
+
+            pnx += nx;
+            pny += ny;
+            const float invlen = 1.0f / sqrtf(pnx * pnx + pny * pny);
+            pnx *= invlen;
+            pny *= invlen;
+        }
+
+        dst_positions[0].x = src_position[0].x + pnx * extent;
+        dst_positions[0].y = src_position[0].y + pny * extent;
+        dst_positions[1].x = src_position[0].x - pnx * extent;
+        dst_positions[1].y = src_position[0].y - pny * extent;
+
+        const Position first_dst_positions[2] = {
+            dst_positions[0],
+            dst_positions[1]
+        };
+
         src_position++;
         dst_positions += 2;
 
@@ -238,8 +270,6 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         dst_annotations[1].signed_distance_from_spine = -extent;
         dst_annotations += 2;
 
-        float pnx = nx;
-        float pny = ny;
         float distance_along_spine = segment_length;
 
         uint16_t segment_index = 1;
@@ -273,7 +303,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             dst_annotations += 2;
             distance_along_spine += segment_length;
 
-            if (context->config.wireframe) {
+            if (wireframe) {
                 dst_indices[0] = base_index + (segment_index - 1) * 2;
                 dst_indices[1] = base_index + (segment_index - 1) * 2 + 1;
                 dst_indices[2] = base_index + (segment_index - 0) * 2;
@@ -296,6 +326,20 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             }
         }
 
+        if (closed) {
+            const float dx = first_src_position.x - src_position[0].x;
+            const float dy = first_src_position.y - src_position[0].y;
+            const float segment_length = sqrtf(dx * dx + dy * dy);
+            const float nx = -dy / segment_length;
+            const float ny = dx / segment_length;
+
+            pnx += nx;
+            pny += ny;
+            const float invlen = 1.0f / sqrtf(pnx * pnx + pny * pny);
+            pnx *= invlen;
+            pny *= invlen;
+        }
+
         dst_positions[0].x = src_position[0].x + pnx * extent;
         dst_positions[0].y = src_position[0].y + pny * extent;
         dst_positions[1].x = src_position[0].x - pnx * extent;
@@ -312,7 +356,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
         dst_annotations += 2;
         distance_along_spine += segment_length;
 
-        if (context->config.wireframe) {
+        if (wireframe) {
             dst_indices[0] = base_index + (segment_index - 1) * 2;
             dst_indices[1] = base_index + (segment_index - 1) * 2 + 1;
             dst_indices[2] = base_index + (segment_index - 0) * 2;
@@ -334,14 +378,60 @@ par_streamlines_mesh* par_streamlines_draw_lines(
             dst_indices += 6;
         }
 
-        dst_annotations -= spine_length * 2;
-        for (uint16_t i = 0; i < spine_length; i++) {
-            dst_annotations[0].spine_length = distance_along_spine;
-            dst_annotations[1].spine_length = distance_along_spine;
-            dst_annotations += 2;
-        }
+        if (closed) {
+            segment_index++;
 
-        base_index += spine_length * 2;
+            dst_positions[0] = first_dst_positions[0];
+            dst_positions[1] = first_dst_positions[1];
+            dst_positions += 2;
+
+            dst_annotations[0].distance_along_spine = distance_along_spine;
+            dst_annotations[0].signed_distance_from_spine = extent;
+            dst_annotations[0].spine_index = (uint16_t) spine;
+            dst_annotations[0].segment_index = segment_index;
+            dst_annotations[1] = dst_annotations[0];
+            dst_annotations[1].signed_distance_from_spine = -extent;
+            dst_annotations += 2;
+            distance_along_spine += segment_length;
+
+            if (wireframe) {
+                dst_indices[0] = base_index + (segment_index - 1) * 2;
+                dst_indices[1] = base_index + (segment_index - 1) * 2 + 1;
+                dst_indices[2] = base_index + (segment_index - 0) * 2;
+                dst_indices[3] = base_index + (segment_index - 1) * 2;
+
+                dst_indices[4] = base_index + (segment_index - 0) * 2;
+                dst_indices[5] = base_index + (segment_index - 1) * 2 + 1;
+                dst_indices[6] = base_index + (segment_index - 0) * 2 + 1;
+                dst_indices[7] = base_index + (segment_index - 0) * 2;
+                dst_indices += 8;
+            } else {
+                dst_indices[0] = base_index + (segment_index - 1) * 2;
+                dst_indices[1] = base_index + (segment_index - 1) * 2 + 1;
+                dst_indices[2] = base_index + (segment_index - 0) * 2;
+
+                dst_indices[3] = base_index + (segment_index - 0) * 2;
+                dst_indices[4] = base_index + (segment_index - 1) * 2 + 1;
+                dst_indices[5] = base_index + (segment_index - 0) * 2 + 1;
+                dst_indices += 6;
+            }
+
+            dst_annotations -= 2 + spine_length * 2;
+            for (uint16_t i = 0; i < spine_length + 1; i++) {
+                dst_annotations[0].spine_length = distance_along_spine;
+                dst_annotations[1].spine_length = distance_along_spine;
+                dst_annotations += 2;
+            }
+            base_index += 2 + spine_length * 2;
+        } else {
+            dst_annotations -= spine_length * 2;
+            for (uint16_t i = 0; i < spine_length; i++) {
+                dst_annotations[0].spine_length = distance_along_spine;
+                dst_annotations[1].spine_length = distance_along_spine;
+                dst_annotations += 2;
+            }
+            base_index += spine_length * 2;
+        }
     }
 
     assert(src_position - spines.vertices == spines.num_vertices);
