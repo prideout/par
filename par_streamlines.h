@@ -140,7 +140,7 @@ par_streamlines_mesh* par_streamlines_draw_streamlines(
 #define pa___needgrow(a, n) ((a) == 0 || pa___n(a) + (n) >= pa___m(a))
 #define pa___maybegrow(a, n) (pa___needgrow(a, (n)) ? pa___grow(a, n) : 0)
 #define pa___grow(a, n) (*((void**)& (a)) = pa___growf((void*) (a), (n), \
-    sizeof(*(a))))
+        sizeof(*(a))))
 
 static void* pa___growf(void* arr, int increment, int itemsize)
 {
