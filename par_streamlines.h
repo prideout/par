@@ -255,7 +255,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             const float phi = acos(pnx * nx + pny * ny) / 2;
-            const float theta = M_PI / 2 - phi;
+            const float theta = PAR_PI / 2 - phi;
             const float extent = 0.5 * thickness / sin(theta);
 
             ex = pnx + nx;
@@ -304,7 +304,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             const float phi = acos(pnx * nx + pny * ny) / 2;
-            const float theta = M_PI / 2 - phi;
+            const float theta = PAR_PI / 2 - phi;
             const float extent = 0.5 * thickness / sin(theta);
 
             float ex = pnx + nx;
@@ -369,7 +369,7 @@ par_streamlines_mesh* par_streamlines_draw_lines(
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             const float phi = acos(pnx * nx + pny * ny) / 2;
-            const float theta = M_PI / 2 - phi;
+            const float theta = PAR_PI / 2 - phi;
             const float extent = 0.5 * thickness / sin(theta);
 
             ex = pnx + nx;
