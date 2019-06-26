@@ -57,7 +57,7 @@ static int _ready = 0;
 void par_easycurl_init(unsigned int flags)
 {
     if (!_ready) {
-        curl_global_init(CURL_GLOBAL_SSL);
+        curl_global_init(CURL_GLOBAL_DEFAULT);
         _ready = 1;
     }
 }
