@@ -39,11 +39,18 @@ int par_easycurl_to_file(char const* srcurl, char const* dstpath);
 // -----------------------------------------------------------------------------
 
 #ifdef PAR_EASYCURL_IMPLEMENTATION
-#include <strings.h>
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <curl/curl.h>
+
+#ifdef _MSC_VER
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#else
+#include <strings.h>
+#endif
 
 static int _ready = 0;
 
