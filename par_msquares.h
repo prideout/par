@@ -8,6 +8,9 @@
 //
 //     https://prideout.net/marching-squares
 //
+// Another interesting project for converting bitmaps into vectors can be found
+// at https://github.com/BlockoS/blob.
+//
 // Distributed under the MIT License, see bottom of file.
 
 #ifndef PAR_MSQUARES_H
