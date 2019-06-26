@@ -7,17 +7,15 @@
 //   #define PAR_STREAMLINES_IMPLEMENTATION
 //   #include "par_streamlines.h"
 //
-//   parsl_config cfg = { .thickness = 3 };
-//   parsl_context* ctx = parsl_create_context(cfg);
+//   parsl_context* ctx = parsl_create_context({ .thickness = 3 });
 //   parsl_position vertices[] = { {0, 0}, {2, 1}, {4, 0} };
 //   uint16_t spine_lengths[] = { 3 };
-//   parsl_spine_list spines = {
+//   parsl_mesh* mesh = parsl_mesh_from_lines(ctx, {
 //       .num_vertices = sizeof(vertices) / sizeof(parsl_position),
 //       .num_spines = sizeof(spine_lengths) / sizeof(uint16_t),
 //       .vertices = vertices,
 //       .spine_lengths = spine_lengths
-//   };
-//   parsl_mesh* mesh = parsl_mesh_from_lines(ctx, spines);
+//   });
 //   ...
 //   parsl_destroy_context(ctx);
 //
@@ -60,10 +58,11 @@ typedef struct {
 typedef struct {
     uint32_t num_vertices;
     uint32_t num_triangles;
-    parsl_position* vertex_positions;
-    parsl_annotation* vertex_annotations;
-    float* vertex_lengths;
     uint32_t* triangle_indices;
+    parsl_position* positions;
+    parsl_annotation* annotations;
+    float* spine_lengths;
+    float* random_offsets;
 } parsl_mesh;
 
 // Viewport for streamline seed placement.
@@ -74,6 +73,11 @@ typedef struct {
     float bottom;
 } parsl_viewport;
 
+#define PARSL_FLAG_WIREFRAME      (1 << 0) // enables 4 indices per triangle
+#define PARSL_FLAG_ANNOTATIONS    (1 << 1) // populates mesh.annotations
+#define PARSL_FLAG_SPINE_LENGTHS  (1 << 2) // populates mesh.lengths
+#define PARSL_FLAG_RANDOM_OFFSETS (1 << 3) // populates mesh.random_offsets
+
 // Immutable configuration for a streamlines context.
 typedef struct {
     float thickness;
@@ -81,7 +85,7 @@ typedef struct {
     float streamlines_seed_spacing;
     parsl_viewport streamlines_seed_viewport;
     uint32_t streamlines_num_frames;
-    bool wireframe; // creates 4 indices per triangle instead of 3
+    uint32_t flags;
     parsl_u_mode u_mode;
 } parsl_config;
 
@@ -218,9 +222,11 @@ parsl_context* parsl_create_context(
 
 void parsl_destroy_context(parsl_context* context)
 {
-    pa_free(context->result.vertex_lengths);
-    pa_free(context->result.vertex_annotations);
-    pa_free(context->result.vertex_positions);
+    pa_free(context->result.triangle_indices);
+    pa_free(context->result.spine_lengths);
+    pa_free(context->result.annotations);
+    pa_free(context->result.positions);
+    pa_free(context->result.random_offsets);
     PAR_FREE(context);
 }
 
@@ -233,7 +239,9 @@ parsl_mesh* parsl_mesh_from_lines(
     parsl_mesh* mesh = &context->result;
     const float thickness = context->config.thickness;
     const bool closed = spines.closed;
-    const bool wireframe = context->config.wireframe;
+    const bool wireframe = context->config.flags & PARSL_FLAG_WIREFRAME;
+    const bool has_annotations = context->config.flags & PARSL_FLAG_ANNOTATIONS;
+    const bool has_lengths = context->config.flags & PARSL_FLAG_SPINE_LENGTHS;
     const uint32_t ind_per_tri = wireframe ? 4 : 3;
 
     mesh->num_vertices = 0;
@@ -249,19 +257,24 @@ parsl_mesh* parsl_mesh_from_lines(
         }
     }
 
-    pa_clear(mesh->vertex_lengths);
-    pa_clear(mesh->vertex_annotations);
-    pa_clear(mesh->vertex_positions);
+    pa_clear(mesh->spine_lengths);
+    pa_clear(mesh->annotations);
+    pa_clear(mesh->positions);
     pa_clear(mesh->triangle_indices);
 
-    pa_add(mesh->vertex_lengths, mesh->num_vertices);
-    pa_add(mesh->vertex_annotations, mesh->num_vertices);
-    pa_add(mesh->vertex_positions, mesh->num_vertices);
+    if (has_lengths) {
+        pa_add(mesh->spine_lengths, mesh->num_vertices);
+    }
+    if (has_annotations) {
+        pa_add(mesh->annotations, mesh->num_vertices);
+    }
+
+    pa_add(mesh->positions, mesh->num_vertices);
     pa_add(mesh->triangle_indices, ind_per_tri * mesh->num_triangles);
 
-    float* dst_lengths = mesh->vertex_lengths;
-    Annotation* dst_annotations = mesh->vertex_annotations;
-    Position* dst_positions = mesh->vertex_positions;
+    float* dst_lengths = mesh->spine_lengths;
+    Annotation* dst_annotations = mesh->annotations;
+    Position* dst_positions = mesh->positions;
     uint32_t* dst_indices = mesh->triangle_indices;
 
     const Position* src_position = spines.vertices;
@@ -316,15 +329,17 @@ parsl_mesh* parsl_mesh_from_lines(
         src_position++;
         dst_positions += 2;
 
-        dst_annotations[0].u_along_curve = 0;
-        dst_annotations[1].u_along_curve = 0;
-        dst_annotations[0].v_across_curve = 1;
-        dst_annotations[1].v_across_curve = -1;
-        dst_annotations[0].spine_to_edge_x = ex;
-        dst_annotations[1].spine_to_edge_x = -ex;
-        dst_annotations[0].spine_to_edge_y = ey;
-        dst_annotations[1].spine_to_edge_y = -ey;
-        dst_annotations += 2;
+        if (has_annotations) {
+            dst_annotations[0].u_along_curve = 0;
+            dst_annotations[1].u_along_curve = 0;
+            dst_annotations[0].v_across_curve = 1;
+            dst_annotations[1].v_across_curve = -1;
+            dst_annotations[0].spine_to_edge_x = ex;
+            dst_annotations[1].spine_to_edge_x = -ex;
+            dst_annotations[0].spine_to_edge_y = ey;
+            dst_annotations[1].spine_to_edge_y = -ey;
+            dst_annotations += 2;
+        }
 
         float distance_along_spine = segment_length;
 
@@ -358,15 +373,17 @@ parsl_mesh* parsl_mesh_from_lines(
             pnx = nx;
             pny = ny;
 
-            dst_annotations[0].u_along_curve = distance_along_spine;
-            dst_annotations[1].u_along_curve = distance_along_spine;
-            dst_annotations[0].v_across_curve = 1;
-            dst_annotations[1].v_across_curve = -1;
-            dst_annotations[0].spine_to_edge_x = ex;
-            dst_annotations[1].spine_to_edge_x = -ex;
-            dst_annotations[0].spine_to_edge_y = ey;
-            dst_annotations[1].spine_to_edge_y = -ey;
-            dst_annotations += 2;
+            if (has_annotations) {
+                dst_annotations[0].u_along_curve = distance_along_spine;
+                dst_annotations[1].u_along_curve = distance_along_spine;
+                dst_annotations[0].v_across_curve = 1;
+                dst_annotations[1].v_across_curve = -1;
+                dst_annotations[0].spine_to_edge_x = ex;
+                dst_annotations[1].spine_to_edge_x = -ex;
+                dst_annotations[0].spine_to_edge_y = ey;
+                dst_annotations[1].spine_to_edge_y = -ey;
+                dst_annotations += 2;
+            }
             distance_along_spine += segment_length;
 
             if (wireframe) {
@@ -424,15 +441,17 @@ parsl_mesh* parsl_mesh_from_lines(
         pnx = nx;
         pny = ny;
 
-        dst_annotations[0].u_along_curve = distance_along_spine;
-        dst_annotations[1].u_along_curve = distance_along_spine;
-        dst_annotations[0].v_across_curve = 1;
-        dst_annotations[1].v_across_curve = -1;
-        dst_annotations[0].spine_to_edge_x = ex;
-        dst_annotations[1].spine_to_edge_x = -ex;
-        dst_annotations[0].spine_to_edge_y = ey;
-        dst_annotations[1].spine_to_edge_y = -ey;
-        dst_annotations += 2;
+        if (has_annotations) {
+            dst_annotations[0].u_along_curve = distance_along_spine;
+            dst_annotations[1].u_along_curve = distance_along_spine;
+            dst_annotations[0].v_across_curve = 1;
+            dst_annotations[1].v_across_curve = -1;
+            dst_annotations[0].spine_to_edge_x = ex;
+            dst_annotations[1].spine_to_edge_x = -ex;
+            dst_annotations[0].spine_to_edge_y = ey;
+            dst_annotations[1].spine_to_edge_y = -ey;
+            dst_annotations += 2;
+        }
 
         if (wireframe) {
             dst_indices[0] = base_index + (segment_index - 1) * 2;
@@ -464,15 +483,17 @@ parsl_mesh* parsl_mesh_from_lines(
             dst_positions[1] = first_dst_positions[1];
             dst_positions += 2;
 
-            dst_annotations[0].u_along_curve = distance_along_spine;
-            dst_annotations[1].u_along_curve = distance_along_spine;
-            dst_annotations[0].v_across_curve = 1;
-            dst_annotations[1].v_across_curve = -1;
-            dst_annotations[0].spine_to_edge_x = ex;
-            dst_annotations[1].spine_to_edge_x = -ex;
-            dst_annotations[0].spine_to_edge_y = ey;
-            dst_annotations[1].spine_to_edge_y = -ey;
-            dst_annotations += 2;
+            if (has_annotations) {
+                dst_annotations[0].u_along_curve = distance_along_spine;
+                dst_annotations[1].u_along_curve = distance_along_spine;
+                dst_annotations[0].v_across_curve = 1;
+                dst_annotations[1].v_across_curve = -1;
+                dst_annotations[0].spine_to_edge_x = ex;
+                dst_annotations[1].spine_to_edge_x = -ex;
+                dst_annotations[0].spine_to_edge_y = ey;
+                dst_annotations[1].spine_to_edge_y = -ey;
+                dst_annotations += 2;
+            }
 
             if (wireframe) {
                 dst_indices[0] = base_index + (segment_index - 1) * 2;
@@ -500,48 +521,52 @@ parsl_mesh* parsl_mesh_from_lines(
         base_index += spine_length * 2 + (closed ? 2  : 0);
 
         const uint16_t nverts = spine_length + (closed ? 1 : 0);
-        for (uint16_t i = 0; i < nverts; i++) {
-            dst_lengths[0] = distance_along_spine;
-            dst_lengths[1] = distance_along_spine;
-            dst_lengths += 2;
+
+        if (has_lengths) {
+            for (uint16_t i = 0; i < nverts; i++) {
+                dst_lengths[0] = distance_along_spine;
+                dst_lengths[1] = distance_along_spine;
+                dst_lengths += 2;
+            }
         }
 
         // Go back through the curve and fix up the U coordinates.
-        const float invlength = 1.0f / distance_along_spine;
-        const float invcount = 1.0f / spine_length;
-        switch (context->config.u_mode) {
-        case PAR_U_MODE_DISTANCE:
-            break;
-        case PAR_U_MODE_NORMALIZED_DISTANCE:
-            dst_annotations -= nverts * 2;
-            for (uint16_t i = 0; i < nverts; i++) {
-                dst_annotations[0].u_along_curve *= invlength;
-                dst_annotations[1].u_along_curve *= invlength;
-                dst_annotations += 2;
+        if (has_annotations) {
+            const float invlength = 1.0f / distance_along_spine;
+            const float invcount = 1.0f / spine_length;
+            switch (context->config.u_mode) {
+            case PAR_U_MODE_DISTANCE:
+                break;
+            case PAR_U_MODE_NORMALIZED_DISTANCE:
+                dst_annotations -= nverts * 2;
+                for (uint16_t i = 0; i < nverts; i++) {
+                    dst_annotations[0].u_along_curve *= invlength;
+                    dst_annotations[1].u_along_curve *= invlength;
+                    dst_annotations += 2;
+                }
+                break;
+            case PAR_U_MODE_SEGMENT_INDEX:
+                dst_annotations -= nverts * 2;
+                for (uint16_t i = 0; i < nverts; i++) {
+                    dst_annotations[0].u_along_curve = i;
+                    dst_annotations[1].u_along_curve = i;
+                    dst_annotations += 2;
+                }
+                break;
+            case PAR_U_MODE_SEGMENT_FRACTION:
+                dst_annotations -= nverts * 2;
+                for (uint16_t i = 0; i < nverts; i++) {
+                    dst_annotations[0].u_along_curve = invcount * i;
+                    dst_annotations[1].u_along_curve = invcount * i;
+                    dst_annotations += 2;
+                }
+                break;
             }
-            break;
-        case PAR_U_MODE_SEGMENT_INDEX:
-            dst_annotations -= nverts * 2;
-            for (uint16_t i = 0; i < nverts; i++) {
-                dst_annotations[0].u_along_curve = i;
-                dst_annotations[1].u_along_curve = i;
-                dst_annotations += 2;
-            }
-            break;
-        case PAR_U_MODE_SEGMENT_FRACTION:
-            dst_annotations -= nverts * 2;
-            for (uint16_t i = 0; i < nverts; i++) {
-                dst_annotations[0].u_along_curve = invcount * i;
-                dst_annotations[1].u_along_curve = invcount * i;
-                dst_annotations += 2;
-            }
-            break;
         }
     }
 
     assert(src_position - spines.vertices == spines.num_vertices);
-    assert(dst_annotations - mesh->vertex_annotations == mesh->num_vertices);
-    assert(dst_positions - mesh->vertex_positions == mesh->num_vertices);
+    assert(dst_positions - mesh->positions == mesh->num_vertices);
     assert(dst_indices - mesh->triangle_indices ==
         mesh->num_triangles * ind_per_tri);
 
