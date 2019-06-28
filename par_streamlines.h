@@ -78,13 +78,14 @@ typedef struct {
 #define PARSL_FLAG_ANNOTATIONS    (1 << 1) // populates mesh.annotations
 #define PARSL_FLAG_SPINE_LENGTHS  (1 << 2) // populates mesh.lengths
 #define PARSL_FLAG_RANDOM_OFFSETS (1 << 3) // populates mesh.random_offsets
+#define PARSL_FLAG_CURVE_GUIDES   (1 << 4) // draws control points
 
 // Immutable configuration for a streamlines context.
 typedef struct {
     float thickness;
     uint32_t flags;
     parsl_u_mode u_mode;
-    uint32_t curves_level_of_detail;
+    float curves_max_flatness;
     float streamlines_seed_spacing;
     parsl_viewport streamlines_seed_viewport;
 } parsl_config;
@@ -108,17 +109,43 @@ parsl_context* parsl_create_context(parsl_config config);
 
 void parsl_destroy_context(parsl_context* ctx);
 
+// Low-level function that simply generates two triangles for each line segment.
 parsl_mesh* parsl_mesh_from_lines(parsl_context* ctx, parsl_spine_list spines);
 
-parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
-    parsl_spine_list spines);
-
-parsl_mesh* parsl_mesh_from_curves_quadratic(parsl_context* context,
-    parsl_spine_list spines);
-
+// High-level function that can be used to visualize a vector field.
 parsl_mesh* parsl_mesh_from_streamlines(parsl_context* context,
     parsl_advection_callback advect, uint32_t first_tick, uint32_t num_ticks,
     void* userdata);
+
+// High-level function that tessellates a series of curves into triangles,
+// where each spine is a series of chained cubic Bézier curves.
+//
+// The first curve of each spine is defined by an endpoint, followed by two
+// control points, followed by an endpoint. Every subsequent curve in the spine
+// is defined by a single control point followed by an endpoint. Only one
+// control point is required because the first control point is computed via
+// reflection over the endpoint.
+//
+// The number of vertices in each spine should be 4+(n-1)*2 where n is the
+// number of piecewise curves.
+//
+// Each spine is equivalent to an SVG path that looks like M C S S S.
+parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
+    parsl_spine_list spines);
+
+// High-level function that tessellates a series of curves into triangles,
+// where each spine is a series of chained quadratic Bézier curves.
+//
+// The first curve of each spine is defined by an endpoint, followed by one
+// control points, followed by an endpoint. Every subsequent curve in the spine
+// is defined by a single control point followed by an endpoint.
+//
+// The number of vertices in each spine should be n*2 where n is the number of
+// piecewise curves.
+//
+// Each spine is equivalent to an SVG path that looks like M Q M Q M Q.
+parsl_mesh* parsl_mesh_from_curves_quadratic(parsl_context* context,
+    parsl_spine_list spines);
 
 #ifdef __cplusplus
 }
@@ -136,19 +163,19 @@ parsl_mesh* parsl_mesh_from_streamlines(parsl_context* context,
 #include <memory.h>
 #include <stdlib.h>
 
-static float par__dot(parsl_position a, parsl_position b) {
+static float parsl__dot(parsl_position a, parsl_position b) {
     return a.x * b.x + a.y * b.y;
 }
 
-static parsl_position par__sub(parsl_position a, parsl_position b) {
+static parsl_position parsl__sub(parsl_position a, parsl_position b) {
     return (parsl_position) { a.x - b.x, a.y - b.y };
 }
 
-static parsl_position par__add(parsl_position a, parsl_position b) {
+static parsl_position parsl__add(parsl_position a, parsl_position b) {
     return (parsl_position) { a.x + b.x, a.y + b.y };
 }
 
-static parsl_position par_mul(parsl_position v, float s) {
+static parsl_position parsl_mul(parsl_position v, float s) {
     return (parsl_position) { v.x * s, v.y * s };
 }
 
@@ -211,6 +238,7 @@ struct parsl_context_s {
     parsl_position* streamline_seeds;
     parsl_position* streamline_points;
     parsl_spine_list streamline_spines;
+    parsl_spine_list curve_spines;
 };
 
 parsl_context* parsl_create_context(parsl_config config)
@@ -231,6 +259,8 @@ void parsl_destroy_context(parsl_context* context)
     pa_free(context->streamline_points);
     pa_free(context->streamline_spines.spine_lengths);
     pa_free(context->streamline_spines.vertices);
+    pa_free(context->curve_spines.spine_lengths);
+    pa_free(context->curve_spines.vertices);
     PAR_FREE(context);
 }
 
@@ -590,15 +620,182 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
     return mesh;
 }
 
-parsl_mesh* parsl_mesh_from_curves_cubic(
-    parsl_context* context, parsl_spine_list spines)
+// This function is designed to be called in two passes. In the first pass, the
+// points pointer is null, so this simply determines the number of required
+// points to fulfill the flatness criterion. On the second pass, points is
+// non-null it actually writes out the point positions.
+static void parsl__tesselate_cubic(
+    parsl_position* points,
+    uint32_t* num_points,
+    float x0, float y0,
+    float x1, float y1,
+    float x2, float y2,
+    float x3, float y3,
+    float max_flatness_squared,
+    int recursion_depth)
 {
+    float dx0 = x1-x0;
+    float dy0 = y1-y0;
+    float dx1 = x2-x1;
+    float dy1 = y2-y1;
+    float dx2 = x3-x2;
+    float dy2 = y3-y2;
+    float dx = x3-x0;
+    float dy = y3-y0;
+    float longlen = (float) (sqrt(dx0*dx0 + dy0*dy0) + sqrt(dx1*dx1 + dy1*dy1) +
+        sqrt(dx2*dx2 + dy2*dy2));
+    float shortlen = (float) sqrt(dx*dx+dy*dy);
+    float flatness_squared = longlen*longlen - shortlen*shortlen;
+
+    if (recursion_depth > 16) {
+        return;
+    }
+
+    if (flatness_squared > max_flatness_squared) {
+        const float x01 = (x0+x1) / 2;
+        const float y01 = (y0+y1) / 2;
+        const float x12 = (x1+x2) / 2;
+        const float y12 = (y1+y2) / 2;
+        const float x23 = (x2+x3) / 2;
+        const float y23 = (y2+y3) / 2;
+        const float xa = (x01+x12) / 2;
+        const float ya = (y01+y12) / 2;
+        const float xb = (x12+x23) / 2;
+        const float yb = (y12+y23) / 2;
+        const float mx = (xa+xb) / 2;
+        const float my = (ya+yb) / 2;
+        parsl__tesselate_cubic(points, num_points, x0,y0, x01,y01, xa,ya, mx,my,
+            max_flatness_squared, recursion_depth + 1);
+        parsl__tesselate_cubic(points, num_points, mx,my, xb,yb, x23,y23, x3,y3,
+            max_flatness_squared, recursion_depth + 1);
+        return;
+    }
+
+    int n = *num_points;
+    if (points) {
+        points[n].x = x3;
+        points[n].y = y3;
+    }
+    *num_points = n + 1;
+}
+
+parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
+    parsl_spine_list source_spines)
+{
+    float max_flatness = context->config.curves_max_flatness;
+    if (max_flatness == 0) {
+        max_flatness = 1.0f;
+    }
+    const float max_flatness_squared = max_flatness * max_flatness;
+    parsl_spine_list* target_spines = &context->curve_spines;
+
+    // TODO: honor PARSL_FLAG_CURVE_GUIDES
+
+    target_spines->num_spines = source_spines.num_spines;
+    pa_clear(target_spines->spine_lengths);
+    pa_add(target_spines->spine_lengths, source_spines.num_spines);
+
+    // First pass: determine the number of required vertices.
+    uint32_t total_required_spine_points = 0;
+    const parsl_position* psource = source_spines.vertices;
+    for (uint32_t spine = 0; spine < source_spines.num_spines; spine++) {
+
+        // Source vertices look like: P1 C1 C2 P2 [C2 P2]*
+        uint32_t spine_length = source_spines.spine_lengths[spine];
+        assert(spine_length >= 4);
+        assert((spine_length % 2) == 0);
+        uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+
+        // First piecewise curve.
+        uint32_t num_required_spine_points = 0;
+        parsl__tesselate_cubic(NULL, &num_required_spine_points,
+            psource[0].x, psource[0].y, psource[1].x, psource[1].y,
+            psource[2].x, psource[2].y, psource[3].x, psource[3].y,
+            max_flatness_squared, 0);
+        psource += 4;
+
+        // Subsequent piecewise curves.
+        for (uint32_t piecewise = 1; piecewise < num_piecewise; piecewise++) {
+            parsl_position p1 = psource[-1];
+            parsl_position previous_c2 = psource[-2];
+            parsl_position c1 = parsl__sub(p1, parsl__sub(previous_c2, p1));
+            parsl_position c2 = psource[0];
+            parsl_position p2 = psource[1];
+            parsl__tesselate_cubic(NULL, &num_required_spine_points,
+                p1.x, p1.y, c1.x, c1.y, c2.x, c2.y, p2.x, p2.y,
+                max_flatness_squared, 0);
+            psource += 2;
+        }
+
+        target_spines->spine_lengths[spine] = num_required_spine_points;
+        total_required_spine_points += num_required_spine_points;
+    }
+
+    // Allocate memory.
+    target_spines->num_vertices = total_required_spine_points;
+    pa_clear(target_spines->vertices);
+    pa_add(target_spines->vertices, total_required_spine_points);
+
+    // Second pass: write out the data.
+    psource = source_spines.vertices;
+    parsl_position* ptarget = target_spines->vertices;
+    for (uint32_t spine = 0; spine < source_spines.num_spines; spine++) {
+
+        // Source vertices look like: P1 C1 C2 P2 [C2 P2]*
+        uint32_t spine_length = source_spines.spine_lengths[spine];
+        uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+
+        // First piecewise curve.
+        uint32_t num_written_points = 0;
+        parsl__tesselate_cubic(ptarget, &num_written_points,
+            psource[0].x, psource[0].y, psource[1].x, psource[1].y,
+            psource[2].x, psource[2].y, psource[3].x, psource[3].y,
+            max_flatness_squared, 0);
+        psource += 4;
+        ptarget += num_written_points;
+
+        // Subsequent piecewise curves.
+        for (uint32_t piecewise = 1; piecewise < num_piecewise; piecewise++) {
+            parsl_position p1 = psource[-1];
+            parsl_position previous_c2 = psource[-2];
+            parsl_position c1 = parsl__sub(p1, parsl__sub(previous_c2, p1));
+            parsl_position c2 = psource[0];
+            parsl_position p2 = psource[1];
+            num_written_points = 0;
+            parsl__tesselate_cubic(ptarget, &num_written_points,
+                p1.x, p1.y, c1.x, c1.y, c2.x, c2.y, p2.x, p2.y,
+                max_flatness_squared, 0);
+            psource += 2;
+            ptarget += num_written_points;
+        }
+    }
+
+    parsl_mesh_from_lines(context, context->curve_spines);
     return &context->result;
 }
 
 parsl_mesh* parsl_mesh_from_curves_quadratic(
     parsl_context* context, parsl_spine_list spines)
 {
+    float max_flatness = context->config.curves_max_flatness;
+    if (max_flatness == 0) {
+        max_flatness = 1.0f;
+    }
+    // const float max_flatness_squared = max_flatness * max_flatness;
+
+    // TODO: honor PARSL_FLAG_CURVE_GUIDES
+
+    context->curve_spines.num_spines = spines.num_spines;
+    pa_clear(context->curve_spines.spine_lengths);
+    pa_add(context->curve_spines.spine_lengths, spines.num_spines);
+
+    // TODO ...
+
+    // Source vertices look like:
+    // PT C PT [C PT]*
+    assert(spines.num_vertices >= 3);
+    assert((spines.num_vertices % 2) == 1);
+
     return &context->result;
 }
 
@@ -622,7 +819,7 @@ static parsl_position par__sample_annulus(float radius, parsl_position center,
     while (1) {
         r.x = 4 * rscale * par__randhash(seed++) - 2;
         r.y = 4 * rscale * par__randhash(seed++) - 2;
-        float r2 = par__dot(r, r);
+        float r2 = parsl__dot(r, r);
         if (r2 > 1 && r2 <= 4) {
             break;
         }
@@ -694,8 +891,8 @@ static parsl_position* par__generate_pts(float width, float height,
             }
 
             // Test proximity to nearby samples.
-            maxj = par_mul(par__add(pt, rvec), invcell);
-            minj = par_mul(par__sub(pt, rvec), invcell);
+            maxj = parsl_mul(parsl__add(pt, rvec), invcell);
+            minj = parsl_mul(parsl__sub(pt, rvec), invcell);
 
             minj.x = PAR_CLAMP((int) minj.x, 0, maxcol);
             minj.y = PAR_CLAMP((int) minj.y, 0, maxrow);
@@ -706,8 +903,8 @@ static parsl_position* par__generate_pts(float width, float height,
                 for (j.x = minj.x; j.x <= maxj.x && !reject; j.x++) {
                     int entry = GRIDI(j);
                     if (entry > -1 && entry != sindex) {
-                        delta = par__sub(samples[entry], pt);
-                        if (par__dot(delta, delta) < r2) {
+                        delta = parsl__sub(samples[entry], pt);
+                        if (parsl__dot(delta, delta) < r2) {
                             reject = 1;
                         }
                     }
