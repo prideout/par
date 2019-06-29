@@ -701,11 +701,11 @@ static void parsl__tesselate_quadratic(
     float x0, float y0, float x1, float y1, float x2, float y2,
     float max_flatness_squared, int recursion_depth)
 {
-   const float mx = (x0 + 2 * x1 + x2) / 4;
-   const float my = (y0 + 2 * y1 + y2) / 4;
-   const float dx = (x0 + x2) / 2 - mx;
-   const float dy = (y0 + y2) / 2 - my;
-   const float flatness_squared = dx * dx + dy * dy;
+    const float mx = (x0 + 2 * x1 + x2) / 4;
+    const float my = (y0 + 2 * y1 + y2) / 4;
+    const float dx = (x0 + x2) / 2 - mx;
+    const float dy = (y0 + y2) / 2 - my;
+    const float flatness_squared = dx * dx + dy * dy;
 
     if (recursion_depth++ > PARSL_MAX_RECURSION) {
         return;
