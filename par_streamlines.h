@@ -700,12 +700,19 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
     }
     const float max_flatness_squared = max_flatness * max_flatness;
     parsl_spine_list* target_spines = &context->curve_spines;
+    const bool has_guides = context->config.flags & PARSL_FLAG_CURVE_GUIDES;
 
-    // TODO: honor PARSL_FLAG_CURVE_GUIDES
-
+    // Determine the number of spines in the target list.
     target_spines->num_spines = source_spines.num_spines;
+    if (has_guides) {
+        for (uint32_t spine = 0; spine < source_spines.num_spines; spine++) {
+            uint32_t spine_length = source_spines.spine_lengths[spine];
+            uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+            target_spines->num_spines += num_piecewise * 2;
+        }
+    }
     pa_clear(target_spines->spine_lengths);
-    pa_add(target_spines->spine_lengths, source_spines.num_spines);
+    pa_add(target_spines->spine_lengths, target_spines->num_spines);
 
     // First pass: determine the number of required vertices.
     uint32_t total_required_spine_points = 0;
@@ -741,6 +748,21 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
 
         target_spines->spine_lengths[spine] = num_required_spine_points;
         total_required_spine_points += num_required_spine_points;
+    }
+
+    if (has_guides) {
+        uint32_t nsrcspines = source_spines.num_spines;
+        uint16_t* guide_lengths = &target_spines->spine_lengths[nsrcspines];
+        for (uint32_t spine = 0; spine < nsrcspines; spine++) {
+            uint32_t spine_length = source_spines.spine_lengths[spine];
+            uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+            for (uint32_t pw = 0; pw < num_piecewise; pw++) {
+                guide_lengths[0] = 2;
+                guide_lengths[1] = 2;
+                guide_lengths += 2;
+                total_required_spine_points += 4;
+            }
+        }
     }
 
     // Allocate memory.
@@ -791,8 +813,35 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
         uint32_t num_written = ptarget - target_spine_start;
         assert(num_written == (uint32_t) target_spines->spine_lengths[spine]);
     }
-    assert(ptarget - target_spines->vertices == total_required_spine_points);
 
+    // Source vertices look like: P1 C1 C2 P2 [C2 P2]*
+    if (has_guides) {
+        uint32_t nsrcspines = source_spines.num_spines;
+        psource = source_spines.vertices;
+        for (uint32_t spine = 0; spine < nsrcspines; spine++) {
+            uint32_t spine_length = source_spines.spine_lengths[spine];
+            uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+            *ptarget++ = psource[0];
+            *ptarget++ = psource[1];
+            *ptarget++ = psource[2];
+            *ptarget++ = psource[3];
+            psource += 4;
+            for (uint32_t pw = 1; pw < num_piecewise; pw++) {
+                parsl_position p1 = psource[-1];
+                parsl_position previous_c2 = psource[-2];
+                parsl_position c1 = parsl__sub(p1, parsl__sub(previous_c2, p1));
+                parsl_position c2 = psource[0];
+                parsl_position p2 = psource[1];
+                *ptarget++ = p1;
+                *ptarget++ = c1;
+                *ptarget++ = p2;
+                *ptarget++ = c2;
+                psource += 2;
+            }
+        }
+    }
+
+    assert(ptarget - target_spines->vertices == total_required_spine_points);
     parsl_mesh_from_lines(context, context->curve_spines);
     return &context->result;
 }
