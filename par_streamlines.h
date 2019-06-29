@@ -336,9 +336,13 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             const float pny = dx / segment_length;
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
-            const float phi = acos(pnx * nx + pny * ny) / 2;
-            const float theta = PAR_PI / 2 - phi;
-            const float extent = 0.5 * thickness / sin(theta);
+            float extent = 0.5 * thickness;
+            const float dotp = pnx * nx + pny * ny;
+            if (dotp < 1.0f) {
+                const float phi = acos(dotp) / 2;
+                const float theta = PAR_PI / 2 - phi;
+                extent /= sin(theta);
+            }
 
             ex = pnx + nx;
             ey = pny + ny;
@@ -387,9 +391,13 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             const float ny = dx / segment_length;
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
-            const float phi = acos(pnx * nx + pny * ny) / 2;
-            const float theta = PAR_PI / 2 - phi;
-            const float extent = 0.5 * thickness / sin(theta);
+            float extent = 0.5 * thickness;
+            const float dotp = pnx * nx + pny * ny;
+            if (dotp < 1.0f) {
+                const float phi = acos(dotp) / 2;
+                const float theta = PAR_PI / 2 - phi;
+                extent /= sin(theta);
+            }
 
             float ex = pnx + nx;
             float ey = pny + ny;
@@ -454,9 +462,13 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             const float ny = dx / segment_length;
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
-            const float phi = acos(pnx * nx + pny * ny) / 2;
-            const float theta = PAR_PI / 2 - phi;
-            const float extent = 0.5 * thickness / sin(theta);
+            float extent = 0.5 * thickness;
+            const float dotp = pnx * nx + pny * ny;
+            if (dotp < 1.0f) {
+                const float phi = acos(dotp) / 2;
+                const float theta = PAR_PI / 2 - phi;
+                extent /= sin(theta);
+            }
 
             ex = pnx + nx;
             ey = pny + ny;
