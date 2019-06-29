@@ -218,8 +218,8 @@ static void* pa___growf(void* arr, int increment, int itemsize)
     int dbl_cur = arr ? 2 * pa___m(arr) : 0;
     int min_needed = pa_count(arr) + increment;
     int m = dbl_cur > min_needed ? dbl_cur : min_needed;
-    int* p = PAR_REALLOC(int, arr ? pa___raw(arr) : 0,
-        itemsize * m / sizeof(int) + 2);
+    int* p = (int *) PAR_REALLOC(uint8_t, arr ? pa___raw(arr) : 0,
+        itemsize * m + sizeof(int) * 2);
     if (p) {
         if (!arr) {
             p[1] = 0;
