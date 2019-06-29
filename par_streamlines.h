@@ -239,6 +239,7 @@ struct parsl_context_s {
     parsl_position* streamline_points;
     parsl_spine_list streamline_spines;
     parsl_spine_list curve_spines;
+    uint16_t guideline_start;
 };
 
 parsl_context* parsl_create_context(parsl_config config)
@@ -271,7 +272,6 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
     typedef parsl_annotation Annotation;
 
     parsl_mesh* mesh = &context->result;
-    const float thickness = context->config.thickness;
     const bool closed = spines.closed;
     const bool wireframe = context->config.flags & PARSL_FLAG_WIREFRAME;
     const bool has_annotations = context->config.flags & PARSL_FLAG_ANNOTATIONS;
@@ -315,6 +315,9 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
     uint32_t base_index = 0;
 
     for (uint16_t spine = 0; spine < spines.num_spines; spine++) {
+        const bool thin = context->guideline_start > 0 &&
+            spine >= context->guideline_start;
+        const float thickness = thin ? 1.0f : context->config.thickness;
         const uint16_t spine_length = spines.spine_lengths[spine];
         float dx = src_position[1].x - src_position[0].x;
         float dy = src_position[1].y - src_position[0].y;
@@ -817,6 +820,7 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
     // Source vertices look like: P1 C1 C2 P2 [C2 P2]*
     if (has_guides) {
         uint32_t nsrcspines = source_spines.num_spines;
+        context->guideline_start = nsrcspines;
         psource = source_spines.vertices;
         for (uint32_t spine = 0; spine < nsrcspines; spine++) {
             uint32_t spine_length = source_spines.spine_lengths[spine];
@@ -843,6 +847,7 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
 
     assert(ptarget - target_spines->vertices == total_required_spine_points);
     parsl_mesh_from_lines(context, context->curve_spines);
+    context->guideline_start = 0;
     return &context->result;
 }
 
