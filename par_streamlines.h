@@ -179,6 +179,8 @@ static parsl_position parsl_mul(parsl_position v, float s) {
     return (parsl_position) { v.x * s, v.y * s };
 }
 
+#define PARSL_MAX_RECURSION 16
+
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
 #define PAR_MIN(a, b) (a > b ? b : a)
@@ -640,14 +642,10 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
 // points to fulfill the flatness criterion. On the second pass, points is
 // non-null it actually writes out the point positions.
 static void parsl__tesselate_cubic(
-    parsl_position* points,
-    uint32_t* num_points,
-    float x0, float y0,
-    float x1, float y1,
-    float x2, float y2,
-    float x3, float y3,
-    float max_flatness_squared,
-    int recursion_depth)
+    parsl_position* points, uint32_t* num_points,
+    float x0, float y0, float x1, float y1,
+    float x2, float y2, float x3, float y3,
+    float max_flatness_squared, int recursion_depth)
 {
     float dx0 = x1-x0;
     float dy0 = y1-y0;
@@ -662,7 +660,7 @@ static void parsl__tesselate_cubic(
     float shortlen = (float) sqrt(dx*dx+dy*dy);
     float flatness_squared = longlen*longlen - shortlen*shortlen;
 
-    if (recursion_depth > 16) {
+    if (recursion_depth > PARSL_MAX_RECURSION) {
         return;
     }
 
@@ -690,6 +688,45 @@ static void parsl__tesselate_cubic(
     if (points) {
         points[n].x = x3;
         points[n].y = y3;
+    }
+    *num_points = n + 1;
+}
+
+// This function is designed to be called in two passes. In the first pass, the
+// points pointer is null, so this simply determines the number of required
+// points to fulfill the flatness criterion. On the second pass, points is
+// non-null it actually writes out the point positions.
+static void parsl__tesselate_quadratic(
+    parsl_position* points, uint32_t* num_points,
+    float x0, float y0, float x1, float y1, float x2, float y2,
+    float max_flatness_squared, int recursion_depth)
+{
+   const float mx = (x0 + 2 * x1 + x2) / 4;
+   const float my = (y0 + 2 * y1 + y2) / 4;
+   const float dx = (x0 + x2) / 2 - mx;
+   const float dy = (y0 + y2) / 2 - my;
+   const float flatness_squared = dx * dx + dy * dy;
+
+    if (recursion_depth++ > PARSL_MAX_RECURSION) {
+        return;
+    }
+
+    if (flatness_squared > max_flatness_squared) {
+        parsl__tesselate_quadratic(points, num_points, x0,y0,
+            (x0 + x1) / 2.0f, (y0 + y1) / 2.0f,
+            mx, my,
+            max_flatness_squared, recursion_depth);
+        parsl__tesselate_quadratic(points, num_points, mx,my,
+            (x1 + x2) / 2.0f, (y1 + y2) / 2.0f,
+            x2, y2,
+            max_flatness_squared, recursion_depth);
+        return;
+    }
+
+    int n = *num_points;
+    if (points) {
+        points[n].x = x2;
+        points[n].y = y2;
     }
     *num_points = n + 1;
 }
@@ -851,28 +888,160 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
     return &context->result;
 }
 
-parsl_mesh* parsl_mesh_from_curves_quadratic(
-    parsl_context* context, parsl_spine_list spines)
+parsl_mesh* parsl_mesh_from_curves_quadratic(parsl_context* context,
+    parsl_spine_list source_spines)
 {
     float max_flatness = context->config.curves_max_flatness;
     if (max_flatness == 0) {
         max_flatness = 1.0f;
     }
-    // const float max_flatness_squared = max_flatness * max_flatness;
+    const float max_flatness_squared = max_flatness * max_flatness;
+    parsl_spine_list* target_spines = &context->curve_spines;
+    const bool has_guides = context->config.flags & PARSL_FLAG_CURVE_GUIDES;
 
-    // TODO: honor PARSL_FLAG_CURVE_GUIDES
+    // Determine the number of spines in the target list.
+    target_spines->num_spines = source_spines.num_spines;
+    if (has_guides) {
+        for (uint32_t spine = 0; spine < source_spines.num_spines; spine++) {
+            uint32_t spine_length = source_spines.spine_lengths[spine];
+            uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+            target_spines->num_spines += num_piecewise * 2;
+        }
+    }
+    pa_clear(target_spines->spine_lengths);
+    pa_add(target_spines->spine_lengths, target_spines->num_spines);
 
-    context->curve_spines.num_spines = spines.num_spines;
-    pa_clear(context->curve_spines.spine_lengths);
-    pa_add(context->curve_spines.spine_lengths, spines.num_spines);
+    // First pass: determine the number of required vertices.
+    uint32_t total_required_spine_points = 0;
+    const parsl_position* psource = source_spines.vertices;
+    for (uint32_t spine = 0; spine < source_spines.num_spines; spine++) {
 
-    // TODO ...
+        // Source vertices look like: PT C PT [C PT]*
+        uint32_t spine_length = source_spines.spine_lengths[spine];
+        assert(spine_length >= 4);
+        assert((spine_length % 2) == 0);
+        uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
 
-    // Source vertices look like:
-    // PT C PT [C PT]*
-    assert(spines.num_vertices >= 3);
-    assert((spines.num_vertices % 2) == 1);
+        // First piecewise curve.
+        uint32_t num_required_spine_points = 1;
+        parsl__tesselate_cubic(NULL, &num_required_spine_points,
+            psource[0].x, psource[0].y, psource[1].x, psource[1].y,
+            psource[2].x, psource[2].y, psource[3].x, psource[3].y,
+            max_flatness_squared, 0);
+        psource += 4;
 
+        // Subsequent piecewise curves.
+        for (uint32_t piecewise = 1; piecewise < num_piecewise; piecewise++) {
+            parsl_position p1 = psource[-1];
+            parsl_position previous_c2 = psource[-2];
+            parsl_position c1 = parsl__sub(p1, parsl__sub(previous_c2, p1));
+            parsl_position c2 = psource[0];
+            parsl_position p2 = psource[1];
+            parsl__tesselate_cubic(NULL, &num_required_spine_points,
+                p1.x, p1.y, c1.x, c1.y, c2.x, c2.y, p2.x, p2.y,
+                max_flatness_squared, 0);
+            psource += 2;
+        }
+
+        target_spines->spine_lengths[spine] = num_required_spine_points;
+        total_required_spine_points += num_required_spine_points;
+    }
+
+    if (has_guides) {
+        uint32_t nsrcspines = source_spines.num_spines;
+        uint16_t* guide_lengths = &target_spines->spine_lengths[nsrcspines];
+        for (uint32_t spine = 0; spine < nsrcspines; spine++) {
+            uint32_t spine_length = source_spines.spine_lengths[spine];
+            uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+            for (uint32_t pw = 0; pw < num_piecewise; pw++) {
+                guide_lengths[0] = 2;
+                guide_lengths[1] = 2;
+                guide_lengths += 2;
+                total_required_spine_points += 4;
+            }
+        }
+    }
+
+    // Allocate memory.
+    target_spines->num_vertices = total_required_spine_points;
+    pa_clear(target_spines->vertices);
+    pa_add(target_spines->vertices, total_required_spine_points);
+
+    // Second pass: write out the data.
+    psource = source_spines.vertices;
+    parsl_position* ptarget = target_spines->vertices;
+    for (uint32_t spine = 0; spine < source_spines.num_spines; spine++) {
+
+        // Source vertices look like: PT C PT [C PT]*
+        uint32_t spine_length = source_spines.spine_lengths[spine];
+        uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+
+        __attribute__((unused))
+        parsl_position* target_spine_start = ptarget;
+
+        // First piecewise curve.
+        ptarget[0].x = psource[0].x;
+        ptarget[0].y = psource[0].y;
+        ptarget++;
+        uint32_t num_written_points = 0;
+        parsl__tesselate_cubic(ptarget, &num_written_points,
+            psource[0].x, psource[0].y, psource[1].x, psource[1].y,
+            psource[2].x, psource[2].y, psource[3].x, psource[3].y,
+            max_flatness_squared, 0);
+        psource += 4;
+        ptarget += num_written_points;
+
+        // Subsequent piecewise curves.
+        for (uint32_t piecewise = 1; piecewise < num_piecewise; piecewise++) {
+            parsl_position p1 = psource[-1];
+            parsl_position previous_c2 = psource[-2];
+            parsl_position c1 = parsl__sub(p1, parsl__sub(previous_c2, p1));
+            parsl_position c2 = psource[0];
+            parsl_position p2 = psource[1];
+            num_written_points = 0;
+            parsl__tesselate_cubic(ptarget, &num_written_points,
+                p1.x, p1.y, c1.x, c1.y, c2.x, c2.y, p2.x, p2.y,
+                max_flatness_squared, 0);
+            psource += 2;
+            ptarget += num_written_points;
+        }
+
+        __attribute__((unused))
+        uint32_t num_written = ptarget - target_spine_start;
+        assert(num_written == (uint32_t) target_spines->spine_lengths[spine]);
+    }
+
+    // Source vertices look like: PT C PT [C PT]*
+    if (has_guides) {
+        uint32_t nsrcspines = source_spines.num_spines;
+        context->guideline_start = nsrcspines;
+        psource = source_spines.vertices;
+        for (uint32_t spine = 0; spine < nsrcspines; spine++) {
+            uint32_t spine_length = source_spines.spine_lengths[spine];
+            uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
+            *ptarget++ = psource[0];
+            *ptarget++ = psource[1];
+            *ptarget++ = psource[2];
+            *ptarget++ = psource[3];
+            psource += 4;
+            for (uint32_t pw = 1; pw < num_piecewise; pw++) {
+                parsl_position p1 = psource[-1];
+                parsl_position previous_c2 = psource[-2];
+                parsl_position c1 = parsl__sub(p1, parsl__sub(previous_c2, p1));
+                parsl_position c2 = psource[0];
+                parsl_position p2 = psource[1];
+                *ptarget++ = p1;
+                *ptarget++ = c1;
+                *ptarget++ = p2;
+                *ptarget++ = c2;
+                psource += 2;
+            }
+        }
+    }
+
+    assert(ptarget - target_spines->vertices == total_required_spine_points);
+    parsl_mesh_from_lines(context, context->curve_spines);
+    context->guideline_start = 0;
     return &context->result;
 }
 
