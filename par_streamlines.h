@@ -88,6 +88,7 @@ typedef struct {
     float curves_max_flatness;
     float streamlines_seed_spacing;
     parsl_viewport streamlines_seed_viewport;
+    float miter_limit;
 } parsl_config;
 
 // Client-owned list of line strips that will be tessellated.
@@ -154,7 +155,6 @@ parsl_mesh* parsl_mesh_from_curves_quadratic(parsl_context* context,
 // -----------------------------------------------------------------------------
 // END PUBLIC API
 // -----------------------------------------------------------------------------
-
 #ifdef PAR_STREAMLINES_IMPLEMENTATION
 
 #include <assert.h>
@@ -278,6 +278,10 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
     const bool wireframe = context->config.flags & PARSL_FLAG_WIREFRAME;
     const bool has_annotations = context->config.flags & PARSL_FLAG_ANNOTATIONS;
     const bool has_lengths = context->config.flags & PARSL_FLAG_SPINE_LENGTHS;
+    const float miter_limit = context->config.miter_limit ?
+        context->config.miter_limit : (context->config.thickness * 2);
+    const float miter_acos_max = +1.0;
+    const float miter_acos_min = -1.0;
     const uint32_t ind_per_tri = wireframe ? 4 : 3;
 
     mesh->num_vertices = 0;
@@ -342,11 +346,11 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             float extent = 0.5 * thickness;
-            const float dotp = pnx * nx + pny * ny;
-            if (dotp < 1.0f) {
+            const float dotp = (pnx * nx + pny * ny);
+            if (dotp < miter_acos_max && dotp > miter_acos_min) {
                 const float phi = acos(dotp) / 2;
                 const float theta = PAR_PI / 2 - phi;
-                extent /= sin(theta);
+                extent = PAR_CLAMP(extent / sin(theta), -miter_limit, miter_limit);
             }
 
             ex = pnx + nx;
@@ -397,11 +401,11 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             float extent = 0.5 * thickness;
-            const float dotp = pnx * nx + pny * ny;
-            if (dotp < 1.0f) {
+            const float dotp = (pnx * nx + pny * ny);
+            if (dotp < miter_acos_max && dotp > miter_acos_min) {
                 const float phi = acos(dotp) / 2;
                 const float theta = PAR_PI / 2 - phi;
-                extent /= sin(theta);
+                extent = PAR_CLAMP(extent / sin(theta), -miter_limit, miter_limit);
             }
 
             float ex = pnx + nx;
@@ -468,11 +472,11 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             float extent = 0.5 * thickness;
-            const float dotp = pnx * nx + pny * ny;
-            if (dotp < 1.0f) {
+            const float dotp = (pnx * nx + pny * ny);
+            if (dotp < miter_acos_max && dotp > miter_acos_min) {
                 const float phi = acos(dotp) / 2;
                 const float theta = PAR_PI / 2 - phi;
-                extent /= sin(theta);
+                extent = PAR_CLAMP(extent / sin(theta), -miter_limit, miter_limit);
             }
 
             ex = pnx + nx;
