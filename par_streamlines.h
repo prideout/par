@@ -707,7 +707,7 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
         uint32_t num_piecewise = 1 + (spine_length - 4) / 2;
 
         // First piecewise curve.
-        uint32_t num_required_spine_points = 0;
+        uint32_t num_required_spine_points = 1;
         parsl__tesselate_cubic(NULL, &num_required_spine_points,
             psource[0].x, psource[0].y, psource[1].x, psource[1].y,
             psource[2].x, psource[2].y, psource[3].x, psource[3].y,
@@ -749,6 +749,9 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
         parsl_position* target_spine_start = ptarget;
 
         // First piecewise curve.
+        ptarget[0].x = psource[0].x;
+        ptarget[0].y = psource[0].y;
+        ptarget++;
         uint32_t num_written_points = 0;
         parsl__tesselate_cubic(ptarget, &num_written_points,
             psource[0].x, psource[0].y, psource[1].x, psource[1].y,
