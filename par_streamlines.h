@@ -141,8 +141,8 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
 // control points, followed by an endpoint. Every subsequent curve in the spine
 // is defined by a single control point followed by an endpoint.
 //
-// The number of vertices in each spine should be n*2 where n is the number of
-// piecewise curves.
+// The number of vertices in each spine should be 3+(n-1)*2 where n is the
+// number of piecewise curves.
 //
 // Each spine is equivalent to an SVG path that looks like M Q M Q M Q.
 parsl_mesh* parsl_mesh_from_curves_quadratic(parsl_context* context,
@@ -350,7 +350,8 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             if (dotp < miter_acos_max && dotp > miter_acos_min) {
                 const float phi = acos(dotp) / 2;
                 const float theta = PAR_PI / 2 - phi;
-                extent = PAR_CLAMP(extent / sin(theta), -miter_limit, miter_limit);
+                extent = PAR_CLAMP(extent / sin(theta), -miter_limit,
+                    miter_limit);
             }
 
             ex = pnx + nx;
@@ -405,7 +406,8 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             if (dotp < miter_acos_max && dotp > miter_acos_min) {
                 const float phi = acos(dotp) / 2;
                 const float theta = PAR_PI / 2 - phi;
-                extent = PAR_CLAMP(extent / sin(theta), -miter_limit, miter_limit);
+                extent = PAR_CLAMP(extent / sin(theta), -miter_limit,
+                    miter_limit);
             }
 
             float ex = pnx + nx;
@@ -476,7 +478,8 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             if (dotp < miter_acos_max && dotp > miter_acos_min) {
                 const float phi = acos(dotp) / 2;
                 const float theta = PAR_PI / 2 - phi;
-                extent = PAR_CLAMP(extent / sin(theta), -miter_limit, miter_limit);
+                extent = PAR_CLAMP(extent / sin(theta), -miter_limit,
+                    miter_limit);
             }
 
             ex = pnx + nx;
