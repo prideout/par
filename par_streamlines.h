@@ -198,6 +198,7 @@ static parsl_position parsl_mul(parsl_position v, float s) {
 #endif
 
 #ifndef PAR_ARRAY
+#define PAR_ARRAY
 #define pa_free(a) ((a) ? PAR_FREE(pa___raw(a)), 0 : 0)
 #define pa_push(a, v) (pa___maybegrow(a, 1), (a)[pa___n(a)++] = (v))
 #define pa_count(a) ((a) ? pa___n(a) : 0)

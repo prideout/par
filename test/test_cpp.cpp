@@ -22,6 +22,9 @@
 #define PAR_EASINGS_IMPLEMENTATION
 #include "par_easings.h"
 
+#define PAR_STREAMLINES_IMPLEMENTATION
+#include "par_streamlines.h"
+
 int main(int argc, char* argv[])
 {
     return 0;
