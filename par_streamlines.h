@@ -138,7 +138,7 @@ parsl_mesh* parsl_mesh_from_curves_cubic(parsl_context* context,
 // where each spine is a series of chained quadratic Bézier curves.
 //
 // The first curve of each spine is defined by an endpoint, followed by one
-// control points, followed by an endpoint. Every subsequent curve in the spine
+// control point, followed by an endpoint. Every subsequent curve in the spine
 // is defined by a single control point followed by an endpoint.
 //
 // The number of vertices in each spine should be 3+(n-1)*2 where n is the
