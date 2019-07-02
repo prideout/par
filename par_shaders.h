@@ -118,7 +118,7 @@ static const char* parsh__list_get(parsh__list*, const char* id, size_t idlen);
 static void parsh__list_free(parsh__list* );
 
 parsh_context* parsh_create_context(parsh_config config) {
-    parsh_context* context = calloc(1, sizeof(parsh_context));
+    parsh_context* context = (parsh_context*) calloc(1, sizeof(parsh_context));
     context->config = config;
     return context;
 }
@@ -305,11 +305,11 @@ static char* parsh__list_add(parsh__list* list, const char* name,
         char line_directive[16] = {0};
         size_t prefix_length =
             snprintf(line_directive, 16, "\n#line %d\n", line_number);
-        storage = calloc(1, prefix_length + value_size + 1);
+        storage = (char*) calloc(1, prefix_length + value_size + 1);
         memcpy(storage, line_directive, prefix_length);
         cursor = storage + prefix_length;
     } else {
-        storage = cursor = calloc(1, value_size + 1);
+        storage = cursor = (char*) calloc(1, value_size + 1);
     }
 
     if (value) {
