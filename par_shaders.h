@@ -42,6 +42,7 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -84,8 +85,11 @@ void parsh_write_cstring(parsh_context*, parsh_write_line writefn, void* user);
 
 #ifdef PAR_SHADERS_IMPLEMENTATION
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
@@ -375,7 +379,7 @@ int main(int argc, char** argv) {
 
     FILE* outfile = fopen(dstfile, "wt");
     fprintf(outfile, "const char SHADERS[] = \n");
-    parsh_write_cstring(context, write_line, outfile);
+    parsh_write_cstring(ctx, write_line, outfile);
     fprintf(outfile, ";\n");
     fclose(outfile);
     parsh_destroy_context(ctx);

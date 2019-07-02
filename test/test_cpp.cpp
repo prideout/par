@@ -25,6 +25,9 @@
 #define PAR_STREAMLINES_IMPLEMENTATION
 #include "par_streamlines.h"
 
+#define PAR_SHADERS_IMPLEMENTATION
+#include "par_shaders.h"
+
 int main(int argc, char* argv[])
 {
     return 0;
