@@ -189,7 +189,9 @@ void parsh_add_blocks(parsh_context* context, const char* blob,
 
 void parsh_add_block(parsh_context* context, const char* name,
     const char* body) {
-    parsh__list_add(&context->blocks, name, strdup(body), 1 + strlen(body), 0);
+    char* dup = malloc(strlen(body) + 1);
+    memcpy(dup, body, 1 + strlen(body));
+    parsh__list_add(&context->blocks, name, dup, 1 + strlen(body), 0);
 }
 
 const char* parsh_get_blocks(parsh_context* context, const char* block_names) {
@@ -324,7 +326,14 @@ static char* parsh__list_add(parsh__list* list, const char* name,
         }
     }
 
-    list->names[list->count] = name ? strdup(name) : 0;
+    if (name) {
+        char* dup = malloc(strlen(name) + 1);
+        memcpy(dup, name, strlen(name) + 1);
+        list->names[list->count] = dup;
+    } else {
+        list->names[list->count] = 0;
+    }
+
     list->values[list->count] = storage;
     list->count++;
     return storage;
@@ -353,15 +362,17 @@ static void parsh__list_free(parsh__list* list) {
 void write_line(const char* ln, void* userdata) {
     FILE* outfile = (FILE*) userdata;
     fputs(ln, outfile);
+    fputc('\n', outfile);
 }
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        puts("Usage: parsh srcfile dstfile");
+    if (argc != 4) {
+        puts("Usage: parsh srcfile dstfile array_name");
         return 1;
     }
     const char* srcfile = argv[1];
     const char* dstfile = argv[2];
+    const char* array_name = argv[3];
 
     FILE *f = fopen(srcfile, "rb");
     fseek(f, 0, SEEK_END);
@@ -378,7 +389,7 @@ int main(int argc, char** argv) {
     free(buffer);
 
     FILE* outfile = fopen(dstfile, "wt");
-    fprintf(outfile, "const char SHADERS[] = \n");
+    fprintf(outfile, "const char %s[] = \n", array_name);
     parsh_write_cstring(ctx, write_line, outfile);
     fprintf(outfile, ";\n");
     fclose(outfile);
