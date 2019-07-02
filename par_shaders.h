@@ -189,7 +189,7 @@ void parsh_add_blocks(parsh_context* context, const char* blob,
 
 void parsh_add_block(parsh_context* context, const char* name,
     const char* body) {
-    char* dup = malloc(strlen(body) + 1);
+    char* dup = (char*) malloc(strlen(body) + 1);
     memcpy(dup, body, 1 + strlen(body));
     parsh__list_add(&context->blocks, name, dup, 1 + strlen(body), 0);
 }
@@ -327,7 +327,7 @@ static char* parsh__list_add(parsh__list* list, const char* name,
     }
 
     if (name) {
-        char* dup = malloc(strlen(name) + 1);
+        char* dup = (char*) malloc(strlen(name) + 1);
         memcpy(dup, name, strlen(name) + 1);
         list->names[list->count] = dup;
     } else {
