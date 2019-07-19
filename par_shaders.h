@@ -42,9 +42,9 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 typedef struct {
     bool enable_line_directives;
@@ -62,6 +62,8 @@ const char* parsh_get_blocks(parsh_context*, const char* block_names);
 
 typedef void (*parsh_write_line)(const char* line, void* userdata);
 void parsh_write_cstring(parsh_context*, parsh_write_line writefn, void* user);
+
+parsh_context* parsh_create_context_from_file(const char* filename);
 
 #ifndef PARSH_MAX_NUM_BLOCKS
 #define PARSH_MAX_NUM_BLOCKS 128
@@ -357,7 +359,28 @@ static void parsh__list_free(parsh__list* list) {
     list->count = 0;
 }
 
-#ifdef PAR_SHADERS_MAIN
+#ifdef PARSH_ENABLE_STDIO
+
+parsh_context* parsh_create_context_from_file(const char* filename) {
+    FILE* f = fopen(filename, "rb");
+    if (!f) {
+        return NULL;
+    }
+    fseek(f, 0, SEEK_END);
+    size_t length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* buffer = malloc(length);
+    fread(buffer, 1, length, f);
+    fclose(f);
+    parsh_context* shaders = parsh_create_context((parsh_config){.enable_line_directives = true});
+    parsh_add_blocks(shaders, buffer, length);
+    free(buffer);
+    return shaders;
+}
+
+#endif
+
+#ifdef PARSH_ENABLE_MAIN
 
 void write_line(const char* ln, void* userdata) {
     FILE* outfile = (FILE*) userdata;
