@@ -372,7 +372,9 @@ parsh_context* parsh_create_context_from_file(const char* filename) {
     char* buffer = malloc(length);
     fread(buffer, 1, length, f);
     fclose(f);
-    parsh_context* shaders = parsh_create_context((parsh_config){.enable_line_directives = true});
+    parsh_context* shaders = parsh_create_context((parsh_config){
+        .enable_line_directives = true
+    });
     parsh_add_blocks(shaders, buffer, length);
     free(buffer);
     return shaders;
