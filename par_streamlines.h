@@ -200,7 +200,7 @@ static parsl_position parsl_mul(parsl_position v, float s) {
 #ifndef PAR_ARRAY
 #define PAR_ARRAY
 #define pa_free(a) ((a) ? PAR_FREE(pa___raw(a)), 0 : 0)
-#define pa_push(a, v) (pa___maybegrow(a, 1), (a)[pa___n(a)++] = (v))
+#define pa_push(a, v) (pa___maybegrow(a, (int) 1), (a)[pa___n(a)++] = (v))
 #define pa_count(a) ((a) ? pa___n(a) : 0)
 #define pa_add(a, n) (pa___maybegrow(a, (int) n), pa___n(a) += (n))
 #define pa_last(a) ((a)[pa___n(a) - 1])
@@ -210,7 +210,7 @@ static parsl_position parsl_mul(parsl_position v, float s) {
 #define pa___raw(a) ((int*) (a) -2)
 #define pa___m(a) pa___raw(a)[0]
 #define pa___n(a) pa___raw(a)[1]
-#define pa___needgrow(a, n) ((a) == 0 || pa___n(a) + (n) >= pa___m(a))
+#define pa___needgrow(a, n) ((a) == 0 || pa___n(a) + ((int) n) >= pa___m(a))
 #define pa___maybegrow(a, n) (pa___needgrow(a, (n)) ? pa___grow(a, n) : 0)
 #define pa___grow(a, n) (*((void**)& (a)) = pa___growf((void*) (a), (n), \
         sizeof(*(a))))
