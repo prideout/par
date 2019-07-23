@@ -64,6 +64,7 @@ typedef void (*parsh_write_line)(const char* line, void* userdata);
 void parsh_write_cstring(parsh_context*, parsh_write_line writefn, void* user);
 
 parsh_context* parsh_create_context_from_file(const char* filename);
+void parsh_add_blocks_from_file(parsh_context* context, const char* filename);
 
 #ifndef PARSH_MAX_NUM_BLOCKS
 #define PARSH_MAX_NUM_BLOCKS 128
@@ -378,6 +379,22 @@ parsh_context* parsh_create_context_from_file(const char* filename) {
     parsh_add_blocks(shaders, buffer, length);
     free(buffer);
     return shaders;
+}
+
+void parsh_add_blocks_from_file(parsh_context* context, const char* filename) {
+    FILE* f = fopen(filename, "rb");
+    if (!f) {
+        fprintf(stderr, "Unable to open %s\n", filename);
+        return;
+    }
+    fseek(f, 0, SEEK_END);
+    size_t length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* buffer = malloc(length);
+    fread(buffer, 1, length, f);
+    fclose(f);
+    parsh_add_blocks(context, buffer, length);
+    free(buffer);
 }
 
 #endif
