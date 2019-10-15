@@ -140,6 +140,10 @@ void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
 par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
     par_shapes_mesh* target);
 
+// Global Config ---------------------------------------------------------------
+
+void par_shapes_set_epsilon_welded_normals(float epsilon);
+
 // Transformations -------------------------------------------------------------
 
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
@@ -203,6 +207,8 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+
+static float par_shapes__epsilon_welded_normals = 0.001;
 
 static void par_shapes__sphere(float const* uv, float* xyz, void*);
 static void par_shapes__hemisphere(float const* uv, float* xyz, void*);
@@ -300,9 +306,10 @@ static float par_shapes__sqrdist3(float const* a, float const* b)
 
 static void par_shapes__compute_welded_normals(par_shapes_mesh* m)
 {
+    const float epsilon = par_shapes__epsilon_welded_normals;
     m->normals = PAR_MALLOC(float, m->npoints * 3);
     PAR_SHAPES_T* weldmap = PAR_MALLOC(PAR_SHAPES_T, m->npoints);
-    par_shapes_mesh* welded = par_shapes_weld(m, 0.01, weldmap);
+    par_shapes_mesh* welded = par_shapes_weld(m, epsilon, weldmap);
     par_shapes_compute_normals(welded);
     float* pdst = m->normals;
     for (int i = 0; i < m->npoints; i++, pdst += 3) {
@@ -341,7 +348,6 @@ par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks)
     }
     par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__sphere,
         slices, stacks, 0);
-    par_shapes_remove_degenerate(m, 0.0001);
     return m;
 }
 
@@ -352,7 +358,6 @@ par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks)
     }
     par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__hemisphere,
         slices, stacks, 0);
-    par_shapes_remove_degenerate(m, 0.0001);
     return m;
 }
 
@@ -636,6 +641,10 @@ static void par_shapes__trefoil(float const* uv, float* xyz, void* userdata)
     xyz[0] = x + d * (qvn[0] * cos(v) + ww[0] * sin(v));
     xyz[1] = y + d * (qvn[1] * cos(v) + ww[1] * sin(v));
     xyz[2] = z + d * ww[2] * sin(v);
+}
+
+void par_shapes_set_epsilon_welded_normals(float epsilon) {
+    par_shapes__epsilon_welded_normals = epsilon;
 }
 
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
