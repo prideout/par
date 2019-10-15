@@ -140,11 +140,6 @@ void par_shapes_compute_aabb(par_shapes_mesh const* mesh, float* aabb);
 par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
     par_shapes_mesh* target);
 
-// Global Config ---------------------------------------------------------------
-
-void par_shapes_set_epsilon_welded_normals(float epsilon);
-void par_shapes_set_epsilon_degenerate_sphere(float epsilon);
-
 // Transformations -------------------------------------------------------------
 
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src);
@@ -175,6 +170,17 @@ par_shapes_mesh* par_shapes_weld(par_shapes_mesh const*, float epsilon,
 
 // Compute smooth normals by averaging adjacent facet normals.
 void par_shapes_compute_normals(par_shapes_mesh* m);
+
+// Global Config ---------------------------------------------------------------
+
+void par_shapes_set_epsilon_welded_normals(float epsilon);
+void par_shapes_set_epsilon_degenerate_sphere(float epsilon);
+
+// Advanced --------------------------------------------------------------------
+
+void par_shapes__compute_welded_normals(par_shapes_mesh* m);
+void par_shapes__connect(par_shapes_mesh* scene, par_shapes_mesh* cylinder,
+    int slices);
 
 #ifndef PAR_PI
 #define PAR_PI (3.14159265359)
@@ -306,7 +312,7 @@ static float par_shapes__sqrdist3(float const* a, float const* b)
     return dx * dx + dy * dy + dz * dz;
 }
 
-static void par_shapes__compute_welded_normals(par_shapes_mesh* m)
+void par_shapes__compute_welded_normals(par_shapes_mesh* m)
 {
     const float epsilon = par_shapes__epsilon_welded_normals;
     m->normals = PAR_MALLOC(float, m->npoints * 3);
@@ -1145,8 +1151,8 @@ static par_shapes_mesh* par_shapes__apply_turtle(par_shapes_mesh* mesh,
     return m;
 }
 
-static void par_shapes__connect(par_shapes_mesh* scene,
-    par_shapes_mesh* cylinder, int slices)
+void par_shapes__connect(par_shapes_mesh* scene, par_shapes_mesh* cylinder,
+    int slices)
 {
     int stacks = 1;
     int npoints = (slices + 1) * (stacks + 1);
