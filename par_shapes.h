@@ -1165,7 +1165,8 @@ static void par_shapes__connect(par_shapes_mesh* scene,
     // Create the new triangle list.
     int ntriangles = scene->ntriangles + 2 * slices * stacks;
     PAR_SHAPES_T* triangles = PAR_MALLOC(PAR_SHAPES_T, ntriangles * 3);
-    memcpy(triangles, scene->triangles, 2 * scene->ntriangles * 3);
+    memcpy(triangles, scene->triangles,
+        sizeof(PAR_SHAPES_T) * scene->ntriangles * 3);
     int v = scene->npoints - (slices + 1);
     PAR_SHAPES_T* face = triangles + scene->ntriangles * 3;
     for (int stack = 0; stack < stacks; stack++) {
