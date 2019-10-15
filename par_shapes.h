@@ -143,6 +143,7 @@ par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
 // Global Config ---------------------------------------------------------------
 
 void par_shapes_set_epsilon_welded_normals(float epsilon);
+void par_shapes_set_epsilon_degenerate_sphere(float epsilon);
 
 // Transformations -------------------------------------------------------------
 
@@ -209,6 +210,7 @@ void par_shapes_compute_normals(par_shapes_mesh* m);
 #include <errno.h>
 
 static float par_shapes__epsilon_welded_normals = 0.001;
+static float par_shapes__epsilon_degenerate_sphere = 0.0001;
 
 static void par_shapes__sphere(float const* uv, float* xyz, void*);
 static void par_shapes__hemisphere(float const* uv, float* xyz, void*);
@@ -348,6 +350,7 @@ par_shapes_mesh* par_shapes_create_parametric_sphere(int slices, int stacks)
     }
     par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__sphere,
         slices, stacks, 0);
+    par_shapes_remove_degenerate(m, par_shapes__epsilon_degenerate_sphere);
     return m;
 }
 
@@ -358,6 +361,7 @@ par_shapes_mesh* par_shapes_create_hemisphere(int slices, int stacks)
     }
     par_shapes_mesh* m = par_shapes_create_parametric(par_shapes__hemisphere,
         slices, stacks, 0);
+    par_shapes_remove_degenerate(m, par_shapes__epsilon_degenerate_sphere);
     return m;
 }
 
@@ -645,6 +649,10 @@ static void par_shapes__trefoil(float const* uv, float* xyz, void* userdata)
 
 void par_shapes_set_epsilon_welded_normals(float epsilon) {
     par_shapes__epsilon_welded_normals = epsilon;
+}
+
+void par_shapes_set_epsilon_degenerate_sphere(float epsilon) {
+    par_shapes__epsilon_degenerate_sphere = epsilon;
 }
 
 void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
