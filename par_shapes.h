@@ -1685,8 +1685,9 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
         // Check for colocated points in each nearby bin.
         for (int b = 0; b < nbins; b++) {
             int binindex = nearby[b];
-            PAR_SHAPES_T binvalue = *(bins + binindex);
+            PAR_SHAPES_T binvalue = bins[binindex];
             PAR_SHAPES_T nindex = binvalue - 1;
+            assert(nindex < mesh->npoints);
             while (true) {
 
                 // If this isn't "self" and it's colocated, then weld it!
@@ -1752,6 +1753,9 @@ static void par_shapes__weld_points(par_shapes_mesh* mesh, int gridsize,
         PAR_SHAPES_T b = weldmap[tsrc[1]];
         PAR_SHAPES_T c = weldmap[tsrc[2]];
         if (a != b && a != c && b != c) {
+            assert(a < mesh->npoints);
+            assert(b < mesh->npoints);
+            assert(c < mesh->npoints);
             *tdst++ = a;
             *tdst++ = b;
             *tdst++ = c;
