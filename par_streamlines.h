@@ -329,9 +329,9 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
         float dx = src_position[1].x - src_position[0].x;
         float dy = src_position[1].y - src_position[0].y;
         float segment_length = sqrtf(dx * dx + dy * dy);
-        float inv_length = segment_length == 0.0f ? 0.0f : (1.0f / segment_length);
-        const float nx = -dy * inv_length;
-        const float ny = dx * inv_length;
+        float invlen = segment_length ? 1.0f / segment_length : 0.0f;
+        const float nx = -dy * invlen;
+        const float ny = dx * invlen;
 
         const Position first_src_position = src_position[0];
         const Position last_src_position = src_position[spine_length - 1];
@@ -343,9 +343,9 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             const float dx = src_position[0].x - last_src_position.x;
             const float dy = src_position[0].y - last_src_position.y;
             const float segment_length = sqrtf(dx * dx + dy * dy);
-            const float inv_length = segment_length == 0.0f ? 0.0f : (1.0f / segment_length);
-            const float pnx = -dy * inv_length;
-            const float pny = dx * inv_length;
+            float invlen = segment_length ? 1.0f / segment_length : 0.0f;
+            const float pnx = -dy * invlen;
+            const float pny = dx * invlen;
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             float extent = 0.5 * thickness;
@@ -360,7 +360,7 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             ex = pnx + nx;
             ey = pny + ny;
             const float len = sqrtf(ex * ex + ey * ey);
-            const float invlen = len == 0.0 ? 0.0 : (1.0f / len);
+            invlen = len == 0.0 ? 0.0 : (1.0f / len);
             ex *= invlen * extent;
             ey *= invlen * extent;
         }
@@ -401,9 +401,9 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             const float dx = src_position[1].x - src_position[0].x;
             const float dy = src_position[1].y - src_position[0].y;
             const float segment_length = sqrtf(dx * dx + dy * dy);
-            const float inv_length = segment_length == 0.0f ? 0.0f : (1.0f / segment_length);
-            const float nx = -dy * inv_length;
-            const float ny = dx * inv_length;
+            float invlen = segment_length ? 1.0f / segment_length : 0.0f;
+            const float nx = -dy * invlen;
+            const float ny = dx * invlen;
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             float extent = 0.5 * thickness;
@@ -418,7 +418,7 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             float ex = pnx + nx;
             float ey = pny + ny;
             const float len = sqrtf(ex * ex + ey * ey);
-            const float invlen = len == 0.0 ? 0.0 : (1.0f / len);
+            invlen = len == 0.0 ? 0.0 : (1.0f / len);
             ex *= invlen * extent;
             ey *= invlen * extent;
 
@@ -475,9 +475,9 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             const float dx = first_src_position.x - src_position[0].x;
             const float dy = first_src_position.y - src_position[0].y;
             segment_length = sqrtf(dx * dx + dy * dy);
-            float inv_length = segment_length == 0.0f ? 0.0f : (1.0f / segment_length);
-            const float nx = -dy * inv_length;
-            const float ny = dx * inv_length;
+            float invlen = segment_length ? 1.0f / segment_length : 0.0f;
+            const float nx = -dy * invlen;
+            const float ny = dx * invlen;
 
             // NOTE: sin(pi / 2 - acos(X) / 2) == sqrt(1 + X) / sqrt(2)
             float extent = 0.5 * thickness;
@@ -492,7 +492,7 @@ parsl_mesh* parsl_mesh_from_lines(parsl_context* context,
             ex = pnx + nx;
             ey = pny + ny;
             const float len = sqrtf(ex * ex + ey * ey);
-            const float invlen = len == 0.0 ? 0.0 : (1.0f / len);
+            invlen = len == 0.0 ? 0.0 : (1.0f / len);
             ex *= invlen * extent;
             ey *= invlen * extent;
         }
