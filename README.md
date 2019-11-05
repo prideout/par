@@ -12,7 +12,7 @@ library    | description  | link
 **par_sprune.h** | efficient broad-phase collision detection in 2D | [web demo](https://prideout.net/d3cpp/)
 **par_easings.h** | Robert Penner's easing functions |
 **par_bubbles.h** | pack circles into hierarchical diagrams | [blog post](https://prideout.net/bubbles)
-**par_msquares.h** | efficient marching squares implementation | [blog post](https://prideout.net/marching-squares)
+**par_msquares.h** | quick-and-dirty marching squares |
 **par_bluenoise.h** | generate progressive 2D point sequences | [blog post](https://prideout.net/recursive-wang-tiles)
 **par_easycurl.h** | simple HTTP requests using libcurl |
 **par_filecache.h** | LRU caching on your device's filesystem |
