@@ -898,9 +898,11 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
 
                 if (mesh->dim == 3) {
                     if (width > height) {
-                        ppts[2] = heightfn(ppts[0], ppts[1] * width / height, context);
+                        ppts[2] = heightfn(ppts[0], ppts[1] * width / height,
+                            context);
                     } else {
-                        ppts[2] = heightfn(ppts[0] * height / width, ppts[1], context);
+                        ppts[2] = heightfn(ppts[0] * height / width, ppts[1],
+                            context);
                     }
                 }
 
