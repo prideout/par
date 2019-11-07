@@ -370,7 +370,7 @@ parsh_context* parsh_create_context_from_file(const char* filename) {
     fseek(f, 0, SEEK_END);
     size_t length = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char* buffer = malloc(length);
+    char* buffer = (char*) malloc(length);
     fread(buffer, 1, length, f);
     fclose(f);
     parsh_context* shaders = parsh_create_context((parsh_config){
@@ -390,7 +390,7 @@ void parsh_add_blocks_from_file(parsh_context* context, const char* filename) {
     fseek(f, 0, SEEK_END);
     size_t length = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char* buffer = malloc(length);
+    char* buffer = (char*) malloc(length);
     fread(buffer, 1, length, f);
     fclose(f);
     parsh_add_blocks(context, buffer, length);
