@@ -249,6 +249,17 @@ static void parcc_float3_scale(parcc_float dst[3], parcc_float v) {
     dst[2] *= v;
 }
 
+inline void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
+    parcc_float t) {
+    dst[0] = a[0] * (1 - t) + b[0] * t;
+    dst[1] = a[1] * (1 - t) + b[1] * t;
+    dst[2] = a[2] * (1 - t) + b[2] * t;
+}
+
+static parcc_float parcc_float_lerp(const parcc_float a, const parcc_float b, parcc_float t) {
+    return a * (1 - t) + b * t;
+}
+
 static parcc_float parcc_float3_length(const parcc_float dst[3]) {
     return sqrtf(parcc_float3_dot(dst, dst));
 }
@@ -836,48 +847,65 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
 }
 
 parcc_frame parcc_interpolate_frames(parcc_frame a, parcc_frame b, double t) {
-    const double rho = sqrt(2.0);
-    const double rho2 = 2, rho4 = 4;
-    const double ux0 = a.center[0], uy0 = a.center[1], w0 = a.extent;
-    const double ux1 = b.center[0], uy1 = b.center[1], w1 = b.extent;
-    const double dx = ux1 - ux0, dy = uy1 - uy0, d2 = dx * dx + dy * dy, d1 = sqrt(d2);
-    const double b0 = (w1 * w1 - w0 * w0 + rho4 * d2) / (2.0 * w0 * rho2 * d1);
-    const double b1 = (w1 * w1 - w0 * w0 - rho4 * d2) / (2.0 * w1 * rho2 * d1);
-    const double r0 = log(sqrt(b0 * b0 + 1.0) - b0);
-    const double r1 = log(sqrt(b1 * b1 + 1) - b1);
-    const double dr = r1 - r0;
-    const int valid_dr = (dr == dr) && dr != 0;
-    const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
     parcc_frame frame;
-    const double s = t * S;
-    if (valid_dr) {
-        const double coshr0 = cosh(r0);
-        const double u = w0 / (rho2 * d1) * (coshr0 * tanh(rho * s + r0) - sinh(r0));
-        frame.center[0] = ux0 + u * dx;
-        frame.center[1] = uy0 + u * dy;
-        frame.extent = w0 * coshr0 / cosh(rho * s + r0);
-        return frame;
+    if (a.mode == PARCC_MAP && b.mode == PARCC_MAP) {
+        const double rho = sqrt(2.0);
+        const double rho2 = 2, rho4 = 4;
+        const double ux0 = a.center[0], uy0 = a.center[1], w0 = a.extent;
+        const double ux1 = b.center[0], uy1 = b.center[1], w1 = b.extent;
+        const double dx = ux1 - ux0, dy = uy1 - uy0, d2 = dx * dx + dy * dy, d1 = sqrt(d2);
+        const double b0 = (w1 * w1 - w0 * w0 + rho4 * d2) / (2.0 * w0 * rho2 * d1);
+        const double b1 = (w1 * w1 - w0 * w0 - rho4 * d2) / (2.0 * w1 * rho2 * d1);
+        const double r0 = log(sqrt(b0 * b0 + 1.0) - b0);
+        const double r1 = log(sqrt(b1 * b1 + 1) - b1);
+        const double dr = r1 - r0;
+        const int valid_dr = (dr == dr) && dr != 0;
+        const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
+        const double s = t * S;
+        if (valid_dr) {
+            const double coshr0 = cosh(r0);
+            const double u = w0 / (rho2 * d1) * (coshr0 * tanh(rho * s + r0) - sinh(r0));
+            frame.center[0] = ux0 + u * dx;
+            frame.center[1] = uy0 + u * dy;
+            frame.extent = w0 * coshr0 / cosh(rho * s + r0);
+            return frame;
+        }
+        frame.center[0] = ux0 + t * dx;
+        frame.center[1] = uy0 + t * dy;
+        frame.extent = w0 * exp(rho * s);
+    } else if (a.mode == PARCC_ORBIT && b.mode == PARCC_ORBIT) {
+        frame.phi = parcc_float_lerp(a.phi, b.phi, t);
+        frame.theta = parcc_float_lerp(a.theta, b.theta, t);
+        frame.pivot_distance = parcc_float_lerp(a.pivot_distance, b.pivot_distance, t);
+        parcc_float3_lerp(frame.pivot, a.pivot, b.pivot, t);
+    } else {
+        // Cross-mode interpolation is not implemented.
+        frame = b;
     }
-    frame.center[0] = ux0 + t * dx;
-    frame.center[1] = uy0 + t * dy;
-    frame.extent = w0 * exp(rho * s);
     return frame;
 }
 
 double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) {
-    const double rho = sqrt(2.0);
-    const double rho2 = 2, rho4 = 4;
-    const double ux0 = a.center[0], uy0 = a.center[1], w0 = a.extent;
-    const double ux1 = b.center[0], uy1 = b.center[1], w1 = b.extent;
-    const double dx = ux1 - ux0, dy = uy1 - uy0, d2 = dx * dx + dy * dy, d1 = sqrt(d2);
-    const double b0 = (w1 * w1 - w0 * w0 + rho4 * d2) / (2.0 * w0 * rho2 * d1);
-    const double b1 = (w1 * w1 - w0 * w0 - rho4 * d2) / (2.0 * w1 * rho2 * d1);
-    const double r0 = log(sqrt(b0 * b0 + 1.0) - b0);
-    const double r1 = log(sqrt(b1 * b1 + 1) - b1);
-    const double dr = r1 - r0;
-    const int valid_dr = (dr == dr) && dr != 0;
-    const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
-    return fabs(S);
+    if (a.mode == PARCC_MAP && b.mode == PARCC_MAP) {
+        const double rho = sqrt(2.0);
+        const double rho2 = 2, rho4 = 4;
+        const double ux0 = a.center[0], uy0 = a.center[1], w0 = a.extent;
+        const double ux1 = b.center[0], uy1 = b.center[1], w1 = b.extent;
+        const double dx = ux1 - ux0, dy = uy1 - uy0, d2 = dx * dx + dy * dy, d1 = sqrt(d2);
+        const double b0 = (w1 * w1 - w0 * w0 + rho4 * d2) / (2.0 * w0 * rho2 * d1);
+        const double b1 = (w1 * w1 - w0 * w0 - rho4 * d2) / (2.0 * w1 * rho2 * d1);
+        const double r0 = log(sqrt(b0 * b0 + 1.0) - b0);
+        const double r1 = log(sqrt(b1 * b1 + 1) - b1);
+        const double dr = r1 - r0;
+        const int valid_dr = (dr == dr) && dr != 0;
+        const double S = (valid_dr ? dr : log(w1 / w0)) / rho;
+        return fabs(S);
+    } else if (a.mode == PARCC_ORBIT && b.mode == PARCC_ORBIT) {
+        return 1;
+    } else {
+        // Cross-mode interpolation is not implemented.
+    }
+    return 0;
 }
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
