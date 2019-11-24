@@ -36,6 +36,15 @@ add_executable(
 target_link_libraries(test_cpp ${CURL_LIBRARIES})
 
 add_executable(
+    test_c
+    test_c.c
+    lz4.cpp
+    lodepng.c
+    sds.c
+    whereami.c)
+target_link_libraries(test_c ${CURL_LIBRARIES})
+
+add_executable(
     test_linkage
     test_linkage.cpp
     test_linkage.c
