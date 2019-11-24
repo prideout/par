@@ -67,5 +67,5 @@ if __name__ == '__main__':
     for filename in glob.glob('*.h'):
         good = check_format(filename) and good
     if not good:
-        print 'Illegal formatting detected.'
+        print('Illegal formatting detected.')
         sys.exit(1)

@@ -1,19 +1,26 @@
 language: c
 script:
+# uncrustify
     - curl -L https://github.com/uncrustify/uncrustify/archive/uncrustify-0.70.0.tar.gz | tar -xz
-    - cd uncrustify-uncrustify-0.70.0 && cmake . -B build && cd build && make -j
-    - cp uncrustify ../.. && cd ../..
+    - cd uncrustify-uncrustify-0.70.0
+    - ls
+    - cmake . -Bbuild
+    - cmake --build build
+    - cp build/uncrustify .. && cd ..
     - ./uncrustify --version
     - python tools/format.py --check
-    - export CC=gcc-5 CXX=g++-5
+# gcc
+    - export CC=gcc CXX=g++
     - cmake test -Bbuild
     - cmake --build build
     - build/test_msquares
     - echo Switching from gcc to clang...
     - rm -rf build
+# clang
     - export CC=clang CXX=clang++
     - cmake test -Bbuild
     - cmake --build build
+# smoke tests
     - build/test_bubbles
     - build/test_shapes
     - build/test_filecache
