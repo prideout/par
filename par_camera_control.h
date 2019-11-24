@@ -226,12 +226,6 @@ static void parcc_float3_add(parcc_float dst[3], const parcc_float a[3], const p
     dst[2] = a[2] + b[2];
 }
 
-static void parcc_float3_macc(parcc_float dst[3], const parcc_float src[3], parcc_float scale) {
-    dst[0] += src[0] * scale;
-    dst[1] += src[1] * scale;
-    dst[2] += src[2] * scale;
-}
-
 static void parcc_float3_subtract(parcc_float dst[3], const parcc_float a[3],
     const parcc_float b[3]) {
     dst[0] = a[0] - b[0];
@@ -267,20 +261,6 @@ static void parcc_float3_copy(parcc_float dst[3], const parcc_float src[3]) {
     dst[0] = src[0];
     dst[1] = src[1];
     dst[2] = src[2];
-}
-
-static void parcc_float3_copy_to_vec4(parcc_float dst[4], const parcc_float src[3], parcc_float w) {
-    dst[0] = src[0];
-    dst[1] = src[1];
-    dst[2] = src[2];
-    dst[3] = w;
-}
-
-static void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
-    parcc_float t) {
-    dst[0] = a[0] * (1 - t) + b[0] * t;
-    dst[1] = a[1] * (1 - t) + b[1] * t;
-    dst[2] = a[2] * (1 - t) + b[2] * t;
 }
 
 static void parcc_float16_look_at(float dst[16], const float eye[3], const float target[3],
