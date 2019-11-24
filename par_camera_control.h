@@ -249,7 +249,7 @@ static void parcc_float3_scale(parcc_float dst[3], parcc_float v) {
     dst[2] *= v;
 }
 
-inline void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
+static void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
     parcc_float t) {
     dst[0] = a[0] * (1 - t) + b[0] * t;
     dst[1] = a[1] * (1 - t) + b[1] * t;
