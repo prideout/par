@@ -39,8 +39,8 @@ def check_format(filename):
     previous_is_blank = False
     for line in infile:
         line = line.rstrip('\n')
-        if len(line) > 80:
-            fail('{}:{} Line is over 80 chars.')
+        if len(line) > 100:
+            fail('{}:{} Line is over 100 chars.')
             bad = True
         is_blank = len(line) == 0
         if previous_is_blank and line.lstrip(' ') == '}':

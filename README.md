@@ -54,5 +54,5 @@ The aforementioned Python script is also invoked from Travis, but using the `--c
 
 Beyond what our uncrustify configuration enforces, the Python script does the following:
 
-- Checks that no lines are more than 80 chars.
+- Checks that no lines are more than 100 chars.
 - Checks for extra newlines before an end brace.
