@@ -189,9 +189,7 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 #include <memory.h>
 #include <stdlib.h>
 
-#include "../../src/ray_float.h"  // TODO: integrate
-#include "../../src/vec_float.h"  // TODO: integrate
-
+#define PARCC_PI (3.14159265359)
 #define PARCC_MIN(a, b) (a > b ? b : a)
 #define PARCC_MAX(a, b) (a > b ? a : b)
 #define PARCC_CLAMP(v, lo, hi) PARCC_MAX(lo, PARCC_MIN(hi, v))
@@ -203,6 +201,159 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
         B = A;              \
         A = tmp;            \
     }
+
+inline void parcc_float4_set(parcc_float dst[4], parcc_float x, parcc_float y, parcc_float z,
+                             parcc_float w) {
+    dst[0] = x;
+    dst[1] = y;
+    dst[2] = z;
+    dst[3] = w;
+}
+
+inline parcc_float parcc_float4_dot(const parcc_float a[4], const parcc_float b[4]) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+}
+
+inline void parcc_float3_set(parcc_float dst[3], parcc_float x, parcc_float y, parcc_float z) {
+    dst[0] = x;
+    dst[1] = y;
+    dst[2] = z;
+}
+
+inline void parcc_float3_add(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3]) {
+    dst[0] = a[0] + b[0];
+    dst[1] = a[1] + b[1];
+    dst[2] = a[2] + b[2];
+}
+
+inline void parcc_float3_macc(parcc_float dst[3], const parcc_float src[3], parcc_float scale) {
+    dst[0] += src[0] * scale;
+    dst[1] += src[1] * scale;
+    dst[2] += src[2] * scale;
+}
+
+inline void parcc_float3_subtract(parcc_float dst[3], const parcc_float a[3],
+                                  const parcc_float b[3]) {
+    dst[0] = a[0] - b[0];
+    dst[1] = a[1] - b[1];
+    dst[2] = a[2] - b[2];
+}
+
+inline parcc_float parcc_float3_dot(const parcc_float a[3], const parcc_float b[3]) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+inline void parcc_float3_cross(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3]) {
+    dst[0] = a[1] * b[2] - a[2] * b[1];
+    dst[1] = a[2] * b[0] - a[0] * b[2];
+    dst[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+inline void parcc_float3_scale(parcc_float dst[3], parcc_float v) {
+    dst[0] *= v;
+    dst[1] *= v;
+    dst[2] *= v;
+}
+
+inline parcc_float parcc_float3_length(const parcc_float dst[3]) {
+    return sqrtf(parcc_float3_dot(dst, dst));
+}
+
+inline void parcc_float3_normalize(parcc_float dst[3]) {
+    parcc_float3_scale(dst, 1.0f / parcc_float3_length(dst));
+}
+
+inline void parcc_float3_copy(parcc_float dst[3], const parcc_float src[3]) {
+    dst[0] = src[0];
+    dst[1] = src[1];
+    dst[2] = src[2];
+}
+
+inline void parcc_float3_copy_to_vec4(parcc_float dst[4], const parcc_float src[3], parcc_float w) {
+    dst[0] = src[0];
+    dst[1] = src[1];
+    dst[2] = src[2];
+    dst[3] = w;
+}
+
+inline void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
+                              parcc_float t) {
+    dst[0] = a[0] * (1 - t) + b[0] * t;
+    dst[1] = a[1] * (1 - t) + b[1] * t;
+    dst[2] = a[2] * (1 - t) + b[2] * t;
+}
+
+inline void parcc_float16_look_at(float dst[16], const float eye[3], const float target[3],
+                                  const float up[3]) {
+    parcc_float v3X[3];
+    parcc_float v3Y[3];
+    parcc_float v3Z[3];
+
+    parcc_float3_copy(v3Y, up);
+    parcc_float3_normalize(v3Y);
+
+    parcc_float3_subtract(v3Z, eye, target);
+    parcc_float3_normalize(v3Z);
+
+    parcc_float3_cross(v3X, v3Y, v3Z);
+    parcc_float3_normalize(v3X);
+
+    parcc_float3_cross(v3Y, v3Z, v3X);
+
+    parcc_float4_set(dst + 0, v3X[0], v3Y[0], v3Z[0], 0);
+    parcc_float4_set(dst + 4, v3X[1], v3Y[1], v3Z[1], 0);
+    parcc_float4_set(dst + 8, v3X[2], v3Y[2], v3Z[2], 0);
+    parcc_float4_set(dst + 12,                     //
+                     -parcc_float3_dot(v3X, eye),  //
+                     -parcc_float3_dot(v3Y, eye),  //
+                     -parcc_float3_dot(v3Z, eye), 1.0);
+}
+
+inline void parcc_float16_perspective_y(float dst[16], float fovy_degrees, float aspect_ratio,
+                                        float near, float far) {
+    const parcc_float fovy_radians = fovy_degrees * PARCC_PI / 180;
+    const parcc_float f = tan(PARCC_PI / 2.0 - 0.5 * fovy_radians);
+    const parcc_float rangeinv = 1.0f / (near - far);
+    dst[0] = f / aspect_ratio;
+    dst[1] = 0;
+    dst[2] = 0;
+    dst[3] = 0;
+    dst[4] = 0;
+    dst[5] = f;
+    dst[6] = 0;
+    dst[7] = 0;
+    dst[8] = 0;
+    dst[9] = 0;
+    dst[10] = (near + far) * rangeinv;
+    dst[11] = -1;
+    dst[12] = 0;
+    dst[13] = 0;
+    dst[14] = ((near * far) * rangeinv) * 2.0f;
+    dst[15] = 0;
+}
+
+inline void parcc_float16_perspective_x(float dst[16], float fovy_degrees, float aspect_ratio,
+                                        float near, float far) {
+    const parcc_float fovy_radians = fovy_degrees * PARCC_PI / 180;
+    const parcc_float f = tan(PARCC_PI / 2.0 - 0.5 * fovy_radians);
+    const parcc_float rangeinv = 1.0 / (near - far);
+    dst[0] = f;
+    dst[1] = 0;
+    dst[2] = 0;
+    dst[3] = 0;
+    dst[4] = 0;
+    dst[5] = f * aspect_ratio;
+    dst[6] = 0;
+    dst[7] = 0;
+    dst[8] = 0;
+    dst[9] = 0;
+    dst[10] = (near + far) * rangeinv;
+    dst[11] = -1;
+    dst[12] = 0;
+    dst[13] = 0;
+    dst[14] = ((near * far) * rangeinv) * 2.0;
+    dst[15] = 0;
+}
 
 // Implementation note about the "parcc_frame" POD. This is an abbreviated camera state
 // used for animation and bookmarking.
@@ -221,7 +372,7 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
 
 typedef enum { PARCC_GRAB_NONE, PARCC_GRAB, PARCC_GRAB_STRAFE } parcc_grab_state;
 
-static const parcc_float PARCC_MAX_PHI = VEC_PI / 2 - 0.001;
+static const parcc_float PARCC_MAX_PHI = PARCC_PI / 2.0 - 0.001;
 
 struct parcc_context_s {
     parcc_properties props;
@@ -267,10 +418,10 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
     if (props.zoom_speed == 0) {
         props.zoom_speed = 0.01;
     }
-    if (float3_dot(props.home_upward, props.home_upward) == 0) {
+    if (parcc_float3_dot(props.home_upward, props.home_upward) == 0) {
         props.home_upward[1] = 1;
     }
-    if (float4_dot(props.map_plane, props.map_plane) == 0) {
+    if (parcc_float4_dot(props.map_plane, props.map_plane) == 0) {
         props.map_plane[2] = 1;
     }
     if (props.orbit_speed[0] == 0) {
@@ -301,43 +452,43 @@ void parcc_destroy_context(parcc_context* context) { PARCC_FREE(context); }
 void parcc_get_matrices(const parcc_context* context, parcc_float projection[16],
                         parcc_float view[16]) {
     parcc_float gaze[3];
-    float3_subtract(gaze, context->target, context->eyepos);
-    float3_normalize(gaze);
+    parcc_float3_subtract(gaze, context->target, context->eyepos);
+    parcc_float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->props.home_upward);
-    float3_normalize(right);
+    parcc_float3_cross(right, gaze, context->props.home_upward);
+    parcc_float3_normalize(right);
 
     parcc_float upward[3];
-    float3_cross(upward, right, gaze);
-    float3_normalize(upward);
+    parcc_float3_cross(upward, right, gaze);
+    parcc_float3_normalize(upward);
 
-    float16_look_at(view, context->eyepos, context->target, upward);
+    parcc_float16_look_at(view, context->eyepos, context->target, upward);
     const parcc_properties props = context->props;
     const parcc_float aspect = (parcc_float)props.viewport_width / props.viewport_height;
     const parcc_float fov = props.fov_degrees;
     if (context->props.fov_orientation == PARCC_HORIZONTAL) {
-        float16_perspective_x(projection, fov, aspect, props.near_plane, props.far_plane);
+        parcc_float16_perspective_x(projection, fov, aspect, props.near_plane, props.far_plane);
     } else {
-        float16_perspective_y(projection, fov, aspect, props.near_plane, props.far_plane);
+        parcc_float16_perspective_y(projection, fov, aspect, props.near_plane, props.far_plane);
     }
 }
 
 void parcc_get_look_at(const parcc_context* ctx, parcc_float eyepos[3], parcc_float target[3],
                        parcc_float upward[3]) {
-    float3_copy(eyepos, ctx->eyepos);
-    float3_copy(target, ctx->target);
+    parcc_float3_copy(eyepos, ctx->eyepos);
+    parcc_float3_copy(target, ctx->target);
     if (upward) {
         parcc_float gaze[3];
-        float3_subtract(gaze, ctx->target, ctx->eyepos);
-        float3_normalize(gaze);
+        parcc_float3_subtract(gaze, ctx->target, ctx->eyepos);
+        parcc_float3_normalize(gaze);
 
         parcc_float right[3];
-        float3_cross(right, gaze, ctx->props.home_upward);
-        float3_normalize(right);
+        parcc_float3_cross(right, gaze, ctx->props.home_upward);
+        parcc_float3_normalize(right);
 
-        float3_cross(upward, right, gaze);
-        float3_normalize(upward);
+        parcc_float3_cross(upward, right, gaze);
+        parcc_float3_normalize(upward);
     }
 }
 
@@ -355,35 +506,35 @@ void parcc_grab_begin(parcc_context* context, int winx, int winy, bool strafe) {
         context->grab_frame = parcc_get_current_frame(context);
         context->grab_winx = winx;
         context->grab_winy = winy;
-        float3_copy(context->grab_point_pivot, context->orbit_pivot);
+        parcc_float3_copy(context->grab_point_pivot, context->orbit_pivot);
     }
 
-    float3_copy(context->grab_point_eyepos, context->eyepos);
-    float3_copy(context->grab_point_target, context->target);
+    parcc_float3_copy(context->grab_point_eyepos, context->eyepos);
+    parcc_float3_copy(context->grab_point_target, context->target);
 }
 
 void parcc_grab_update(parcc_context* context, int winx, int winy) {
     if (context->props.mode == PARCC_MAP && context->grabbing == PARCC_GRAB) {
         parcc_float u_vec[3];
-        float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
-        const parcc_float u_len = float3_length(u_vec);
+        parcc_float3_subtract(u_vec, context->grab_point_world, context->grab_point_eyepos);
+        const parcc_float u_len = parcc_float3_length(u_vec);
 
         parcc_float v_vec[3];
-        float3_subtract(v_vec, context->grab_point_far, context->grab_point_world);
-        const parcc_float v_len = float3_length(v_vec);
+        parcc_float3_subtract(v_vec, context->grab_point_far, context->grab_point_world);
+        const parcc_float v_len = parcc_float3_length(v_vec);
 
         parcc_float far_point[3];
         parcc_get_ray_far(context, winx, winy, far_point);
 
         parcc_float translation[3];
-        float3_subtract(translation, far_point, context->grab_point_far);
-        float3_scale(translation, -u_len / v_len);
+        parcc_float3_subtract(translation, far_point, context->grab_point_far);
+        parcc_float3_scale(translation, -u_len / v_len);
 
         parcc_float eyepos[3];
-        float3_add(eyepos, context->grab_point_eyepos, translation);
+        parcc_float3_add(eyepos, context->grab_point_eyepos, translation);
 
         parcc_float target[3];
-        float3_add(target, context->grab_point_target, translation);
+        parcc_float3_add(target, context->grab_point_target, translation);
 
         parcc_move_with_constraints(context, eyepos, target);
     }
@@ -408,15 +559,15 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
         parcc_float upward[3];
 
         parcc_float gaze[3];
-        float3_subtract(gaze, context->target, context->eyepos);
-        float3_normalize(gaze);
+        parcc_float3_subtract(gaze, context->target, context->eyepos);
+        parcc_float3_normalize(gaze);
 
         parcc_float right[3];
-        float3_cross(right, gaze, context->props.home_upward);
-        float3_normalize(right);
+        parcc_float3_cross(right, gaze, context->props.home_upward);
+        parcc_float3_normalize(right);
 
-        float3_cross(upward, right, gaze);
-        float3_normalize(upward);
+        parcc_float3_cross(upward, right, gaze);
+        parcc_float3_normalize(upward);
 
         const int delx = context->grab_winx - winx;
         const int dely = context->grab_winy - winy;
@@ -424,15 +575,15 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
         const parcc_float dx = delx * 0.001;
         const parcc_float dy = dely * 0.001;
 
-        float3_scale(right, dx);
-        float3_scale(upward, dy);
+        parcc_float3_scale(right, dx);
+        parcc_float3_scale(upward, dy);
 
         parcc_float movement[3];
-        float3_add(movement, upward, right);
+        parcc_float3_add(movement, upward, right);
 
-        float3_add(context->orbit_pivot, context->grab_point_pivot, movement);
-        float3_add(context->eyepos, context->grab_point_eyepos, movement);
-        float3_add(context->target, context->grab_point_target, movement);
+        parcc_float3_add(context->orbit_pivot, context->grab_point_pivot, movement);
+        parcc_float3_add(context->eyepos, context->grab_point_eyepos, movement);
+        parcc_float3_add(context->target, context->grab_point_target, movement);
     }
 }
 
@@ -449,46 +600,46 @@ void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrollde
         // We intentionally avoid normalizing this vector since you usually
         // want to slow down when approaching the surface.
         parcc_float u_vec[3];
-        float3_subtract(u_vec, grab_point_world, context->eyepos);
+        parcc_float3_subtract(u_vec, grab_point_world, context->eyepos);
 
         // Prevent getting stuck; this needs to be done regardless
         // of the user's min_distance setting, which is enforced in
         // parcc_move_with_constraints.
         const parcc_float zoom_speed = context->props.zoom_speed;
         if (scrolldelta > 0.0) {
-            const parcc_float distance_to_surface = float3_length(u_vec);
+            const parcc_float distance_to_surface = parcc_float3_length(u_vec);
             if (distance_to_surface < zoom_speed) {
                 return;
             }
         }
 
-        float3_scale(u_vec, scrolldelta * zoom_speed);
+        parcc_float3_scale(u_vec, scrolldelta * zoom_speed);
 
         parcc_float eyepos[3];
-        float3_add(eyepos, context->eyepos, u_vec);
+        parcc_float3_add(eyepos, context->eyepos, u_vec);
 
         parcc_float target[3];
-        float3_add(target, context->target, u_vec);
+        parcc_float3_add(target, context->target, u_vec);
 
         parcc_move_with_constraints(context, eyepos, target);
     }
 
     if (context->props.mode == PARCC_ORBIT) {
         parcc_float gaze[3];
-        float3_subtract(gaze, context->target, context->eyepos);
-        float3_normalize(gaze);
-        float3_scale(gaze, context->props.orbit_zoom_speed * scrolldelta);
+        parcc_float3_subtract(gaze, context->target, context->eyepos);
+        parcc_float3_normalize(gaze);
+        parcc_float3_scale(gaze, context->props.orbit_zoom_speed * scrolldelta);
 
         parcc_float v0[3];
-        float3_subtract(v0, context->orbit_pivot, context->eyepos);
+        parcc_float3_subtract(v0, context->orbit_pivot, context->eyepos);
 
-        float3_add(context->eyepos, context->eyepos, gaze);
-        float3_add(context->target, context->target, gaze);
+        parcc_float3_add(context->eyepos, context->eyepos, gaze);
+        parcc_float3_add(context->target, context->target, gaze);
 
         parcc_float v1[3];
-        float3_subtract(v1, context->orbit_pivot, context->eyepos);
+        parcc_float3_subtract(v1, context->orbit_pivot, context->eyepos);
 
-        if (float3_dot(v0, v1) < 0) {
+        if (parcc_float3_dot(v0, v1) < 0) {
             context->orbit_flipped = !context->orbit_flipped;
         }
     }
@@ -499,21 +650,21 @@ void parcc_grab_end(parcc_context* context) { context->grabbing = PARCC_GRAB_NON
 bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->props.viewport_width;
     const parcc_float height = context->props.viewport_height;
-    const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+    const parcc_float fov = context->props.fov_degrees * PARCC_PI / 180.0;
     const bool vertical_fov = context->props.fov_orientation == PARCC_VERTICAL;
     const parcc_float* origin = context->eyepos;
 
     parcc_float gaze[3];
-    float3_subtract(gaze, context->target, origin);
-    float3_normalize(gaze);
+    parcc_float3_subtract(gaze, context->target, origin);
+    parcc_float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->props.home_upward);
-    float3_normalize(right);
+    parcc_float3_cross(right, gaze, context->props.home_upward);
+    parcc_float3_normalize(right);
 
     parcc_float upward[3];
-    float3_cross(upward, right, gaze);
-    float3_normalize(upward);
+    parcc_float3_cross(upward, right, gaze);
+    parcc_float3_normalize(upward);
 
     // Remap the grid coordinate into [-1, +1] and shift it to the pixel center.
     const parcc_float u = 2.0 * (winx + 0.5) / width - 1.0;
@@ -525,15 +676,15 @@ bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float resul
 
     // Adjust the gaze so it goes through the pixel of interest rather than the grid center.
     if (vertical_fov) {
-        float3_scale(right, tangent * u * aspect);
-        float3_scale(upward, tangent * v);
+        parcc_float3_scale(right, tangent * u * aspect);
+        parcc_float3_scale(upward, tangent * v);
     } else {
-        float3_scale(right, tangent * u);
-        float3_scale(upward, tangent * v / aspect);
+        parcc_float3_scale(right, tangent * u);
+        parcc_float3_scale(upward, tangent * v / aspect);
     }
-    float3_add(gaze, gaze, right);
-    float3_add(gaze, gaze, upward);
-    float3_normalize(gaze);
+    parcc_float3_add(gaze, gaze, right);
+    parcc_float3_add(gaze, gaze, upward);
+    parcc_float3_normalize(gaze);
 
     // Invoke the user's callback or fallback function.
     parcc_raycast_fn callback = context->props.raycast_function;
@@ -555,8 +706,8 @@ bool parcc_raycast(parcc_context* context, int winx, int winy, parcc_float resul
         }
     }
 
-    float3_scale(gaze, t);
-    float3_add(result, origin, gaze);
+    parcc_float3_scale(gaze, t);
+    parcc_float3_add(result, origin, gaze);
     return true;
 }
 
@@ -569,46 +720,46 @@ parcc_frame parcc_get_current_frame(const parcc_context* context) {
         const parcc_float* upward = context->props.home_upward;
 
         parcc_float direction[3];
-        float3_subtract(direction, context->target, origin);
-        float3_normalize(direction);
+        parcc_float3_subtract(direction, context->target, origin);
+        parcc_float3_normalize(direction);
 
         parcc_float distance;
         parcc_raycast_plane(origin, direction, &distance, (void*)context);
 
-        const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+        const parcc_float fov = context->props.fov_degrees * PARCC_PI / 180.0;
         const parcc_float half_extent = distance * tan(fov / 2);
 
         parcc_float target[3];
-        float3_scale(direction, distance);
-        float3_add(target, origin, direction);
+        parcc_float3_scale(direction, distance);
+        parcc_float3_add(target, origin, direction);
 
         // Compute the tangent frame defined by the map_plane normal and the home_upward vector.
         parcc_float uvec[3];
         parcc_float vvec[3];
         parcc_float target_to_eye[3];
 
-        float3_copy(target_to_eye, context->props.map_plane);
-        float3_cross(uvec, upward, target_to_eye);
-        float3_cross(vvec, target_to_eye, uvec);
+        parcc_float3_copy(target_to_eye, context->props.map_plane);
+        parcc_float3_cross(uvec, upward, target_to_eye);
+        parcc_float3_cross(vvec, target_to_eye, uvec);
 
-        float3_subtract(target, target, context->props.home_target);
+        parcc_float3_subtract(target, target, context->props.home_target);
 
         frame.extent = half_extent * 2;
-        frame.center[0] = float3_dot(uvec, target);
-        frame.center[1] = float3_dot(vvec, target);
+        frame.center[0] = parcc_float3_dot(uvec, target);
+        frame.center[1] = parcc_float3_dot(vvec, target);
     }
 
     if (context->props.mode == PARCC_ORBIT) {
         parcc_float pivot_to_eye[3];
-        float3_subtract(pivot_to_eye, context->eyepos, context->orbit_pivot);
-        const parcc_float d = float3_length(pivot_to_eye);
+        parcc_float3_subtract(pivot_to_eye, context->eyepos, context->orbit_pivot);
+        const parcc_float d = parcc_float3_length(pivot_to_eye);
         const parcc_float x = pivot_to_eye[0] / d;
         const parcc_float y = pivot_to_eye[1] / d;
         const parcc_float z = pivot_to_eye[2] / d;
         frame.phi = asin(y);
         frame.theta = atan2(x, z);
         frame.pivot_distance = context->orbit_flipped ? -d : d;
-        float3_copy(frame.pivot, context->orbit_pivot);
+        parcc_float3_copy(frame.pivot, context->orbit_pivot);
     }
 
     return frame;
@@ -649,8 +800,8 @@ parcc_frame parcc_get_home_frame(const parcc_context* context) {
 
     if (frame.mode == PARCC_ORBIT) {
         frame.theta = frame.phi = 0;
-        float3_copy(frame.pivot, context->props.home_target);
-        frame.pivot_distance = float3_length(context->props.home_vector);
+        parcc_float3_copy(frame.pivot, context->props.home_target);
+        frame.pivot_distance = parcc_float3_length(context->props.home_vector);
     }
 
     return frame;
@@ -660,7 +811,7 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
     if (context->props.mode == PARCC_MAP) {
         const parcc_float* upward = context->props.home_upward;
         const parcc_float half_extent = frame.extent / 2.0;
-        const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+        const parcc_float fov = context->props.fov_degrees * PARCC_PI / 180.0;
         const parcc_float distance = half_extent / tan(fov / 2);
 
         // Compute the tangent frame defined by the map_plane normal and the home_upward vector.
@@ -668,39 +819,39 @@ void parcc_goto_frame(parcc_context* context, parcc_frame frame) {
         parcc_float vvec[3];
         parcc_float target_to_eye[3];
 
-        float3_copy(target_to_eye, context->props.map_plane);
-        float3_cross(uvec, upward, target_to_eye);
-        float3_cross(vvec, target_to_eye, uvec);
+        parcc_float3_copy(target_to_eye, context->props.map_plane);
+        parcc_float3_cross(uvec, upward, target_to_eye);
+        parcc_float3_cross(vvec, target_to_eye, uvec);
 
         // Scale the U and V components by the frame coordinate.
-        float3_scale(uvec, frame.center[0]);
-        float3_scale(vvec, frame.center[1]);
+        parcc_float3_scale(uvec, frame.center[0]);
+        parcc_float3_scale(vvec, frame.center[1]);
 
         // Obtain the new target position by adding U and V to home_target.
-        float3_copy(context->target, context->props.home_target);
-        float3_add(context->target, context->target, uvec);
-        float3_add(context->target, context->target, vvec);
+        parcc_float3_copy(context->target, context->props.home_target);
+        parcc_float3_add(context->target, context->target, uvec);
+        parcc_float3_add(context->target, context->target, vvec);
 
         // Obtain the new eye position by adding the scaled plane normal to the new target
         // position.
-        float3_scale(target_to_eye, distance);
-        float3_add(context->eyepos, context->target, target_to_eye);
+        parcc_float3_scale(target_to_eye, distance);
+        parcc_float3_add(context->eyepos, context->target, target_to_eye);
     }
 
     if (context->props.mode == PARCC_ORBIT) {
-        float3_copy(context->orbit_pivot, frame.pivot);
+        parcc_float3_copy(context->orbit_pivot, frame.pivot);
         const parcc_float x = sin(frame.theta) * cos(frame.phi);
         const parcc_float y = sin(frame.phi);
         const parcc_float z = cos(frame.theta) * cos(frame.phi);
-        float3_set(context->eyepos, x, y, z);
-        float3_scale(context->eyepos, fabs(frame.pivot_distance));
-        float3_add(context->eyepos, context->eyepos, context->orbit_pivot);
+        parcc_float3_set(context->eyepos, x, y, z);
+        parcc_float3_scale(context->eyepos, fabs(frame.pivot_distance));
+        parcc_float3_add(context->eyepos, context->eyepos, context->orbit_pivot);
 
         context->orbit_flipped = frame.pivot_distance < 0;
 
-        float3_set(context->target, x, y, z);
-        float3_scale(context->target, context->orbit_flipped ? 1.0 : -1.0);
-        float3_add(context->target, context->target, context->eyepos);
+        parcc_float3_set(context->target, x, y, z);
+        parcc_float3_scale(context->target, context->orbit_flipped ? 1.0 : -1.0);
+        parcc_float3_add(context->target, context->target, context->eyepos);
     }
 }
 
@@ -751,19 +902,16 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b) {
 
 static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float dir[3],
                                 parcc_float* t, void* userdata) {
-    typedef struct parcc_vec3 {
-        parcc_float x, y, z;
-    } parcc_vec3;
     parcc_context* context = (parcc_context*)userdata;
     const parcc_float* plane = context->props.map_plane;
-    parcc_vec3 n = {plane[0], plane[1], plane[2]};
-    parcc_vec3 p0 = n;
-    float3_scale(&p0.x, plane[3]);
-    const parcc_float denom = -float3_dot(&n.x, dir);
+    parcc_float n[3] = {plane[0], plane[1], plane[2]};
+    parcc_float p0[3] = {plane[0], plane[1], plane[2]};
+    parcc_float3_scale(p0, plane[3]);
+    const parcc_float denom = -parcc_float3_dot(n, dir);
     if (denom > 1e-6) {
-        parcc_vec3 p0l0;
-        float3_subtract(&p0l0.x, &p0.x, origin);
-        *t = float3_dot(&p0l0.x, &n.x) / -denom;
+        parcc_float p0l0[3];
+        parcc_float3_subtract(p0l0, p0, origin);
+        *t = parcc_float3_dot(p0l0, n) / -denom;
         return *t >= 0;
     }
     return false;
@@ -773,21 +921,21 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
 static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_float result[3]) {
     const parcc_float width = context->props.viewport_width;
     const parcc_float height = context->props.viewport_height;
-    const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+    const parcc_float fov = context->props.fov_degrees * PARCC_PI / 180.0;
     const bool vertical_fov = context->props.fov_orientation == PARCC_VERTICAL;
     const parcc_float* origin = context->eyepos;
 
     parcc_float gaze[3];
-    float3_subtract(gaze, context->target, origin);
-    float3_normalize(gaze);
+    parcc_float3_subtract(gaze, context->target, origin);
+    parcc_float3_normalize(gaze);
 
     parcc_float right[3];
-    float3_cross(right, gaze, context->props.home_upward);
-    float3_normalize(right);
+    parcc_float3_cross(right, gaze, context->props.home_upward);
+    parcc_float3_normalize(right);
 
     parcc_float upward[3];
-    float3_cross(upward, right, gaze);
-    float3_normalize(upward);
+    parcc_float3_cross(upward, right, gaze);
+    parcc_float3_normalize(upward);
 
     // Remap the grid coordinate into [-1, +1] and shift it to the pixel center.
     const parcc_float u = 2.0 * (winx + 0.5) / width - 1.0;
@@ -799,16 +947,16 @@ static void parcc_get_ray_far(parcc_context* context, int winx, int winy, parcc_
 
     // Adjust the gaze so it goes through the pixel of interest rather than the grid center.
     if (vertical_fov) {
-        float3_scale(right, tangent * u * aspect);
-        float3_scale(upward, tangent * v);
+        parcc_float3_scale(right, tangent * u * aspect);
+        parcc_float3_scale(upward, tangent * v);
     } else {
-        float3_scale(right, tangent * u);
-        float3_scale(upward, tangent * v / aspect);
+        parcc_float3_scale(right, tangent * u);
+        parcc_float3_scale(upward, tangent * v / aspect);
     }
-    float3_add(gaze, gaze, right);
-    float3_add(gaze, gaze, upward);
-    float3_scale(gaze, context->props.far_plane);
-    float3_add(result, origin, gaze);
+    parcc_float3_add(gaze, gaze, right);
+    parcc_float3_add(gaze, gaze, upward);
+    parcc_float3_scale(gaze, context->props.far_plane);
+    parcc_float3_add(result, origin, gaze);
 }
 
 static void parcc_move_with_constraints(parcc_context* context, const parcc_float eyepos[3],
@@ -821,11 +969,11 @@ static void parcc_move_with_constraints(parcc_context* context, const parcc_floa
     const parcc_float map_height = context->props.map_extent[1] / 2;
     const parcc_frame home = parcc_get_home_frame(context);
     const parcc_frame previous_frame = parcc_get_current_frame(context);
-    const parcc_float fov = context->props.fov_degrees * VEC_PI / 180.0;
+    const parcc_float fov = context->props.fov_degrees * PARCC_PI / 180.0;
     const parcc_float min_extent = 2.0 * context->props.map_min_distance * tan(fov / 2);
 
-    float3_copy(context->eyepos, eyepos);
-    float3_copy(context->target, target);
+    parcc_float3_copy(context->eyepos, eyepos);
+    parcc_float3_copy(context->target, target);
 
     parcc_frame frame = parcc_get_current_frame(context);
 
