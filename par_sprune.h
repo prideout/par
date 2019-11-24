@@ -119,7 +119,7 @@ void par_sprune_cull(par_sprune_context* context);
 #define pa___needgrow(a, n) ((a) == 0 || pa___n(a) + ((int) n) >= pa___m(a))
 #define pa___maybegrow(a, n) (pa___needgrow(a, (n)) ? pa___grow(a, n) : 0)
 #define pa___grow(a, n) (*((void**)& (a)) = pa___growf((void*) (a), (n), \
-        sizeof(*(a))))
+    sizeof(*(a))))
 
 // ptr[-2] is capacity, ptr[-1] is size.
 static void* pa___growf(void* arr, int increment, int itemsize)

@@ -213,7 +213,7 @@ static parsl_position parsl_mul(parsl_position v, float s) {
 #define pa___needgrow(a, n) ((a) == 0 || pa___n(a) + ((int) n) >= pa___m(a))
 #define pa___maybegrow(a, n) (pa___needgrow(a, (n)) ? pa___grow(a, n) : 0)
 #define pa___grow(a, n) (*((void**)& (a)) = pa___growf((void*) (a), (n), \
-        sizeof(*(a))))
+    sizeof(*(a))))
 
 // ptr[-2] is capacity, ptr[-1] is size.
 static void* pa___growf(void* arr, int increment, int itemsize)
@@ -1070,9 +1070,9 @@ static parsl_position par__sample_annulus(float radius, parsl_position center,
 }
 
 #define GRIDF(vec) \
-    grid[(int) (vec.x * invcell) + ncols * (int) (vec.y * invcell)]
+    grid [(int) (vec.x * invcell) + ncols * (int) (vec.y * invcell)]
 
-#define GRIDI(vec) grid[(int) vec.y * ncols + (int) vec.x]
+#define GRIDI(vec) grid [(int) vec.y * ncols + (int) vec.x]
 
 static parsl_position* par__generate_pts(float width, float height,
     float radius, int seed, parsl_position* result) {

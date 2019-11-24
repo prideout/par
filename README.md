@@ -12,7 +12,7 @@ library    | description  | link
 **par_easings.h** | Robert Penner's easing functions |
 **par_easycurl.h** | simple HTTP requests using libcurl |
 **par_filecache.h** | LRU caching on your device's filesystem |
-**par_msquares.h** | quick-and-dirty [marching squares](https://prideout.net/marching-squares) | (not recommended)
+**par_msquares.h** | unmaintained marching squares library | [blog post](https://prideout.net/marching-squares) (do not use)
 **par_shaders.h** | string extraction and concatenation |
 **par_shapes.h** | generate parametric surfaces and other simple shapes | [blog post](https://prideout.net/shapes)
 **par_sprune.h** | efficient broad-phase collision detection in 2D | [web demo](https://prideout.net/d3cpp/)

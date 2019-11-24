@@ -111,13 +111,13 @@ bool curlToMemory(char const* url, uint8_t** data, int* nbytes)
     [NSString stringWithCString:url encoding:NSASCIIStringEncoding];
     NSMutableURLRequest* request =
     [NSMutableURLRequest requestWithURL:[NSURL URLWithString:nsurl]];
-    [request setTimeoutInterval : TIMEOUT_SECONDS];
+    [request setTimeoutInterval: TIMEOUT_SECONDS];
     NSURLResponse* response = nil;
     NSError* error = nil;
     // Use the simple non-async API because we're in a secondary thread anyway.
     NSData* nsdata = [NSURLConnection sendSynchronousRequest:request
-    returningResponse:&response
-    error:&error];
+        returningResponse:&response
+        error:&error];
     if (error == nil) {
         *nbytes = (int) [nsdata length];
         *data = (uint8_t*) malloc([nsdata length]);

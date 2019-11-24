@@ -159,16 +159,16 @@ void par_filecache_init(char const* prefix, int maxsize)
 NSString* getPrefix()
 {
     NSString* cachesFolder = [NSSearchPathForDirectoriesInDomains(
-    NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+        NSCachesDirectory, NSUserDomainMask, YES) firstObject];
     NSError* error = nil;
     if (![[NSFileManager defaultManager] createDirectoryAtPath : cachesFolder
         withIntermediateDirectories : YES
         attributes : nil
         error : &error]) {
-        NSLog(@ "MGMPlatformGetCachesFolder error: %@", error);
+        NSLog(@"MGMPlatformGetCachesFolder error: %@", error);
         return nil;
     }
-    return [cachesFolder stringByAppendingString : @ "/_cache."];
+    return [cachesFolder stringByAppendingString : @"/_cache."];
 }
 
 #endif
