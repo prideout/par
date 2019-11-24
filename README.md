@@ -43,7 +43,7 @@ $ build/test_shapes
 
 ## code formatting
 
-This library's code style is strictly enforced to be vertically dense (no consecutive newlines) and horizontally narrow (80 columns or less).
+This library's code style is strictly enforced to be vertically dense (no consecutive newlines) and 100 columns or less.
 
 The `tools/format.py` script invokes a two-step code formatting process:
 

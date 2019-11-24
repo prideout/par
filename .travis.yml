@@ -1,16 +1,7 @@
 language: c
-addons:
-    apt:
-        sources:
-            - llvm-toolchain-precise
-            - ubuntu-toolchain-r-test
-        packages:
-            - clang-3.7
-            - g++-5
-            - gcc-5
 script:
     - curl -L https://github.com/uncrustify/uncrustify/archive/uncrustify-0.70.0.tar.gz | tar -xz
-    - cd uncrustify-uncrustify-0.70.0 && cmake -Bbuild && cd build && make -j
+    - cd uncrustify-uncrustify-0.70.0 && cmake . -B build && cd build && make -j
     - cp uncrustify ../.. && cd ../..
     - ./uncrustify --version
     - python tools/format.py --check
