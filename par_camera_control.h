@@ -202,7 +202,7 @@ double parcc_get_interpolation_duration(parcc_frame a, parcc_frame b);
         A = tmp;            \
     }
 
-inline void parcc_float4_set(parcc_float dst[4], parcc_float x, parcc_float y, parcc_float z,
+static void parcc_float4_set(parcc_float dst[4], parcc_float x, parcc_float y, parcc_float z,
     parcc_float w) {
     dst[0] = x;
     dst[1] = y;
@@ -210,80 +210,80 @@ inline void parcc_float4_set(parcc_float dst[4], parcc_float x, parcc_float y, p
     dst[3] = w;
 }
 
-inline parcc_float parcc_float4_dot(const parcc_float a[4], const parcc_float b[4]) {
+static parcc_float parcc_float4_dot(const parcc_float a[4], const parcc_float b[4]) {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
 }
 
-inline void parcc_float3_set(parcc_float dst[3], parcc_float x, parcc_float y, parcc_float z) {
+static void parcc_float3_set(parcc_float dst[3], parcc_float x, parcc_float y, parcc_float z) {
     dst[0] = x;
     dst[1] = y;
     dst[2] = z;
 }
 
-inline void parcc_float3_add(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3]) {
+static void parcc_float3_add(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3]) {
     dst[0] = a[0] + b[0];
     dst[1] = a[1] + b[1];
     dst[2] = a[2] + b[2];
 }
 
-inline void parcc_float3_macc(parcc_float dst[3], const parcc_float src[3], parcc_float scale) {
+static void parcc_float3_macc(parcc_float dst[3], const parcc_float src[3], parcc_float scale) {
     dst[0] += src[0] * scale;
     dst[1] += src[1] * scale;
     dst[2] += src[2] * scale;
 }
 
-inline void parcc_float3_subtract(parcc_float dst[3], const parcc_float a[3],
+static void parcc_float3_subtract(parcc_float dst[3], const parcc_float a[3],
     const parcc_float b[3]) {
     dst[0] = a[0] - b[0];
     dst[1] = a[1] - b[1];
     dst[2] = a[2] - b[2];
 }
 
-inline parcc_float parcc_float3_dot(const parcc_float a[3], const parcc_float b[3]) {
+static parcc_float parcc_float3_dot(const parcc_float a[3], const parcc_float b[3]) {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-inline void parcc_float3_cross(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3]) {
+static void parcc_float3_cross(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3]) {
     dst[0] = a[1] * b[2] - a[2] * b[1];
     dst[1] = a[2] * b[0] - a[0] * b[2];
     dst[2] = a[0] * b[1] - a[1] * b[0];
 }
 
-inline void parcc_float3_scale(parcc_float dst[3], parcc_float v) {
+static void parcc_float3_scale(parcc_float dst[3], parcc_float v) {
     dst[0] *= v;
     dst[1] *= v;
     dst[2] *= v;
 }
 
-inline parcc_float parcc_float3_length(const parcc_float dst[3]) {
+static parcc_float parcc_float3_length(const parcc_float dst[3]) {
     return sqrtf(parcc_float3_dot(dst, dst));
 }
 
-inline void parcc_float3_normalize(parcc_float dst[3]) {
+static void parcc_float3_normalize(parcc_float dst[3]) {
     parcc_float3_scale(dst, 1.0f / parcc_float3_length(dst));
 }
 
-inline void parcc_float3_copy(parcc_float dst[3], const parcc_float src[3]) {
+static void parcc_float3_copy(parcc_float dst[3], const parcc_float src[3]) {
     dst[0] = src[0];
     dst[1] = src[1];
     dst[2] = src[2];
 }
 
-inline void parcc_float3_copy_to_vec4(parcc_float dst[4], const parcc_float src[3], parcc_float w) {
+static void parcc_float3_copy_to_vec4(parcc_float dst[4], const parcc_float src[3], parcc_float w) {
     dst[0] = src[0];
     dst[1] = src[1];
     dst[2] = src[2];
     dst[3] = w;
 }
 
-inline void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
+static void parcc_float3_lerp(parcc_float dst[3], const parcc_float a[3], const parcc_float b[3],
     parcc_float t) {
     dst[0] = a[0] * (1 - t) + b[0] * t;
     dst[1] = a[1] * (1 - t) + b[1] * t;
     dst[2] = a[2] * (1 - t) + b[2] * t;
 }
 
-inline void parcc_float16_look_at(float dst[16], const float eye[3], const float target[3],
+static void parcc_float16_look_at(float dst[16], const float eye[3], const float target[3],
     const float up[3]) {
     parcc_float v3X[3];
     parcc_float v3Y[3];
@@ -309,7 +309,7 @@ inline void parcc_float16_look_at(float dst[16], const float eye[3], const float
         -parcc_float3_dot(v3Z, eye), 1.0);
 }
 
-inline void parcc_float16_perspective_y(float dst[16], float fovy_degrees, float aspect_ratio,
+static void parcc_float16_perspective_y(float dst[16], float fovy_degrees, float aspect_ratio,
     float near, float far) {
     const parcc_float fovy_radians = fovy_degrees * PARCC_PI / 180;
     const parcc_float f = tan(PARCC_PI / 2.0 - 0.5 * fovy_radians);
@@ -332,7 +332,7 @@ inline void parcc_float16_perspective_y(float dst[16], float fovy_degrees, float
     dst[15] = 0;
 }
 
-inline void parcc_float16_perspective_x(float dst[16], float fovy_degrees, float aspect_ratio,
+static void parcc_float16_perspective_x(float dst[16], float fovy_degrees, float aspect_ratio,
     float near, float far) {
     const parcc_float fovy_radians = fovy_degrees * PARCC_PI / 180;
     const parcc_float f = tan(PARCC_PI / 2.0 - 0.5 * fovy_radians);
