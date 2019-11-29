@@ -101,7 +101,7 @@ typedef struct {
     void* raycast_userdata;             // arbitrary data for the raycast callback
 
     // ORBIT-MODE PROPERTIES
-    parcc_float home_vector[3];    // (required) vector from home_target to initial eye position
+    parcc_float home_vector[3];    // non-unitized vector from home_target to initial eye position
     parcc_float orbit_speed[2];    // rotational speed (defaults to 0.01)
     parcc_float orbit_zoom_speed;  // zoom speed (defaults to 0.01)
 
@@ -425,6 +425,15 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
         props.orbit_zoom_speed = 0.01;
     }
 
+    if (parcc_float3_dot(props.home_vector, props.home_vector) == 0) {
+        const parcc_float extent = props.fov_orientation == PARCC_VERTICAL ? props.map_extent[1] :
+                props.map_extent[0];
+        const parcc_float fov = props.fov_degrees * PARCC_PI / 180.0;
+        props.home_vector[0] = 0;
+        props.home_vector[1] = 0;
+        props.home_vector[2] = 0.5 * extent / tan(fov / 2.0);
+    }
+
     const bool more_constrained = (int)props.map_constraint > (int)context->props.map_constraint;
     const bool orientation_changed = props.fov_orientation != context->props.fov_orientation;
     const bool viewport_resized = props.viewport_height != context->props.viewport_height ||
@@ -432,8 +441,8 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
 
     context->props = props;
 
-    if (more_constrained || orientation_changed ||
-        (viewport_resized && context->props.map_constraint == PARCC_CONSTRAIN_FULL)) {
+    if (props.mode == PARCC_MAP && (more_constrained || orientation_changed ||
+        (viewport_resized && context->props.map_constraint == PARCC_CONSTRAIN_FULL))) {
         parcc_move_with_constraints(context, context->eyepos, context->target);
     }
 }
