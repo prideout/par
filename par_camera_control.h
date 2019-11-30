@@ -427,7 +427,7 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
 
     if (parcc_float3_dot(props.home_vector, props.home_vector) == 0) {
         const parcc_float extent = props.fov_orientation == PARCC_VERTICAL ? props.map_extent[1] :
-                props.map_extent[0];
+            props.map_extent[0];
         const parcc_float fov = props.fov_degrees * PARCC_PI / 180.0;
         props.home_vector[0] = 0;
         props.home_vector[1] = 0;
@@ -925,7 +925,7 @@ static bool parcc_raycast_plane(const parcc_float origin[3], const parcc_float d
     parcc_float p0[3] = {plane[0], plane[1], plane[2]};
     parcc_float3_scale(p0, plane[3]);
     const parcc_float denom = -parcc_float3_dot(n, dir);
-    if (denom > 1e-6) {
+    if (denom > 1e-6 || denom < -1e-6) {
         parcc_float p0l0[3];
         parcc_float3_subtract(p0l0, p0, origin);
         *t = parcc_float3_dot(p0l0, n) / -denom;
