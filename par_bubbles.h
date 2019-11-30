@@ -909,6 +909,10 @@ void par_bubbles_export(par_bubbles_t const* bubbles, char const* filename)
     PARFLT maxextent = PAR_MAX(aabb[2] - aabb[0], aabb[3] - aabb[1]);
     PARFLT padding = 0.05 * maxextent;
     FILE* svgfile = fopen(filename, "wt");
+    if (!svgfile) {
+        fprintf(stderr, "Unable to open %s for writing.\n", filename);
+        return;
+    }
     fprintf(svgfile,
         "<svg viewBox='%f %f %f %f' width='640px' height='640px' "
         "version='1.1' "
