@@ -102,8 +102,9 @@ typedef struct {
 
     // ORBIT-MODE PROPERTIES
     parcc_float home_vector[3];    // non-unitized vector from home_target to initial eye position
-    parcc_float orbit_speed[2];    // rotational speed (defaults to 0.01)
-    parcc_float orbit_zoom_speed;  // zoom speed (defaults to 0.01)
+    parcc_float orbit_speed[2];        // rotational speed (defaults to 0.01)
+    parcc_float orbit_zoom_speed;      // zoom speed (defaults to 0.01)
+    parcc_float orbit_strafe_speed[2]; // strafe speed (defaults to 0.001)
 
 } parcc_properties;
 
@@ -424,6 +425,12 @@ void parcc_set_properties(parcc_context* context, const parcc_properties* pprops
     if (props.orbit_zoom_speed == 0) {
         props.orbit_zoom_speed = 0.01;
     }
+    if (props.orbit_strafe_speed[0] == 0) {
+        props.orbit_strafe_speed[0] = 0.001;
+    }
+    if (props.orbit_strafe_speed[1] == 0) {
+        props.orbit_strafe_speed[1] = 0.001;
+    }
 
     if (parcc_float3_dot(props.home_vector, props.home_vector) == 0) {
         const parcc_float extent = props.fov_orientation == PARCC_VERTICAL ? props.map_extent[1] :
@@ -572,8 +579,8 @@ void parcc_grab_update(parcc_context* context, int winx, int winy) {
         const int delx = context->grab_winx - winx;
         const int dely = context->grab_winy - winy;
 
-        const parcc_float dx = delx * 0.001;
-        const parcc_float dy = dely * 0.001;
+        const parcc_float dx = delx * context->props.orbit_strafe_speed[0];
+        const parcc_float dy = dely * context->props.orbit_strafe_speed[1];
 
         parcc_float3_scale(right, dx);
         parcc_float3_scale(upward, dy);
