@@ -601,9 +601,6 @@ void parcc_zoom(parcc_context* context, int winx, int winy, parcc_float scrollde
             return;
         }
 
-        parcc_float grab_point_far[3];
-        parcc_get_ray_far(context, winx, winy, grab_point_far);
-
         // We intentionally avoid normalizing this vector since you usually
         // want to slow down when approaching the surface.
         parcc_float u_vec[3];
