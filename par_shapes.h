@@ -95,6 +95,12 @@ typedef void (*par_shapes_fn)(float const*, float*, void*);
 par_shapes_mesh* par_shapes_create_parametric(par_shapes_fn, int slices,
     int stacks, void* userdata);
 
+// Rounded cuboid generator and a utility function for generating textures.
+par_shapes_mesh* par_shapes_create_rounded_cuboid(int slices, int stacks, float radius,
+    float width, float height, float depth, int face_resolution);
+void par_shapes_map_rounded_cuboid(float radius, float width, float height, float depth,
+    int face_resolution, const int st_in[2], float xyz_out[3]);
+
 // Generate points for a 20-sided polyhedron that fits in the unit sphere.
 // Texture coordinates and normals are not generated.
 par_shapes_mesh* par_shapes_create_icosahedron();

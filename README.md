@@ -47,7 +47,7 @@ This library's code style is strictly enforced to be vertically dense (no consec
 
 The `tools/format.py` script invokes a two-step code formatting process:
 
-1. Runs `uncrustify` with our custom configuration.  This auto-formats all code in the root folder, up to a point.  For example, it does not enforce the 80-character line constraint because line breaking is best done by a human.
+1. Runs `uncrustify` with our custom configuration.  This auto-formats all code in the root folder, up to a point.
 1. Checks for violations that are not otherwise enforced with uncrustify.
 
 The aforementioned Python script is also invoked from Travis, but using the `--check` option, which checks for conformance without editing the code.
