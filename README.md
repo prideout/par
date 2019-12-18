@@ -9,6 +9,7 @@ The most useful ones are listed in the following table.
 library    | description  | link
 ------------------- | ---- | ---
 **par_camera_control.h** | orbit controller, or pan-and-zoom like Google Maps | [demo project](https://github.com/prideout/camera_demo)
+**par_octasphere.h** | malloc-free mesh gen for spheres and rounded cuboids | [blog post](https://prideout.net/blog/octasphere)
 **par_streamlines.h** | triangulate wide lines and curves | [blog post](https://prideout.net/blog/par_streamlines/)
 **par_shaders.h** | string extraction and concatenation |
 **par_shapes.h** | generate parametric surfaces and other simple shapes | [blog post](https://prideout.net/shapes)
