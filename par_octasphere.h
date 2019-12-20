@@ -106,19 +106,19 @@ void par_octasphere_populate(const par_octasphere_config* config, par_octasphere
 #endif
 
 static uint16_t* paro_write_quad(uint16_t* dst, uint16_t a, uint16_t b, uint16_t c, uint16_t d) {
-    *dst++ = c;
+    *dst++ = a;
     *dst++ = b;
-    *dst++ = a;
-    *dst++ = a;
-    *dst++ = d;
     *dst++ = c;
+    *dst++ = c;
+    *dst++ = d;
+    *dst++ = a;
     return dst;
 }
 
 static void paro_write_ui3(uint16_t* dst, int index, uint16_t a, uint16_t b, uint16_t c) {
-    dst[index * 3 + 0] = c;
+    dst[index * 3 + 0] = a;
     dst[index * 3 + 1] = b;
-    dst[index * 3 + 2] = a;
+    dst[index * 3 + 2] = c;
 }
 
 static float* paro_write_f3(float* dst, const float src[3]) {
