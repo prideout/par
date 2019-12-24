@@ -9,8 +9,8 @@
 // In map mode, users can control their viewing position by grabbing and dragging locations in the
 // scene. Sometimes this is known as "through-the-lens" camera control. In this mode the controller
 // takes an optional raycast callback to support precise grabbing behavior. If this is not required
-// for your use case (e.g. a top-down terrain with an orthgraphic projection), provide NULL for the
-// callback and the library will simply raycast against the ground plane.
+// for your use case (e.g. a top-down terrain with an orthographic projection), provide NULL for
+// the callback and the library will simply raycast against the ground plane.
 //
 // When the controller is in orbit mode, the orientation of the camera is defined by a Y-axis
 // rotation followed by an X-axis rotation. Additionally, the camera can fly forward or backward
