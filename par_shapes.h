@@ -121,8 +121,12 @@ par_shapes_mesh* par_shapes_create_rock(int seed, int nsubdivisions);
 // Create trees or vegetation by executing a recursive turtle graphics program.
 // The program is a list of command-argument pairs.  See the unit test for
 // an example.  Texture coordinates and normals are not generated.
+// rand_fn is expected to return a value between 0 and 1,
+// or can be NULL (in which case `(float) rand() / RAND_MAX` will be used).
+// context is passed unmodified to rand_fn.
+typedef float (*par_shapes_rand_fn)(void* context);
 par_shapes_mesh* par_shapes_create_lsystem(char const* program, int slices,
-    int maxdepth);
+    int maxdepth, par_shapes_rand_fn rand_fn, void* context);
 
 // Queries ---------------------------------------------------------------------
 
@@ -1092,7 +1096,7 @@ typedef struct {
 } par_shapes__stackframe;
 
 static par_shapes__rule* par_shapes__pick_rule(const char* name,
-    par_shapes__rule* rules, int nrules)
+    par_shapes__rule* rules, int nrules, par_shapes_rand_fn rand_fn, void* context)
 {
     par_shapes__rule* rule = 0;
     int total = 0;
@@ -1102,7 +1106,12 @@ static par_shapes__rule* par_shapes__pick_rule(const char* name,
             total += rule->weight;
         }
     }
-    float r = (float) rand() / RAND_MAX;
+    float r;
+    if (rand_fn) {
+        r = rand_fn(context);
+    } else {
+        r = (float) rand() / RAND_MAX;
+    }
     float t = 0;
     for (int i = 0; i < nrules; i++) {
         rule = rules + i;
@@ -1192,7 +1201,7 @@ void par_shapes__connect(par_shapes_mesh* scene, par_shapes_mesh* cylinder,
 }
 
 par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
-    int maxdepth)
+    int maxdepth, par_shapes_rand_fn rand_fn, void* context)
 {
     char* program;
     program = PAR_MALLOC(char, strlen(text) + 1);
@@ -1323,7 +1332,7 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
             }
             par_shapes_free_mesh(m);
         } else if (!strcmp(cmd->cmd, "call") && stackptr < maxdepth - 1) {
-            rule = par_shapes__pick_rule(cmd->arg, rules, nrules);
+            rule = par_shapes__pick_rule(cmd->arg, rules, nrules, rand_fn, context);
             frame = &stack[++stackptr];
             frame->rule = rule;
             frame->orientation = par_shapes_clone(turtle, 0);

@@ -266,7 +266,7 @@ int main()
             );
             const float O[3] = {0, 0, 0};
             const float J[3] = {0, 1, 0};
-            par_shapes_mesh* mesh = par_shapes_create_lsystem(program, 5, 60);
+            par_shapes_mesh* mesh = par_shapes_create_lsystem(program, 5, 60, NULL, NULL);
             par_shapes_mesh* disk = par_shapes_create_disk(10, 30, O, J);
             par_shapes_merge(mesh, disk);
             par_shapes_export(mesh, "build/lsystem.obj");
