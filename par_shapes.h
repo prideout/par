@@ -1,25 +1,22 @@
-// SHAPES :: https://github.com/prideout/par
+// SHAPES :: https://prideout.net/shapes
 // Simple C library for creation and manipulation of triangle meshes.
 //
-// The API is divided into three sections:
+// See also par_octasphere.h, which is a newer, more lean-and-mean library
+// that can tessellate spheres, boxes, capsule, and rounded boxes.
+//
+// The par_shapes API is divided into three sections:
 //
 //   - Generators.  Create parametric surfaces, platonic solids, etc.
 //   - Queries.     Ask a mesh for its axis-aligned bounding box, etc.
 //   - Transforms.  Rotate a mesh, merge it with another, add normals, etc.
-//
-// In addition to the comment block above each function declaration, the API
-// has informal documentation here:
-//
-//     https://prideout.net/shapes
 //
 // For our purposes, a "mesh" is a list of points and a list of triangles; the
 // former is a flattened list of three-tuples (32-bit floats) and the latter is
 // also a flattened list of three-tuples (16-bit uints).  Triangles are always
 // oriented such that their front face winds counter-clockwise.
 //
-// Optionally, meshes can contain 3D normals (one per vertex), and 2D texture
-// coordinates (one per vertex).  That's it!  If you need something fancier,
-// look elsewhere.
+// Depending on which generator function is used, meshes may or may not contain
+// normals and texture coordinates (one per vertex).
 //
 // Distributed under the MIT License, see bottom of file.
 
@@ -2110,7 +2107,7 @@ void par_shapes_remove_degenerate(par_shapes_mesh* mesh, float mintriarea)
 
 // par_shapes is distributed under the MIT license:
 //
-// Copyright (c) 2019 Philip Rideout
+// Copyright (c) 2020 Philip Rideout
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal

@@ -555,7 +555,7 @@ void par_octasphere_populate(const par_octasphere_config* config, par_octasphere
 
 // par_octasphere is distributed under the MIT license:
 //
-// Copyright (c) 2019 Philip Rideout
+// Copyright (c) 2020 Philip Rideout
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
