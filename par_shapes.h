@@ -1202,11 +1202,12 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
 
     // The first pass counts the number of rules and commands.
     strcpy(program, text);
-    char *cmd = strtok(program, " ");
+    const char *delimiters = " \t\n";
+    char *cmd = strtok(program, delimiters);
     int nrules = 1;
     int ncommands = 0;
     while (cmd) {
-        char *arg = strtok(0, " ");
+        char *arg = strtok(0, delimiters);
         if (!arg) {
             puts("lsystem error: unexpected end of program.");
             break;
@@ -1216,7 +1217,7 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
         } else {
             ncommands++;
         }
-        cmd = strtok(0, " ");
+        cmd = strtok(0, delimiters);
     }
 
     // Allocate space.
@@ -1233,9 +1234,9 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
 
     // The second pass fills in the structures.
     strcpy(program, text);
-    cmd = strtok(program, " ");
+    cmd = strtok(program, delimiters);
     while (cmd) {
-        char *arg = strtok(0, " ");
+        char *arg = strtok(0, delimiters);
         if (!strcmp(cmd, "rule")) {
             current_rule++;
 
@@ -1257,7 +1258,7 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
             current_command->arg = arg;
             current_command++;
         }
-        cmd = strtok(0, " ");
+        cmd = strtok(0, delimiters);
     }
 
     // For testing purposes, dump out the parsed program.
