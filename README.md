@@ -11,17 +11,17 @@ library    | description  | link
 **par_camera_control.h** | orbit controller, or pan-and-zoom like Google Maps | [demo project](https://github.com/prideout/camera_demo)
 **par_octasphere.h** | malloc-free mesh gen for spheres and rounded cuboids | [blog post](https://prideout.net/blog/octasphere)
 **par_streamlines.h** | triangulate wide lines and curves | [blog post](https://prideout.net/blog/par_streamlines/)
-**par_shaders.h** | string extraction and concatenation |
+**par_string_blocks.h** | string manager for snippets of Lua or GLSL |
 **par_shapes.h** | generate parametric surfaces and other simple shapes | [blog post](https://prideout.net/shapes)
 
 There are more libraries too but they're probably less useful; scroll to the bottom of this README.
 
 ## tests
 
-To run tests, you need CMake and libcurl.  On OS X, these can be installed with homebrew:
+To run tests, you need CMake and pkg-config.  On macOS, these can be installed with homebrew:
 
 ```bash
-$ brew install cmake pkg-config curl
+$ brew install cmake pkg-config
 ```
 
 Here's how you can tell CMake to use the CMakeLists in the `test` folder, placing all the messy stuff in a new folder called `build`.

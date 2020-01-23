@@ -1,3 +1,6 @@
+#define PAR_STRING_BLOCKS_IMPLEMENTATION
+#include "par_string_blocks.h"
+
 #define PAR_MSQUARES_IMPLEMENTATION
 #include "par_msquares.h"
 
@@ -25,11 +28,11 @@
 #define PAR_STREAMLINES_IMPLEMENTATION
 #include "par_streamlines.h"
 
-#define PAR_SHADERS_IMPLEMENTATION
-#include "par_shaders.h"
-
 #define PAR_CAMERA_CONTROL_IMPLEMENTATION
 #include "par_camera_control.h"
+
+#define PAR_OCTASPHERE_IMPLEMENTATION
+#include "par_octasphere.h"
 
 int main(int argc, char* argv[])
 {
