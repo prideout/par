@@ -350,9 +350,11 @@ static char* parsb__list_add(parsb__list* list, const char* name,
     }
 
     if (value) {
-        memcpy(cursor, value, value_size--);
+        memcpy(cursor, value, value_size);
     }
 
+    #if PARSB_ENABLE_TRIM
+    value_size--;
     while (isspace(cursor[value_size])) {
         cursor[value_size] = 0;
         value_size--;
@@ -360,6 +362,7 @@ static char* parsb__list_add(parsb__list* list, const char* name,
             break;
         }
     }
+    #endif
 
     if (name) {
         list->names[list->count] = strdup(name);
