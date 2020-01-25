@@ -4,9 +4,15 @@ find_package(PkgConfig REQUIRED)
 pkg_search_module(CURL REQUIRED libcurl)
 
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-std=c11 -Wall")
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-Wvla -Wall")
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++17 -Wvla -Wall")
 
 include_directories(.. . ${CURL_INCLUDE_DIRS})
+
+add_executable(
+    test_strings
+    console-colors.c
+    test_strings.cpp)
+target_link_libraries(test_strings)
 
 add_executable(
     test_msquares
