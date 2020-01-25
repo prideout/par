@@ -26,3 +26,4 @@ script:
     - ./build/test_filecache
     - ./build/test_filecache_lz4
     - ./build/test_sprune
+    - ./build/test_strings
