@@ -32,34 +32,33 @@ int main()
         it("can create a context") {
             blocks = parsb_create_context((parsb_options){});
             assert_equal((int) sizeof(test_string), (int) strlen(test_string) + 1);
-            parsb_add_blocks(blocks, test_string, sizeof(test_string));
+            parsb_add_blocks(blocks, test_string, strlen(test_string));
         }
 
         it("can extract single blocks") {
             assert_str_equal(parsb_get_blocks(blocks, "my_shader"),
                     "void main() { ... }");
-            // TODO: why is "common" trimmed when "spooky" is not?
             assert_str_equal(parsb_get_blocks(blocks, "common"),
                     "uniform vec4 resolution;\nuniform vec4 color;");
             assert_str_equal(parsb_get_blocks(blocks, "spooky"),
-                    "-- hello\n!! world\n\n\n");
+                    "-- hello\n!! world");
         }
 
         it("can glue blocks") {
             assert_str_equal(parsb_get_blocks(blocks, "spooky common"),
-                    "-- hello\n!! world\n\n\nuniform vec4 resolution;\nuniform vec4 color;");
+                    "-- hello\n!! worlduniform vec4 resolution;\nuniform vec4 color;");
         }
 
         it("can add a named block") {
             parsb_add_block(blocks, "prefix", "13");
             assert_str_equal(parsb_get_blocks(blocks, "prefix spooky common"),
-                    "13-- hello\n!! world\n\n\nuniform vec4 resolution;\nuniform vec4 color;");
+                    "13-- hello\n!! worlduniform vec4 resolution;\nuniform vec4 color;");
         }
 
         it("can replace a named block") {
             parsb_add_block(blocks, "prefix", "11");
             assert_str_equal(parsb_get_blocks(blocks, "prefix spooky common"),
-                    "11-- hello\n!! world\n\n\nuniform vec4 resolution;\nuniform vec4 color;");
+                    "11-- hello\n!! worlduniform vec4 resolution;\nuniform vec4 color;");
         }
 
         it("add and replace multiple blocks") {
@@ -71,7 +70,7 @@ goodbye
             )";
             parsb_add_blocks(blocks, newblocks, strlen(newblocks));
             assert_str_equal(parsb_get_blocks(blocks, "prefix spooky"),
-                    "12\n-- hello\n!! world\n\n\n");
+                    "12\n-- hello\n!! world");
             assert_str_equal(parsb_get_blocks(blocks, "great prefix"), "goodbye12\n");
         }
 
