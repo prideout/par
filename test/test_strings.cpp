@@ -12,16 +12,10 @@ void main() { ... }
 --- common
 uniform vec4 resolution;
 uniform vec4 color;
-
-
-
-
 --- spooky
 -- hello
 !! world
-
-
-)";
+ )";
 
 int main()
 {
@@ -37,28 +31,28 @@ int main()
 
         it("can extract single blocks") {
             assert_str_equal(parsb_get_blocks(blocks, "my_shader"),
-                    "void main() { ... }");
+                    "void main() { ... }\n\n");
             assert_str_equal(parsb_get_blocks(blocks, "common"),
-                    "uniform vec4 resolution;\nuniform vec4 color;");
+                    "uniform vec4 resolution;\nuniform vec4 color;\n");
             assert_str_equal(parsb_get_blocks(blocks, "spooky"),
-                    "-- hello\n!! world");
+                    "-- hello\n!! world\n ");
         }
 
         it("can glue blocks") {
             assert_str_equal(parsb_get_blocks(blocks, "spooky common"),
-                    "-- hello\n!! worlduniform vec4 resolution;\nuniform vec4 color;");
+                    "-- hello\n!! world\n uniform vec4 resolution;\nuniform vec4 color;\n");
         }
 
         it("can add a named block") {
             parsb_add_block(blocks, "prefix", "13");
             assert_str_equal(parsb_get_blocks(blocks, "prefix spooky common"),
-                    "13-- hello\n!! worlduniform vec4 resolution;\nuniform vec4 color;");
+                    "13-- hello\n!! world\n uniform vec4 resolution;\nuniform vec4 color;\n");
         }
 
         it("can replace a named block") {
             parsb_add_block(blocks, "prefix", "11");
             assert_str_equal(parsb_get_blocks(blocks, "prefix spooky common"),
-                    "11-- hello\n!! worlduniform vec4 resolution;\nuniform vec4 color;");
+                    "11-- hello\n!! world\n uniform vec4 resolution;\nuniform vec4 color;\n");
         }
 
         it("add and replace multiple blocks") {
@@ -66,11 +60,10 @@ int main()
 --- prefix
 12
 --- great
-goodbye
-            )";
+goodbye)";
             parsb_add_blocks(blocks, newblocks, strlen(newblocks));
             assert_str_equal(parsb_get_blocks(blocks, "prefix spooky"),
-                    "12\n-- hello\n!! world");
+                    "12\n-- hello\n!! world\n ");
             assert_str_equal(parsb_get_blocks(blocks, "great prefix"), "goodbye12\n");
         }
 
