@@ -2,8 +2,7 @@
 // String extraction and concatenation, especially useful for snippets of GLSL or Lua.
 //
 // This little library extracts blocks of text from a memory blob or file, then lets you retrieve
-// them by name or dump them out to a C header. It also makes it easy to glue together a sequence of
-// blocks.
+// them by name. It also makes it easy to glue together a sequence of blocks.
 //
 // Each block of text is assigned a name using a prefix line that starts with three dash characters,
 // such as "--- the_name" or "--- my.block".
