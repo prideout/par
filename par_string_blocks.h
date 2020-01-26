@@ -88,10 +88,8 @@ const char* parsb_get_blocks(parsb_context*, const char* block_names);
 // SAVING THE BLOCK LIST
 // ---------------------
 // These functions export the entire "database" of atomic blocks.
-// The latter function is useful for embedding blocks in a C program as a data resource.
 typedef void (*parsb_write_line)(const char* line, void* userdata);
 void parsb_write_blocks(parsb_context*, parsb_write_line writefn, void* user);
-void parsb_write_cstring(parsb_context*, parsb_write_line writefn, void* user);
 
 #ifndef PARSB_MAX_NUM_BLOCKS
 #define PARSB_MAX_NUM_BLOCKS 128
@@ -281,29 +279,27 @@ const char* parsb_get_blocks(parsb_context* context, const char* block_names) {
     return result;
 }
 
-void parsb_write_cstring(parsb_context* context, parsb_write_line writefn,
-    void* userdata) {
-    char line[PARSB_MAX_LINE_LENGTH + 4] = {0};
+void parsb_write_blocks(parsb_context* context, parsb_write_line writefn, void* userdata) {
+    char line[PARSB_MAX_LINE_LENGTH + 1] = {0};
     for (int i = 0; i < context->blocks.count; i++) {
 
-        sprintf(line, "\"--- %s\\n\"", context->blocks.names[i]);
+        sprintf(line, "--- %s", context->blocks.names[i]);
         writefn(line, userdata);
 
         const char* cursor = context->blocks.values[i];
         const int blocklen = strlen(cursor);
         int previous = 0;
         for (int i = 0; i < blocklen; i++) {
-            if (cursor[i] == '\n' || i == blocklen - 1) {
+            if (cursor[i] == '\n') {
                 int line_length = PARSB_MIN(i - previous, PARSB_MAX_LINE_LENGTH);
-                if (i == blocklen - 1) {
-                    line_length++;
-                }
-                line[0] = '\"';
-                memcpy(line + 1, cursor + previous, line_length);
-                line[1 + line_length] = '\\';
-                line[2 + line_length] = 'n';
-                line[3 + line_length] = '\"';
-                line[4 + line_length] = 0;
+                memcpy(line, cursor + previous, line_length);
+                line[line_length] = 0;
+                writefn(line, userdata);
+                previous = i + 1;
+            } else if (i == blocklen - 1) {
+                int line_length = PARSB_MIN(1 + i - previous, PARSB_MAX_LINE_LENGTH);
+                memcpy(line, cursor + previous, line_length);
+                line[line_length] = 0;
                 writefn(line, userdata);
                 previous = i + 1;
             }
@@ -408,46 +404,6 @@ void parsb_add_blocks_from_file(parsb_context* context, const char* filename) {
     fclose(f);
     parsb_add_blocks(context, buffer, length);
     free(buffer);
-}
-
-#endif
-
-#ifdef PARSB_ENABLE_MAIN
-
-void write_line(const char* ln, void* userdata) {
-    FILE* outfile = (FILE*) userdata;
-    fputs(ln, outfile);
-    fputc('\n', outfile);
-}
-
-int main(int argc, char** argv) {
-    if (argc != 4) {
-        puts("Usage: <executable> srcfile dstfile array_name");
-        return 1;
-    }
-    const char* srcfile = argv[1];
-    const char* dstfile = argv[2];
-    const char* array_name = argv[3];
-
-    FILE *f = fopen(srcfile, "rb");
-    fseek(f, 0, SEEK_END);
-    int length = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char* buffer = malloc (length);
-    fread(buffer, 1, length, f);
-    fclose(f);
-
-    parsb_context* ctx = parsb_create_context((parsb_options){ .line_directives = true });
-    parsb_add_blocks(ctx, buffer, length);
-    free(buffer);
-
-    FILE* outfile = fopen(dstfile, "wt");
-    fprintf(outfile, "const char %s[] = \n", array_name);
-    parsb_write_cstring(ctx, write_line, outfile);
-    fprintf(outfile, ";\n");
-    fclose(outfile);
-    parsb_destroy_context(ctx);
-    return 0;
 }
 
 #endif
