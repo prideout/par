@@ -17,6 +17,8 @@ uniform vec4 color;
 !! world
  )";
 
+FILE* global_file;
+
 int main()
 {
     parsb_context* blocks;
@@ -67,7 +69,27 @@ goodbye)";
             assert_str_equal(parsb_get_blocks(blocks, "great prefix"), "goodbye12\n");
         }
 
-        it("can destroy the context") {
+        it("can export the database") {
+            global_file = fopen("test0.glsl", "w");
+            parsb_write_blocks(blocks, [](const char* line, void* user) {
+                fprintf(global_file, "%s\n", line);
+            }, nullptr);
+            fclose(global_file);
+            parsb_destroy_context(blocks);
+        }
+
+        it("can import the database") {
+            blocks = parsb_create_context((parsb_options){});
+            assert_equal((int) sizeof(test_string), (int) strlen(test_string) + 1);
+            parsb_add_blocks_from_file(blocks, "test0.glsl");
+        }
+
+        it("can re-export the database") {
+            global_file = fopen("test1.glsl", "w");
+            parsb_write_blocks(blocks, [](const char* line, void* user) {
+                fprintf(global_file, "%s\n", line);
+            }, nullptr);
+            fclose(global_file);
             parsb_destroy_context(blocks);
         }
     }
