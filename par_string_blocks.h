@@ -95,6 +95,9 @@ void parsb_get_block(const parsb_context*, int index, const char** name, const c
 // These functions export the entire "database" of atomic blocks.
 typedef void (*parsb_write_line)(const char* line, void* userdata);
 void parsb_write_blocks(parsb_context*, parsb_write_line writefn, void* user);
+#ifndef PARSB_NO_STDIO
+void parsb_write_blocks_to_file(parsb_context*, const char* filename);
+#endif
 
 #ifndef PARSB_MAX_NUM_BLOCKS
 #define PARSB_MAX_NUM_BLOCKS 128
@@ -409,7 +412,7 @@ static void parsb__list_free(parsb__list* list) {
 #ifndef PARSB_NO_STDIO
 
 void parsb_add_blocks_from_file(parsb_context* context, const char* filename) {
-    FILE* f = fopen(filename, "rb");
+    FILE* f = fopen(filename, "r");
     if (!f) {
         fprintf(stderr, "Unable to open %s\n", filename);
         return;
@@ -422,6 +425,20 @@ void parsb_add_blocks_from_file(parsb_context* context, const char* filename) {
     fclose(f);
     parsb_add_blocks(context, buffer, length);
     free(buffer);
+}
+
+static void writefn(const char* line, void* userdata) {
+    fprintf((FILE*) userdata, "%s\n", line);
+}
+
+void parsb_write_blocks_to_file(parsb_context* context, const char* filename) {
+    FILE* f = fopen(filename, "w");
+    if (!f) {
+        fprintf(stderr, "Unable to open %s\n", filename);
+        return;
+    }
+    parsb_write_blocks(context, writefn, f);
+    fclose(f);
 }
 
 #endif
