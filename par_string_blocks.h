@@ -85,6 +85,11 @@ void parsb_add_blocks_from_file(parsb_context* context, const char* filename);
 // context. If the returned string is null, then one or more of the block names could not be found.
 const char* parsb_get_blocks(parsb_context*, const char* block_names);
 
+// GETTING BLOCKS BY INDEX
+// -----------------------
+int parsb_get_num_blocks(const parsb_context*);
+void parsb_get_block(const parsb_context*, int index, const char** name, const char** body);
+
 // SAVING THE BLOCK LIST
 // ---------------------
 // These functions export the entire "database" of atomic blocks.
@@ -277,6 +282,19 @@ const char* parsb_get_blocks(parsb_context* context, const char* block_names) {
         cursor += strlen(block);
     }
     return result;
+}
+
+int parsb_get_num_blocks(const parsb_context* context) {
+    return context->blocks.count;
+}
+
+void parsb_get_block(const parsb_context* context, int index, const char** name,
+    const char** body) {
+    if (index < 0 || index >= context->blocks.count) {
+        return;
+    }
+    *name = context->blocks.names[index];
+    *body = context->blocks.values[index];
 }
 
 void parsb_write_blocks(parsb_context* context, parsb_write_line writefn, void* userdata) {
