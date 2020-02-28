@@ -1,6 +1,20 @@
 #include "describe.h"
 
 #define PAR_SHAPES_IMPLEMENTATION
+
+// Used to test PAR_REALLOC
+void* par_realloc_wrapper(void* buf, int new_sz, int old_sz) {
+    void* new_buf = malloc(new_sz);
+    if (buf && old_sz) { memcpy(new_buf, buf, old_sz); }
+    if (buf) { free(buf); }
+    return new_buf;
+}
+
+#define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
+#define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
+#define PAR_REALLOC(T, BUF, N, SZ) ((T*)par_realloc_wrapper(BUF, sizeof(T) * N, sizeof(T) * SZ))
+#define PAR_FREE(BUF) free(BUF)
+
 #include "par_shapes.h"
 
 #include <fcntl.h>
