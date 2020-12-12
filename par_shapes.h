@@ -487,6 +487,7 @@ void par_shapes_free_mesh(par_shapes_mesh* mesh)
     PAR_FREE(mesh->normals);
     PAR_FREE(mesh->tcoords);
     PAR_FREE(mesh);
+    mesh = null;
 }
 
 void par_shapes_export(par_shapes_mesh const* mesh, char const* filename)
