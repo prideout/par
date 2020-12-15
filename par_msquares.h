@@ -759,7 +759,7 @@ par_msquares_meshlist* par_msquares_function(int width, int height,
     int* prevrowinds = PAR_CALLOC(int, ncols * 3);
 
     // If simplification is enabled, we need to track all 'F' cells and their
-    // repsective triangle indices.
+    // respective triangle indices.
     uint8_t* simplification_codes = 0;
     PAR_MSQUARES_T* simplification_tris = 0;
     uint8_t* simplification_ntris = 0;
