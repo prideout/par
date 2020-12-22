@@ -110,6 +110,14 @@ int main()
             par_shapes_export(m, "build/test_shapes_rock.obj");
             par_shapes_free_mesh(m);
 
+            m = par_shapes_create_cone(15, 3);
+            par_shapes_export(m, "build/test_shapes_cone.obj");
+            par_shapes_free_mesh(m);
+
+            m = par_shapes_create_parametric_disk(15, 3);
+            par_shapes_export(m, "build/test_shapes_parametric_disk.obj");
+            par_shapes_free_mesh(m);
+
             float center[3] = {0, 0, 0};
             float normal[3] = {0, 0, 1};
             m = par_shapes_create_disk(1, 5, center, normal);
@@ -160,6 +168,25 @@ int main()
             par_shapes_mesh* a;
             a = par_shapes_create_cylinder(15, 3);
             par_shapes_scale(a, 1, 1, 5);
+            par_shapes_free_mesh(a);
+        }
+        it("should support degenerate scale") {
+            par_shapes_mesh* a;
+            a = par_shapes_create_cone(15, 3);
+            assert_ok(a);
+            par_shapes_scale(a, 1, 1, 0);
+            for (int i = 0; i < a->npoints * 3; i++) {
+                // should not have nans
+                assert_ok(a->points[i] == a->points[i]);
+                assert_ok(a->normals[i] == a->normals[i]);
+                // check components
+                if (i % 3 != 2) {
+                    assert_ok(a->normals[i] == 0.0f);
+                } else {
+                    assert_ok(a->normals[i] == 1.0f);
+                    assert_ok(a->points[i] == 0.0f);
+                }
+            }
             par_shapes_free_mesh(a);
         }
     }
