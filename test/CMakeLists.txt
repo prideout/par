@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.7)
+cmake_minimum_required(VERSION 3.1)
 project(par)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(CURL REQUIRED libcurl)
@@ -85,4 +85,9 @@ add_executable(
 add_executable(
     test_sprune
     test_sprune.c
+    console-colors.c)
+
+add_executable(
+    test_octasphere
+    test_octasphere.cpp
     console-colors.c)

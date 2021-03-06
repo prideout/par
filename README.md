@@ -33,10 +33,9 @@ $ cmake --build build  # Invoke the build
 
 The tests are executed by simply running the programs:
 ```bash
-$ build/test_msquares
-$ build/test_bluenoise
 $ build/test_bubbles
 $ build/test_shapes
+$ build/test_octasphere
 ```
 
 ## code formatting
