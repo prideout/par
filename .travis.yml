@@ -13,7 +13,7 @@ script:
     - export CC=gcc CXX=g++
     - cmake test -Bbuild
     - cmake --build build
-    - ./build/test_msquares
+    - ./build/test_shapes
     - rm -rf build
     - echo Switching from gcc to clang...
 # clang
@@ -27,3 +27,4 @@ script:
     - ./build/test_filecache_lz4
     - ./build/test_sprune
     - ./build/test_strings
+    - ./build/test_octasphere

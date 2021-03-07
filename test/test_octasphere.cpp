@@ -32,7 +32,7 @@ static void generate_gltf(const char* gltf_path, const char* bin_path, int num_v
     cgltf_material materials[1] = {};
     cgltf_material& octasphere_material = materials[0];
 
-    octasphere_material.name = (char*)"tile top";
+    octasphere_material.name = (char*)"octamat";
     octasphere_material.alpha_cutoff = 0.5f;
     octasphere_material.has_pbr_metallic_roughness = true;
     octasphere_material.pbr_metallic_roughness = {
@@ -178,7 +178,7 @@ static void generate_gltf(const char* gltf_path, const char* bin_path, int num_v
 
     cgltf_scene scene = {};
     scene.nodes = pnodes;
-    scene.nodes_count = sizeof(pnodes) / sizeof(pnodes[0]);
+    scene.nodes_count = 1; // only one root
 
     // ASSET
 
@@ -272,7 +272,15 @@ int main()
 
             float minpos[3] = { 99,  99,  99};
             float maxpos[3] = {-99, -99, -99};
-            // TODO: compute minpos and maxpos
+            float* ppos = octasphere.positions;
+            for (int i = 0; i < num_vertices; i++, ppos += 3) {
+                minpos[0] = PARO_MIN(minpos[0], ppos[0]);
+                minpos[1] = PARO_MIN(minpos[1], ppos[1]);
+                minpos[2] = PARO_MIN(minpos[2], ppos[2]);
+                maxpos[0] = PARO_MAX(maxpos[0], ppos[0]);
+                maxpos[1] = PARO_MAX(maxpos[1], ppos[1]);
+                maxpos[2] = PARO_MAX(maxpos[2], ppos[2]);
+            }
 
             FILE* file = fopen("octasphere.bin", "wb");
             if (!file) {
