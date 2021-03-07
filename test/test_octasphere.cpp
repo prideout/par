@@ -10,7 +10,7 @@ extern "C" {
 #include "cgltf_write.h"
 
 static void generate_gltf(const char* gltf_path, const char* bin_path, int num_vertices,
-        int num_indices, float minpos[3], float maxpos[3]) {
+                          int num_indices, float minpos[3], float maxpos[3], bool unlit) {
     cgltf_image images[3] = {
         {(char*)"octasphere color", (char*)"octasphere_color.png"},
         {(char*)"octasphere orm", (char*)"octasphere_orm.png"},
@@ -45,6 +45,13 @@ static void generate_gltf(const char* gltf_path, const char* bin_path, int num_v
     octasphere_material.occlusion_texture = {&orm_texture, 0, 1.0f};
     octasphere_material.normal_texture = {&normal_texture, 0, 1.0f};
 
+    if (unlit) {
+        octasphere_material.unlit = true;
+        octasphere_material.pbr_metallic_roughness.metallic_roughness_texture = {};
+        octasphere_material.occlusion_texture = {};
+        octasphere_material.normal_texture = {};
+    }
+
     // GEOMETRY
 
     cgltf_buffer buffers[1] = {};
@@ -57,7 +64,7 @@ static void generate_gltf(const char* gltf_path, const char* bin_path, int num_v
 
     cgltf_buffer& octasphere_buffer = buffers[0];
 
-    octasphere_buffer.uri = (char*) bin_path;
+    octasphere_buffer.uri = (char*)bin_path;
     octasphere_buffer.size = num_vertices * 32 + num_indices * 2;
 
     buffer_views[0].buffer = &octasphere_buffer;
@@ -159,26 +166,37 @@ static void generate_gltf(const char* gltf_path, const char* bin_path, int num_v
         .translation = {},
         .rotation = {},
         .scale = {},
-        .matrix = {
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1,
-        },
+        .matrix =
+            {
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+            },
     };
 
-    nodes[1] = {
-        .name = (char*) "octasphere",
-        .parent = {},
-        .children = {},
-        .children_count = 0,
-        .skin = {},
-        .mesh = &meshes[0]
-    };
+    nodes[1] = {.name = (char*)"octasphere",
+                .parent = {},
+                .children = {},
+                .children_count = 0,
+                .skin = {},
+                .mesh = &meshes[0]};
 
     cgltf_scene scene = {};
     scene.nodes = pnodes;
-    scene.nodes_count = 1; // only one root
+    scene.nodes_count = 1;  // only one root
 
     // ASSET
 
@@ -218,10 +236,8 @@ static void generate_gltf(const char* gltf_path, const char* bin_path, int num_v
     cgltf_write_file(&options, gltf_path, &asset);
 }
 
-int main()
-{
+int main() {
     describe("octasphere generator") {
-
         it("should generate a tile-like shape") {
             par_octasphere_config config = {
                 .corner_radius = 0.1,
@@ -232,8 +248,7 @@ int main()
                 .uv_mode = PAR_OCTASPHERE_UV_LATLONG,
             };
 
-            uint32_t indices_per_tile;
-            uint32_t vertices_per_tile;
+            uint32_t indices_per_tile, vertices_per_tile;
             par_octasphere_get_counts(&config, &indices_per_tile, &vertices_per_tile);
 
             par_octasphere_mesh octasphere = {};
@@ -242,6 +257,11 @@ int main()
             octasphere.texcoords = (float*)malloc(vertices_per_tile * 8);
             octasphere.indices = (uint16_t*)malloc(indices_per_tile * 2);
             par_octasphere_populate(&config, &octasphere);
+
+            uint32_t nindices, nvertices;
+            par_octasphere_get_counts(&config, &nindices, &nvertices);
+            assert_equal(nindices, indices_per_tile);
+            assert_equal(nvertices, vertices_per_tile);
 
             free(octasphere.positions);
             free(octasphere.normals);
@@ -256,7 +276,7 @@ int main()
                 .height = 1.2,
                 .depth = 1.2,
                 .num_subdivisions = 3,
-                .uv_mode = PAR_OCTASPHERE_UV_LATLONG,
+                .uv_mode = PAR_OCTASPHERE_UV_PTEX,
             };
 
             uint32_t num_indices;
@@ -270,7 +290,7 @@ int main()
             octasphere.indices = (uint16_t*)malloc(num_indices * 2);
             par_octasphere_populate(&config, &octasphere);
 
-            float minpos[3] = { 99,  99,  99};
+            float minpos[3] = {99, 99, 99};
             float maxpos[3] = {-99, -99, -99};
             float* ppos = octasphere.positions;
             for (int i = 0; i < num_vertices; i++, ppos += 3) {
@@ -298,8 +318,8 @@ int main()
             free(octasphere.texcoords);
             free(octasphere.indices);
 
-            generate_gltf("octasphere.gltf", "octasphere.bin", num_vertices, num_indices,
-                    minpos, maxpos);
+            generate_gltf("octasphere.gltf", "octasphere.bin", num_vertices, num_indices, minpos,
+                          maxpos, true);
         }
     }
 

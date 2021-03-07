@@ -49,7 +49,8 @@ extern "C" {
 #define PAR_OCTASPHERE_MAX_SUBDIVISIONS 5
 
 typedef enum {
-    PAR_OCTASPHERE_UV_LATLONG,
+    PAR_OCTASPHERE_UV_LATLONG,  // Classic sphere mapping with theta-phi.
+    PAR_OCTASPHERE_UV_PTEX,     // Each face in the control mesh gets its own patch.
 } par_octasphere_uv_mode;
 
 typedef enum {
@@ -75,7 +76,7 @@ typedef struct {
     uint32_t num_vertices;
 } par_octasphere_mesh;
 
-// Computes the maximum possible number of indices and vertices for the given octasphere config.
+// Computes the number of indices and vertices for the given octasphere config.
 void par_octasphere_get_counts(const par_octasphere_config* config, uint32_t* num_indices,
                                uint32_t* num_vertices);
 
@@ -101,10 +102,7 @@ void par_octasphere_populate(const par_octasphere_config* config, par_octasphere
 #define PARO_CLAMP(v, lo, hi) PARO_MAX(lo, PARO_MIN(hi, v))
 #define PARO_MAX_BOUNDARY_LENGTH ((1 << PAR_OCTASPHERE_MAX_SUBDIVISIONS) + 1)
 
-#ifndef PARO_CONSTANT_TOPOLOGY
-#define PARO_CONSTANT_TOPOLOGY 1
-#endif
-
+// Writes two triangles into the index buffer according to the given quad corners.
 static uint16_t* paro_write_quad(uint16_t* dst, uint16_t a, uint16_t b, uint16_t c, uint16_t d) {
     *dst++ = a;
     *dst++ = b;
@@ -113,6 +111,27 @@ static uint16_t* paro_write_quad(uint16_t* dst, uint16_t a, uint16_t b, uint16_t
     *dst++ = d;
     *dst++ = a;
     return dst;
+}
+
+// Copies the 4 verts at the given indices, appending them to the end of the vertex buffer.
+static void paro_write_quad_unwelded(float const* src_vertices, uint16_t** pindex_write_ptr,
+                                     float** pvertex_write_ptr, uint16_t a, uint16_t b, uint16_t c,
+                                     uint16_t d) {
+    float* vertex_write_ptr = *pvertex_write_ptr;
+    uint16_t* index_write_ptr = *pindex_write_ptr;
+    const uint16_t first_index = (vertex_write_ptr - src_vertices) / 3;
+    *index_write_ptr++ = first_index + 0;
+    *index_write_ptr++ = first_index + 1;
+    *index_write_ptr++ = first_index + 2;
+    *index_write_ptr++ = first_index + 2;
+    *index_write_ptr++ = first_index + 3;
+    *index_write_ptr++ = first_index + 0;
+    *pindex_write_ptr = index_write_ptr;
+    for (int axis = 0; axis < 3; ++axis) *vertex_write_ptr++ = src_vertices[a * 3 + axis];
+    for (int axis = 0; axis < 3; ++axis) *vertex_write_ptr++ = src_vertices[b * 3 + axis];
+    for (int axis = 0; axis < 3; ++axis) *vertex_write_ptr++ = src_vertices[c * 3 + axis];
+    for (int axis = 0; axis < 3; ++axis) *vertex_write_ptr++ = src_vertices[d * 3 + axis];
+    *pvertex_write_ptr = vertex_write_ptr;
 }
 
 static void paro_write_ui3(uint16_t* dst, int index, uint16_t a, uint16_t b, uint16_t c) {
@@ -230,18 +249,11 @@ static float* paro_write_geodesic(float* dst, const float point_a[3], const floa
     return paro_write_f3(dst, point_b);
 }
 
-void paro_add_quads(const par_octasphere_config* config, par_octasphere_mesh* mesh) {
+// Find the vertex indices along each of the first patch's 3 edges.
+static void paro_get_patch_boundaries(const par_octasphere_config* config,
+                                      uint16_t boundaries[3][PARO_MAX_BOUNDARY_LENGTH]) {
     const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
     const int n = (1 << ndivisions) + 1;
-    const int verts_per_patch = n * (n + 1) / 2;
-    const float r2 = config->corner_radius * 2;
-    const float w = PARO_MAX(config->width, r2);
-    const float h = PARO_MAX(config->height, r2);
-    const float d = PARO_MAX(config->depth, r2);
-    const float tx = (w - r2) / 2, ty = (h - r2) / 2, tz = (d - r2) / 2;
-
-    // Find the vertex indices along each of the patch's 3 edges.
-    uint16_t boundaries[3][PARO_MAX_BOUNDARY_LENGTH];
     int a = 0, b = 0, c = 0, row;
     uint16_t j0 = 0;
     for (int col_index = 0; col_index < n - 1; col_index++) {
@@ -261,124 +273,253 @@ void paro_add_quads(const par_octasphere_config* config, par_octasphere_mesh* me
         j0 += col_height + 1;
     }
     boundaries[0][a] = boundaries[1][b] = j0 + row;
+}
 
-    // If there is no rounding (i.e. this is a plain box), then clobber the existing indices.
-    if (!PARO_CONSTANT_TOPOLOGY && config->corner_radius == 0) {
-        mesh->num_indices = 0;
+static void paro_add_quads_ptex(const par_octasphere_config* config, par_octasphere_mesh* mesh) {
+    assert(config->uv_mode == PAR_OCTASPHERE_UV_PTEX);
+    const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
+    const int n = (1 << ndivisions) + 1;
+    const int verts_per_patch = n * (n + 1) / 2;
+
+#warning "TODO: Compute normals for newly added verts."
+
+    // - 4*(n-1) quads between the 4 top patches.
+    // - 4*(n-1) quads between the 4 bottom patches.
+    // - 4*(n-1) quads between the top and bottom patches.
+    // - 6 quads to fill "holes" in each cuboid face.
+    const int num_connection_quads = (4 + 4 + 4) * (n - 1) + 6;
+
+    uint16_t boundaries[3][PARO_MAX_BOUNDARY_LENGTH];
+    paro_get_patch_boundaries(config, boundaries);
+
+    uint16_t* ind_write_ptr = mesh->indices + mesh->num_indices;
+    float* pos_write_ptr = mesh->positions + mesh->num_vertices * 3;
+
+    // Go around the top half.
+    for (int patch = 0; patch < 4; patch++) {
+        const int next_patch = (patch + 1) % 4;
+        const uint16_t* boundary_a = boundaries[1];
+        const uint16_t* boundary_b = boundaries[0];
+        const uint16_t offset_a = verts_per_patch * patch;
+        const uint16_t offset_b = verts_per_patch * next_patch;
+        for (int i = 0; i < n - 1; i++) {
+            const uint16_t a = boundary_a[i] + offset_a;
+            const uint16_t b = boundary_b[i] + offset_b;
+            const uint16_t c = boundary_a[i + 1] + offset_a;
+            const uint16_t d = boundary_b[i + 1] + offset_b;
+            paro_write_quad_unwelded(mesh->positions, &ind_write_ptr, &pos_write_ptr, a, b, d, c);
+        }
     }
-    uint16_t* write_ptr = mesh->indices + mesh->num_indices;
-    const uint16_t* begin_ptr = write_ptr;
 
-    if (PARO_CONSTANT_TOPOLOGY || config->corner_radius > 0) {
-        // Go around the top half.
-        for (int patch = 0; patch < 4; patch++) {
-            if (!PARO_CONSTANT_TOPOLOGY && (patch % 2) == 0 && tz == 0) continue;
-            if (!PARO_CONSTANT_TOPOLOGY && (patch % 2) == 1 && tx == 0) continue;
-            const int next_patch = (patch + 1) % 4;
-            const uint16_t* boundary_a = boundaries[1];
-            const uint16_t* boundary_b = boundaries[0];
-            const uint16_t offset_a = verts_per_patch * patch;
-            const uint16_t offset_b = verts_per_patch * next_patch;
-            for (int i = 0; i < n - 1; i++) {
-                const uint16_t a = boundary_a[i] + offset_a;
-                const uint16_t b = boundary_b[i] + offset_b;
-                const uint16_t c = boundary_a[i + 1] + offset_a;
-                const uint16_t d = boundary_b[i + 1] + offset_b;
-                write_ptr = paro_write_quad(write_ptr, a, b, d, c);
-            }
+    // Go around the bottom half.
+    for (int patch = 4; patch < 8; patch++) {
+        const int next_patch = 4 + (patch + 1) % 4;
+        const uint16_t* boundary_a = boundaries[0];
+        const uint16_t* boundary_b = boundaries[2];
+        const uint16_t offset_a = verts_per_patch * patch;
+        const uint16_t offset_b = verts_per_patch * next_patch;
+        for (int i = 0; i < n - 1; i++) {
+            const uint16_t a = boundary_a[i] + offset_a;
+            const uint16_t b = boundary_b[i] + offset_b;
+            const uint16_t c = boundary_a[i + 1] + offset_a;
+            const uint16_t d = boundary_b[i + 1] + offset_b;
+            paro_write_quad_unwelded(mesh->positions, &ind_write_ptr, &pos_write_ptr, d, b, a, c);
         }
-        // Go around the bottom half.
-        for (int patch = 4; patch < 8; patch++) {
-            if (!PARO_CONSTANT_TOPOLOGY && (patch % 2) == 0 && tx == 0) continue;
-            if (!PARO_CONSTANT_TOPOLOGY && (patch % 2) == 1 && tz == 0) continue;
-            const int next_patch = 4 + (patch + 1) % 4;
-            const uint16_t* boundary_a = boundaries[0];
-            const uint16_t* boundary_b = boundaries[2];
-            const uint16_t offset_a = verts_per_patch * patch;
-            const uint16_t offset_b = verts_per_patch * next_patch;
-            for (int i = 0; i < n - 1; i++) {
-                const uint16_t a = boundary_a[i] + offset_a;
-                const uint16_t b = boundary_b[i] + offset_b;
-                const uint16_t c = boundary_a[i + 1] + offset_a;
-                const uint16_t d = boundary_b[i + 1] + offset_b;
-                write_ptr = paro_write_quad(write_ptr, d, b, a, c);
-            }
-        }
-        // Connect the top and bottom halves.
-        if (PARO_CONSTANT_TOPOLOGY || ty > 0) {
-            for (int patch = 0; patch < 4; patch++) {
-                const int next_patch = 4 + (4 - patch) % 4;
-                const uint16_t* boundary_a = boundaries[2];
-                const uint16_t* boundary_b = boundaries[1];
-                const uint16_t offset_a = verts_per_patch * patch;
-                const uint16_t offset_b = verts_per_patch * next_patch;
-                for (int i = 0; i < n - 1; i++) {
-                    const uint16_t a = boundary_a[i] + offset_a;
-                    const uint16_t b = boundary_b[n - 1 - i] + offset_b;
-                    const uint16_t c = boundary_a[i + 1] + offset_a;
-                    const uint16_t d = boundary_b[n - 1 - i - 1] + offset_b;
-                    write_ptr = paro_write_quad(write_ptr, a, b, d, c);
-                }
-            }
+    }
+    // Connect the top and bottom halves.
+    for (int patch = 0; patch < 4; patch++) {
+        const int next_patch = 4 + (4 - patch) % 4;
+        const uint16_t* boundary_a = boundaries[2];
+        const uint16_t* boundary_b = boundaries[1];
+        const uint16_t offset_a = verts_per_patch * patch;
+        const uint16_t offset_b = verts_per_patch * next_patch;
+        for (int i = 0; i < n - 1; i++) {
+            const uint16_t a = boundary_a[i] + offset_a;
+            const uint16_t b = boundary_b[n - 1 - i] + offset_b;
+            const uint16_t c = boundary_a[i + 1] + offset_a;
+            const uint16_t d = boundary_b[n - 1 - i - 1] + offset_b;
+            paro_write_quad_unwelded(mesh->positions, &ind_write_ptr, &pos_write_ptr, a, b, d, c);
         }
     }
 
     // Fill in the top and bottom holes.
-    if (PARO_CONSTANT_TOPOLOGY || tx > 0 || ty > 0) {
-        uint16_t a, b, c, d;
-        a = boundaries[0][n - 1];
-        b = a + verts_per_patch;
-        c = b + verts_per_patch;
-        d = c + verts_per_patch;
-        write_ptr = paro_write_quad(write_ptr, a, b, c, d);
-        a = boundaries[2][0] + verts_per_patch * 4;
-        b = a + verts_per_patch;
-        c = b + verts_per_patch;
-        d = c + verts_per_patch;
-        write_ptr = paro_write_quad(write_ptr, a, b, c, d);
-    }
+    uint16_t a, b, c, d;
+    a = boundaries[0][n - 1];
+    b = a + verts_per_patch;
+    c = b + verts_per_patch;
+    d = c + verts_per_patch;
+    paro_write_quad_unwelded(mesh->positions, &ind_write_ptr, &pos_write_ptr, a, b, c, d);
+    a = boundaries[2][0] + verts_per_patch * 4;
+    b = a + verts_per_patch;
+    c = b + verts_per_patch;
+    d = c + verts_per_patch;
+    paro_write_quad_unwelded(mesh->positions, &ind_write_ptr, &pos_write_ptr, a, b, c, d);
 
     // Fill in the side holes.
-    if (PARO_CONSTANT_TOPOLOGY || ty > 0) {
-        const int sides[4][2] = {{7, 0}, {1, 2}, {3, 4}, {5, 6}};
-        for (int side = 0; side < 4; side++) {
-            int patch_index, patch, next_patch;
-            uint16_t *boundary_a, *boundary_b;
-            uint16_t offset_a, offset_b;
+    const int sides[4][2] = {{7, 0}, {1, 2}, {3, 4}, {5, 6}};
+    for (int side = 0; side < 4; side++) {
+        int patch_index, patch, next_patch;
+        uint16_t *boundary_a, *boundary_b;
+        uint16_t offset_a, offset_b;
 
-            uint16_t a, b;
-            patch_index = sides[side][0];
-            patch = patch_index / 2;
-            next_patch = 4 + (4 - patch) % 4;
-            offset_a = verts_per_patch * patch;
-            offset_b = verts_per_patch * next_patch;
-            boundary_a = boundaries[2];
-            boundary_b = boundaries[1];
-            if (patch_index % 2 == 0) {
-                a = boundary_a[0] + offset_a;
-                b = boundary_b[n - 1] + offset_b;
-            } else {
-                a = boundary_a[n - 1] + offset_a;
-                b = boundary_b[0] + offset_b;
-            }
+        uint16_t a, b;
+        patch_index = sides[side][0];
+        patch = patch_index / 2;
+        next_patch = 4 + (4 - patch) % 4;
+        offset_a = verts_per_patch * patch;
+        offset_b = verts_per_patch * next_patch;
+        boundary_a = boundaries[2];
+        boundary_b = boundaries[1];
+        if (patch_index % 2 == 0) {
+            a = boundary_a[0] + offset_a;
+            b = boundary_b[n - 1] + offset_b;
+        } else {
+            a = boundary_a[n - 1] + offset_a;
+            b = boundary_b[0] + offset_b;
+        }
 
-            uint16_t c, d;
-            patch_index = sides[side][1];
-            patch = patch_index / 2;
-            next_patch = 4 + (4 - patch) % 4;
-            offset_a = verts_per_patch * patch;
-            offset_b = verts_per_patch * next_patch;
-            boundary_a = boundaries[2];
-            boundary_b = boundaries[1];
-            if (patch_index % 2 == 0) {
-                c = boundary_a[0] + offset_a;
-                d = boundary_b[n - 1] + offset_b;
-            } else {
-                c = boundary_a[n - 1] + offset_a;
-                d = boundary_b[0] + offset_b;
-            }
+        uint16_t c, d;
+        patch_index = sides[side][1];
+        patch = patch_index / 2;
+        next_patch = 4 + (4 - patch) % 4;
+        offset_a = verts_per_patch * patch;
+        offset_b = verts_per_patch * next_patch;
+        boundary_a = boundaries[2];
+        boundary_b = boundaries[1];
+        if (patch_index % 2 == 0) {
+            c = boundary_a[0] + offset_a;
+            d = boundary_b[n - 1] + offset_b;
+        } else {
+            c = boundary_a[n - 1] + offset_a;
+            d = boundary_b[0] + offset_b;
+        }
+        paro_write_quad_unwelded(mesh->positions, &ind_write_ptr, &pos_write_ptr, a, b, d, c);
+    }
+
+    mesh->num_indices += num_connection_quads * 6;
+    mesh->num_vertices += num_connection_quads * 4;
+
+#ifndef NDEBUG
+    assert(mesh->num_indices == ind_write_ptr - mesh->indices);
+    assert(mesh->num_vertices == (pos_write_ptr - mesh->positions) / 3);
+    uint32_t expected_indices;
+    uint32_t expected_vertices;
+    par_octasphere_get_counts(config, &expected_indices, &expected_vertices);
+    assert(mesh->num_indices == expected_indices);
+    assert(mesh->num_vertices == expected_vertices);
+#endif
+}
+
+// This is similar to paro_add_quads_ptex except that verts between patches and quads are welded.
+static void paro_add_quads(const par_octasphere_config* config, par_octasphere_mesh* mesh) {
+    const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
+    const int n = (1 << ndivisions) + 1;
+    const int verts_per_patch = n * (n + 1) / 2;
+
+    uint16_t boundaries[3][PARO_MAX_BOUNDARY_LENGTH];
+    paro_get_patch_boundaries(config, boundaries);
+
+    uint16_t* write_ptr = mesh->indices + mesh->num_indices;
+    const uint16_t* begin_ptr = write_ptr;
+
+    // Go around the top half.
+    for (int patch = 0; patch < 4; patch++) {
+        const int next_patch = (patch + 1) % 4;
+        const uint16_t* boundary_a = boundaries[1];
+        const uint16_t* boundary_b = boundaries[0];
+        const uint16_t offset_a = verts_per_patch * patch;
+        const uint16_t offset_b = verts_per_patch * next_patch;
+        for (int i = 0; i < n - 1; i++) {
+            const uint16_t a = boundary_a[i] + offset_a;
+            const uint16_t b = boundary_b[i] + offset_b;
+            const uint16_t c = boundary_a[i + 1] + offset_a;
+            const uint16_t d = boundary_b[i + 1] + offset_b;
             write_ptr = paro_write_quad(write_ptr, a, b, d, c);
         }
+    }
+    // Go around the bottom half.
+    for (int patch = 4; patch < 8; patch++) {
+        const int next_patch = 4 + (patch + 1) % 4;
+        const uint16_t* boundary_a = boundaries[0];
+        const uint16_t* boundary_b = boundaries[2];
+        const uint16_t offset_a = verts_per_patch * patch;
+        const uint16_t offset_b = verts_per_patch * next_patch;
+        for (int i = 0; i < n - 1; i++) {
+            const uint16_t a = boundary_a[i] + offset_a;
+            const uint16_t b = boundary_b[i] + offset_b;
+            const uint16_t c = boundary_a[i + 1] + offset_a;
+            const uint16_t d = boundary_b[i + 1] + offset_b;
+            write_ptr = paro_write_quad(write_ptr, d, b, a, c);
+        }
+    }
+    // Connect the top and bottom halves.
+    for (int patch = 0; patch < 4; patch++) {
+        const int next_patch = 4 + (4 - patch) % 4;
+        const uint16_t* boundary_a = boundaries[2];
+        const uint16_t* boundary_b = boundaries[1];
+        const uint16_t offset_a = verts_per_patch * patch;
+        const uint16_t offset_b = verts_per_patch * next_patch;
+        for (int i = 0; i < n - 1; i++) {
+            const uint16_t a = boundary_a[i] + offset_a;
+            const uint16_t b = boundary_b[n - 1 - i] + offset_b;
+            const uint16_t c = boundary_a[i + 1] + offset_a;
+            const uint16_t d = boundary_b[n - 1 - i - 1] + offset_b;
+            write_ptr = paro_write_quad(write_ptr, a, b, d, c);
+        }
+    }
+
+    // Fill in the top and bottom holes.
+    uint16_t a, b, c, d;
+    a = boundaries[0][n - 1];
+    b = a + verts_per_patch;
+    c = b + verts_per_patch;
+    d = c + verts_per_patch;
+    write_ptr = paro_write_quad(write_ptr, a, b, c, d);
+    a = boundaries[2][0] + verts_per_patch * 4;
+    b = a + verts_per_patch;
+    c = b + verts_per_patch;
+    d = c + verts_per_patch;
+    write_ptr = paro_write_quad(write_ptr, a, b, c, d);
+
+    // Fill in the side holes.
+    const int sides[4][2] = {{7, 0}, {1, 2}, {3, 4}, {5, 6}};
+    for (int side = 0; side < 4; side++) {
+        int patch_index, patch, next_patch;
+        uint16_t *boundary_a, *boundary_b;
+        uint16_t offset_a, offset_b;
+
+        uint16_t a, b;
+        patch_index = sides[side][0];
+        patch = patch_index / 2;
+        next_patch = 4 + (4 - patch) % 4;
+        offset_a = verts_per_patch * patch;
+        offset_b = verts_per_patch * next_patch;
+        boundary_a = boundaries[2];
+        boundary_b = boundaries[1];
+        if (patch_index % 2 == 0) {
+            a = boundary_a[0] + offset_a;
+            b = boundary_b[n - 1] + offset_b;
+        } else {
+            a = boundary_a[n - 1] + offset_a;
+            b = boundary_b[0] + offset_b;
+        }
+
+        uint16_t c, d;
+        patch_index = sides[side][1];
+        patch = patch_index / 2;
+        next_patch = 4 + (4 - patch) % 4;
+        offset_a = verts_per_patch * patch;
+        offset_b = verts_per_patch * next_patch;
+        boundary_a = boundaries[2];
+        boundary_b = boundaries[1];
+        if (patch_index % 2 == 0) {
+            c = boundary_a[0] + offset_a;
+            d = boundary_b[n - 1] + offset_b;
+        } else {
+            c = boundary_a[n - 1] + offset_a;
+            d = boundary_b[0] + offset_b;
+        }
+        write_ptr = paro_write_quad(write_ptr, a, b, d, c);
     }
 
     mesh->num_indices += write_ptr - begin_ptr;
@@ -387,8 +528,130 @@ void paro_add_quads(const par_octasphere_config* config, par_octasphere_mesh* me
     uint32_t expected_indices;
     uint32_t expected_vertices;
     par_octasphere_get_counts(config, &expected_indices, &expected_vertices);
-    assert(mesh->num_indices <= expected_indices);
+    assert(mesh->num_indices == expected_indices);
 #endif
+}
+
+static void paro_populate_uvs_latlong(const par_octasphere_config* config,
+                                      par_octasphere_mesh* mesh) {
+    assert(config->uv_mode == PAR_OCTASPHERE_UV_LATLONG);
+    const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
+    const int n = (1 << ndivisions) + 1;
+    const int verts_per_patch = n * (n + 1) / 2;
+    const int total_vertices = verts_per_patch * 8;
+    for (int i = 0; i < total_vertices; i++) {
+        const int octant = i / verts_per_patch;
+        const int relative_index = i % verts_per_patch;
+        float* uv = mesh->texcoords + i * 2;
+        const float* xyz = mesh->positions + i * 3;
+        const float x = xyz[0], y = xyz[1], z = xyz[2];
+        const float phi = -atan2(z, x);
+        const float theta = acos(y);
+        uv[0] = 0.5 * (phi / PARO_PI + 1.0);
+        uv[1] = theta / PARO_PI;
+        // Special case for the north pole.
+        if (octant < 4 && relative_index == verts_per_patch - 1) {
+            uv[0] = fmod(0.375 + 0.25 * octant, 1.0);
+            uv[1] = 0;
+        }
+        // Special case for the south pole.
+        if (octant >= 4 && relative_index == 0) {
+            uv[0] = 0.375 - 0.25 * (octant - 4);
+            uv[0] = uv[0] + uv[0] < 0 ? 1.0 : 0.0;
+            uv[1] = 1.0;
+        }
+        // Adjust the prime meridian for proper wrapping.
+        if ((octant == 2 || octant == 6) && uv[0] < 0.5) {
+            uv[0] += 1.0;
+        }
+    }
+}
+
+static void paro_octahedral_proj(const float dir_in[3], float uv_out[2], int octant) {
+    float dir[3];
+    paro_copy(dir, dir_in);
+    paro_scale(dir, 1.0f / (fabs(dir[0]) + fabs(dir[1]) + fabs(dir[2])));
+    const float rev[2] = {
+        fabs(dir[2]) - 1.0f,
+        fabs(dir[0]) - 1.0f,
+    };
+    const float neg[2] = {
+        dir[0] < 0 ? rev[0] : -rev[0],
+        dir[2] < 0 ? rev[1] : -rev[1],
+    };
+    uv_out[0] = dir[1] < 0 ? neg[0] : dir[0];
+    uv_out[1] = dir[1] < 0 ? neg[1] : dir[2];
+    uv_out[0] = 0.5 * uv_out[0] + 0.5;
+    uv_out[1] = 0.5 * uv_out[1] + 0.5;
+    if (octant == 4 && uv_out[1] <= 0.5) {  // G
+        uv_out[1] += 0.5;
+    }
+    if (octant == 5 && uv_out[1] <= 0.5) {  // E
+        uv_out[1] += 0.5;
+    }
+    if (octant == 6 && uv_out[0] > 0.5) {  // A
+        uv_out[0] -= 0.5;
+    }
+    if (octant == 7) {  // C
+        uv_out[1] = fmod(uv_out[1], 0.5);
+    }
+}
+
+static void paro_populate_uvs_ptex_patches(const par_octasphere_config* config,
+                                           par_octasphere_mesh* mesh) {
+    const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
+    const int n = (1 << ndivisions) + 1;
+    const int verts_per_patch = n * (n + 1) / 2;
+    assert(config->uv_mode == PAR_OCTASPHERE_UV_PTEX);
+    const float* pos_read_ptr = mesh->positions;
+    float* uvs_write_ptr = mesh->texcoords;
+
+    for (int i = 0; i < verts_per_patch * 4; i++, pos_read_ptr += 3, uvs_write_ptr += 2) {
+        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 0);
+        uvs_write_ptr[0] *= 2.0 / 11.0;
+    }
+
+    for (int i = 0; i < verts_per_patch; i++, pos_read_ptr += 3, uvs_write_ptr += 2) {
+        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 4);  // G
+        uvs_write_ptr[0] *= 2.0 / 11.0;
+    }
+
+    for (int i = 0; i < verts_per_patch; i++, pos_read_ptr += 3, uvs_write_ptr += 2) {
+        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 5);  // E
+        uvs_write_ptr[0] *= 2.0 / 11.0;
+    }
+
+    for (int i = 0; i < verts_per_patch; i++, pos_read_ptr += 3, uvs_write_ptr += 2) {
+        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 6);  // A
+        uvs_write_ptr[0] *= 2.0 / 11.0;
+    }
+
+    for (int i = 0; i < verts_per_patch; i++, pos_read_ptr += 3, uvs_write_ptr += 2) {
+        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 7);  // C
+        uvs_write_ptr[0] *= 2.0 / 11.0;
+    }
+}
+
+static void paro_populate_uvs_ptex_quads(const par_octasphere_config* config,
+                                         par_octasphere_mesh* mesh) {
+    assert(config->uv_mode == PAR_OCTASPHERE_UV_PTEX);
+    const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
+    const int n = (1 << ndivisions) + 1;
+    const int verts_per_patch = n * (n + 1) / 2;
+
+    // - 4*(n-1) quads between the 4 top patches.
+    // - 4*(n-1) quads between the 4 bottom patches.
+    // - 4*(n-1) quads between the top and bottom patches.
+    // - 6 quads to fill "holes" in each cuboid face.
+    const int num_connection_quads = (4 + 4 + 4) * (n - 1) + 6;
+
+    float* uvs_write_ptr = mesh->texcoords + verts_per_patch * 8 * 2;
+
+#warning "TODO paro_populate_uvs_ptex_quads"
+    for (int i = verts_per_patch * 8; i < mesh->num_vertices; i++, uvs_write_ptr += 2) {
+        uvs_write_ptr[0] = 0;
+        uvs_write_ptr[1] = 0;
+    }
 }
 
 void par_octasphere_get_counts(const par_octasphere_config* config, uint32_t* num_indices,
@@ -396,21 +659,8 @@ void par_octasphere_get_counts(const par_octasphere_config* config, uint32_t* nu
     const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
     const int n = (1 << ndivisions) + 1;
     const int verts_per_patch = n * (n + 1) / 2;
-    const float r2 = config->corner_radius * 2;
-    const float w = PARO_MAX(config->width, r2);
-    const float h = PARO_MAX(config->height, r2);
-    const float d = PARO_MAX(config->depth, r2);
-    const float tx = (w - r2) / 2, ty = (h - r2) / 2, tz = (d - r2) / 2;
     const int triangles_per_patch = (n - 2) * (n - 1) + n - 1;
 
-    // If this is a sphere, return early.
-    if (tx == 0 && ty == 0 && tz == 0) {
-        *num_indices = triangles_per_patch * 8 * 3;
-        *num_vertices = verts_per_patch * 8;
-        return;
-    }
-
-    // This is a cuboid, so account for the maximum number of possible quads.
     // - 4*(n-1) quads between the 4 top patches.
     // - 4*(n-1) quads between the 4 bottom patches.
     // - 4*(n-1) quads between the top and bottom patches.
@@ -419,6 +669,10 @@ void par_octasphere_get_counts(const par_octasphere_config* config, uint32_t* nu
 
     *num_indices = (triangles_per_patch * 8 + num_connection_quads * 2) * 3;
     *num_vertices = verts_per_patch * 8;
+
+    if (config->uv_mode == PAR_OCTASPHERE_UV_PTEX) {
+        *num_vertices += num_connection_quads * 4;
+    }
 }
 
 void par_octasphere_populate(const par_octasphere_config* config, par_octasphere_mesh* mesh) {
@@ -488,34 +742,12 @@ void par_octasphere_populate(const par_octasphere_config* config, par_octasphere
     // END 8-WAY CLONE OF PATCH
 
     if (mesh->texcoords && config->uv_mode == PAR_OCTASPHERE_UV_LATLONG) {
-        for (int i = 0; i < total_vertices; i++) {
-            const int octant = i / verts_per_patch;
-            const int relative_index = i % verts_per_patch;
-            float* uv = mesh->texcoords + i * 2;
-            const float* xyz = mesh->positions + i * 3;
-            const float x = xyz[0], y = xyz[1], z = xyz[2];
-            const float phi = -atan2(z, x);
-            const float theta = acos(y);
-            uv[0] = 0.5 * (phi / PARO_PI + 1.0);
-            uv[1] = theta / PARO_PI;
-            // Special case for the north pole.
-            if (octant < 4 && relative_index == verts_per_patch - 1) {
-                uv[0] = fmod(0.375 + 0.25 * octant, 1.0);
-                uv[1] = 0;
-            }
-            // Special case for the south pole.
-            if (octant >= 4 && relative_index == 0) {
-                uv[0] = 0.375 - 0.25 * (octant - 4);
-                uv[0] = uv[0] + uv[0] < 0 ? 1.0 : 0.0;
-                uv[1] = 1.0;
-            }
-            // Adjust the prime meridian for proper wrapping.
-            if ((octant == 2 || octant == 6) && uv[0] < 0.5) {
-                uv[0] += 1.0;
-            }
-        }
+        paro_populate_uvs_latlong(config, mesh);
     }
 
+    // The following memcpy for normals works because these patches are spherical in nature, and we
+    // have not yet scaled and translated anything. Note that in PTEX mode, we need to populate
+    // additional normals for the quads.
     if (mesh->normals && config->normals_mode == PAR_OCTASPHERE_NORMALS_SMOOTH) {
         memcpy(mesh->normals, mesh->positions, sizeof(float) * 3 * total_vertices);
     }
@@ -532,8 +764,8 @@ void par_octasphere_populate(const par_octasphere_config* config, par_octasphere
     mesh->num_indices = triangles_per_patch * 8 * 3;
     mesh->num_vertices = total_vertices;
 
-    if (tx == 0 && ty == 0 && tz == 0) {
-        return;
+    if (config->uv_mode == PAR_OCTASPHERE_UV_PTEX && mesh->texcoords) {
+        paro_populate_uvs_ptex_patches(config, mesh);
     }
 
     for (int i = 0; i < total_vertices; i++) {
@@ -547,7 +779,14 @@ void par_octasphere_populate(const par_octasphere_config* config, par_octasphere
         xyz[2] += tz * sz;
     }
 
-    paro_add_quads(config, mesh);
+    if (config->uv_mode == PAR_OCTASPHERE_UV_PTEX) {
+        paro_add_quads_ptex(config, mesh);
+        if (mesh->texcoords) {
+            paro_populate_uvs_ptex_quads(config, mesh);
+        }
+    } else {
+        paro_add_quads(config, mesh);
+    }
 }
 
 #endif  // PAR_OCTASPHERE_IMPLEMENTATION
