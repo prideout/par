@@ -275,7 +275,7 @@ int main() {
                 .width = 1.2,
                 .height = 1.2,
                 .depth = 1.2,
-                .num_subdivisions = 3,
+                .num_subdivisions = 4,
                 .uv_mode = PAR_OCTASPHERE_UV_PTEX,
             };
 

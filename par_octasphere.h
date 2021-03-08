@@ -134,6 +134,23 @@ static void paro_write_quad_unwelded(float const* src_vertices, uint16_t** pinde
     *pvertex_write_ptr = vertex_write_ptr;
 }
 
+static void paro_write_quad_uv(float** puv_write_ptr, float x0, float y0, float x1, float y1, int a,
+                               int b, int c, int d) {
+    // clang-format off
+    float corners[4][2];
+    corners[0][0] = x0; corners[0][1] = y0;
+    corners[1][0] = x0; corners[1][1] = y1;
+    corners[2][0] = x1; corners[2][1] = y0;
+    corners[3][0] = x1; corners[3][1] = y1;
+    float* uv = *puv_write_ptr;
+    *uv++ = corners[a][0]; *uv++ = corners[a][1];
+    *uv++ = corners[b][0]; *uv++ = corners[b][1];
+    *uv++ = corners[c][0]; *uv++ = corners[c][1];
+    *uv++ = corners[c][0]; *uv++ = corners[d][1];
+    // clang-format on
+    *puv_write_ptr = uv;
+}
+
 static void paro_write_ui3(uint16_t* dst, int index, uint16_t a, uint16_t b, uint16_t c) {
     dst[index * 3 + 0] = a;
     dst[index * 3 + 1] = b;
@@ -583,17 +600,19 @@ static void paro_octahedral_proj(const float dir_in[3], float uv_out[2], int oct
     uv_out[1] = dir[1] < 0 ? neg[1] : dir[2];
     uv_out[0] = 0.5 * uv_out[0] + 0.5;
     uv_out[1] = 0.5 * uv_out[1] + 0.5;
-    if (octant == 4 && uv_out[1] <= 0.5) {  // G
-        uv_out[1] += 0.5;
+    if (octant == 4) {  // G
+        if (uv_out[1] <= 0.5) uv_out[1] = 1.0 - uv_out[1];
     }
-    if (octant == 5 && uv_out[1] <= 0.5) {  // E
-        uv_out[1] += 0.5;
+    if (octant == 5) {  // E
+        if (uv_out[1] <= 0.5) uv_out[1] = 1.0 - uv_out[1];
+        if (uv_out[0] > 0.5) uv_out[0] = 1.0 - uv_out[0];
     }
-    if (octant == 6 && uv_out[0] > 0.5) {  // A
-        uv_out[0] -= 0.5;
+    if (octant == 6) {  // A
+        if (uv_out[0] > 0.5) uv_out[0] = 1.0 - uv_out[0];
     }
     if (octant == 7) {  // C
-        uv_out[1] = fmod(uv_out[1], 0.5);
+        if (uv_out[0] <= 0.5) uv_out[0] = 1.0 - uv_out[0];
+        if (uv_out[1] > 0.5) uv_out[1] = 1.0 - uv_out[1];
     }
 }
 
@@ -607,7 +626,7 @@ static void paro_populate_uvs_ptex_patches(const par_octasphere_config* config,
     float* uvs_write_ptr = mesh->texcoords;
 
     for (int i = 0; i < verts_per_patch * 4; i++, pos_read_ptr += 3, uvs_write_ptr += 2) {
-        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 0);
+        paro_octahedral_proj(pos_read_ptr, uvs_write_ptr, 0);  // B, D, F, H
         uvs_write_ptr[0] *= 2.0 / 11.0;
     }
 
@@ -638,19 +657,77 @@ static void paro_populate_uvs_ptex_quads(const par_octasphere_config* config,
     const int ndivisions = PARO_CLAMP(config->num_subdivisions, 0, PAR_OCTASPHERE_MAX_SUBDIVISIONS);
     const int n = (1 << ndivisions) + 1;
     const int verts_per_patch = n * (n + 1) / 2;
-
-    // - 4*(n-1) quads between the 4 top patches.
-    // - 4*(n-1) quads between the 4 bottom patches.
-    // - 4*(n-1) quads between the top and bottom patches.
-    // - 6 quads to fill "holes" in each cuboid face.
-    const int num_connection_quads = (4 + 4 + 4) * (n - 1) + 6;
-
     float* uvs_write_ptr = mesh->texcoords + verts_per_patch * 8 * 2;
 
-#warning "TODO paro_populate_uvs_ptex_quads"
     for (int i = verts_per_patch * 8; i < mesh->num_vertices; i++, uvs_write_ptr += 2) {
         uvs_write_ptr[0] = 0;
         uvs_write_ptr[1] = 0;
+    }
+    uvs_write_ptr = mesh->texcoords + verts_per_patch * 8 * 2;
+
+    float x = 0;
+    float y = 0;
+
+    const float dx = 1.0 / (n - 1);
+    const int a = 0, b = 1, c = 2, d = 3;
+
+    // Go around the top half. (I K M O)
+    for (int patch = 0; patch < 4; patch++) {
+        for (int i = 0; i < n - 1; i++) {
+            paro_write_quad_uv(&uvs_write_ptr, x, 0, x + dx, 1, a, b, d, c);
+            x = x + dx;
+        }
+    }
+
+    // Go around the bottom half. (Q S U W)
+    for (int patch = 0; patch < 4; patch++) {
+        for (int i = 0; i < n - 1; i++) {
+            paro_write_quad_uv(&uvs_write_ptr, x, y, x + 1, y + dx, d, c, a, b);
+            y = y + dx;
+        }
+        y = 0;
+        x++;
+    }
+
+    // Connect the top and bottom halves. (Y J L N)
+    for (int patch = 0; patch < 4; patch++) {
+        for (int i = 0; i < n - 1; i++) {
+            paro_write_quad_uv(&uvs_write_ptr, x, 0, x + dx, 1, a, b, d, c);
+            x = x + dx;
+        }
+    }
+
+    // Normalize the coordinates.
+    uvs_write_ptr = mesh->texcoords + verts_per_patch * 8 * 2;
+    for (int patch = 0; patch < 12; patch++) {
+        for (int i = 0; i < 4 * (n - 1); i++) {
+            if (patch >= 9) {
+                uvs_write_ptr[0] -= 9;
+                uvs_write_ptr[1] += 1;
+            }
+            uvs_write_ptr[0] = 2.0 / 11.0 + uvs_write_ptr[0] / 11.0;
+            uvs_write_ptr[1] = uvs_write_ptr[1] / 2.0;
+            uvs_write_ptr += 2;
+        }
+    }
+
+    // Central quads of the six cube faces (P R T V X Z)
+    // clang-format off
+    paro_write_quad_uv(&uvs_write_ptr, x, 1, x + 1, 2, d, c, a, b); x++;
+    paro_write_quad_uv(&uvs_write_ptr, x, 1, x + 1, 2, d, c, a, b); x++;
+    paro_write_quad_uv(&uvs_write_ptr, x, 1, x + 1, 2, d, c, a, b); x++;
+    paro_write_quad_uv(&uvs_write_ptr, x, 1, x + 1, 2, d, c, a, b); x++;
+    paro_write_quad_uv(&uvs_write_ptr, x, 1, x + 1, 2, d, c, a, b); x++;
+    paro_write_quad_uv(&uvs_write_ptr, x, 1, x + 1, 2, d, c, a, b); x++;
+    // clang-format on
+
+    // Normalize the coordinates.
+    uvs_write_ptr -= 4 * 6 * 2;
+    for (int i = 0; i < 6 * 4; i++) {
+        uvs_write_ptr[0] -= 9;
+        uvs_write_ptr[0] = 2.0 / 11.0 + uvs_write_ptr[0] / 11.0;
+        uvs_write_ptr[1] = uvs_write_ptr[1] / 2.0;
+        uvs_write_ptr += 2;
     }
 }
 
