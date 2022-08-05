@@ -1400,6 +1400,7 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
             }
         }
     }
+    par_shapes_free_mesh(tube);
     PAR_FREE(stack);
     PAR_FREE(program);
     PAR_FREE(rules);
