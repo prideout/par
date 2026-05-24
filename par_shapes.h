@@ -1259,6 +1259,9 @@ par_shapes_mesh* par_shapes_create_lsystem(char const* text, int slices,
     cmd = strtok(program, " ");
     while (cmd) {
         char *arg = strtok(0, " ");
+        if (!arg) {
+            break;
+        }
         if (!strcmp(cmd, "rule")) {
             current_rule++;
 
