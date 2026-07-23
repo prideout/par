@@ -198,8 +198,15 @@ void par_shapes__connect(par_shapes_mesh* scene, par_shapes_mesh* cylinder,
 #ifndef PAR_MALLOC
 #define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 #define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N, OLD_SZ) ((T*) realloc(BUF, sizeof(T) * (N)))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * (N)))
 #define PAR_FREE(BUF) free(BUF)
+#endif
+
+// Define this before including par_shapes.h to use a sized realloc.
+// N and OLD_N are element counts.
+#ifndef PAR_SHAPES_REALLOC
+#define PAR_SHAPES_REALLOC(T, BUF, N, OLD_N) \
+    ((void) sizeof(OLD_N), PAR_REALLOC(T, BUF, N))
 #endif
 
 #ifdef __cplusplus
@@ -680,11 +687,13 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     int old_dst_npoints = dst->npoints;
     int npoints = dst->npoints + src->npoints;
     int vecsize = sizeof(float) * 3;
-    dst->points = PAR_REALLOC(float, dst->points, 3 * npoints, 3 * old_dst_npoints);
+    dst->points = PAR_SHAPES_REALLOC(float, dst->points, 3 * npoints,
+        3 * old_dst_npoints);
     memcpy(dst->points + 3 * dst->npoints, src->points, vecsize * src->npoints);
     dst->npoints = npoints;
     if (src->normals || dst->normals) {
-        dst->normals = PAR_REALLOC(float, dst->normals, 3 * npoints, 3 * old_dst_npoints);
+        dst->normals = PAR_SHAPES_REALLOC(float, dst->normals, 3 * npoints,
+            3 * old_dst_npoints);
         if (src->normals) {
             memcpy(dst->normals + 3 * offset, src->normals,
                 vecsize * src->npoints);
@@ -692,14 +701,16 @@ void par_shapes_merge(par_shapes_mesh* dst, par_shapes_mesh const* src)
     }
     if (src->tcoords || dst->tcoords) {
         int uvsize = sizeof(float) * 2;
-        dst->tcoords = PAR_REALLOC(float, dst->tcoords, 2 * npoints, 2 * old_dst_npoints);
+        dst->tcoords = PAR_SHAPES_REALLOC(float, dst->tcoords, 2 * npoints,
+            2 * old_dst_npoints);
         if (src->tcoords) {
             memcpy(dst->tcoords + 2 * offset, src->tcoords,
                 uvsize * src->npoints);
         }
     }
     int ntriangles = dst->ntriangles + src->ntriangles;
-    dst->triangles = PAR_REALLOC(PAR_SHAPES_T, dst->triangles, 3 * ntriangles, 3 * dst->ntriangles);
+    dst->triangles = PAR_SHAPES_REALLOC(PAR_SHAPES_T, dst->triangles,
+        3 * ntriangles, 3 * dst->ntriangles);
     PAR_SHAPES_T* ptriangles = dst->triangles + 3 * dst->ntriangles;
     PAR_SHAPES_T const* striangles = src->triangles;
     for (int i = 0; i < src->ntriangles; i++) {
@@ -1567,21 +1578,24 @@ par_shapes_mesh* par_shapes_clone(par_shapes_mesh const* mesh,
     }
     int old_clone_npoints = clone->npoints;
     clone->npoints = mesh->npoints;
-    clone->points = PAR_REALLOC(float, clone->points, 3 * clone->npoints, 3 * old_clone_npoints);
+    clone->points = PAR_SHAPES_REALLOC(float, clone->points,
+        3 * clone->npoints, 3 * old_clone_npoints);
     memcpy(clone->points, mesh->points, sizeof(float) * 3 * clone->npoints);
     int old_clone_ntriangles = clone->ntriangles;
     clone->ntriangles = mesh->ntriangles;
-    clone->triangles = PAR_REALLOC(PAR_SHAPES_T, clone->triangles, 3 *
-        clone->ntriangles, 3 * old_clone_ntriangles);
+    clone->triangles = PAR_SHAPES_REALLOC(PAR_SHAPES_T, clone->triangles,
+        3 * clone->ntriangles, 3 * old_clone_ntriangles);
     memcpy(clone->triangles, mesh->triangles,
         sizeof(PAR_SHAPES_T) * 3 * clone->ntriangles);
     if (mesh->normals) {
-        clone->normals = PAR_REALLOC(float, clone->normals, 3 * clone->npoints, 3 * old_clone_npoints);
+        clone->normals = PAR_SHAPES_REALLOC(float, clone->normals,
+            3 * clone->npoints, 3 * old_clone_npoints);
         memcpy(clone->normals, mesh->normals,
             sizeof(float) * 3 * clone->npoints);
     }
     if (mesh->tcoords) {
-        clone->tcoords = PAR_REALLOC(float, clone->tcoords, 2 * clone->npoints, 3 * old_clone_npoints);
+        clone->tcoords = PAR_SHAPES_REALLOC(float, clone->tcoords,
+            2 * clone->npoints, 2 * old_clone_npoints);
         memcpy(clone->tcoords, mesh->tcoords,
             sizeof(float) * 2 * clone->npoints);
     }

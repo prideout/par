@@ -2,17 +2,20 @@
 
 #define PAR_SHAPES_IMPLEMENTATION
 
-// Used to test PAR_REALLOC
-void* test_realloc(void* buf, int new_sz, int old_sz) {
+// Used to test PAR_SHAPES_REALLOC
+void* test_realloc(void* buf, size_t new_sz, size_t old_sz) {
     void* new_buf = malloc(new_sz);
-    if (buf && old_sz) { memcpy(new_buf, buf, old_sz); }
+    size_t copy_sz = old_sz < new_sz ? old_sz : new_sz;
+    if (buf && copy_sz) { memcpy(new_buf, buf, copy_sz); }
     if (buf) { free(buf); }
     return new_buf;
 }
 
 #define PAR_MALLOC(T, N) ((T*) malloc(N * sizeof(T)))
 #define PAR_CALLOC(T, N) ((T*) calloc(N * sizeof(T), 1))
-#define PAR_REALLOC(T, BUF, N, OLD_SZ) ((T*)test_realloc(BUF, sizeof(T) * N, sizeof(T) * OLD_SZ))
+#define PAR_REALLOC(T, BUF, N) ((T*) realloc(BUF, sizeof(T) * (N)))
+#define PAR_SHAPES_REALLOC(T, BUF, N, OLD_N) \
+    ((T*)test_realloc(BUF, sizeof(T) * (N), sizeof(T) * (OLD_N)))
 #define PAR_FREE(BUF) free(BUF)
 
 #include "par_shapes.h"
@@ -153,6 +156,30 @@ int main()
             assert_equal(a->ntriangles, ntris + b->ntriangles);
             par_shapes_free_mesh(a);
             par_shapes_free_mesh(b);
+        }
+    }
+
+    describe("par_shapes_clone") {
+        it("should reuse a mesh when growing and shrinking") {
+            par_shapes_mesh* small = par_shapes_create_plane(3, 3);
+            par_shapes_mesh* large = par_shapes_create_plane(20, 20);
+            par_shapes_mesh* clone = par_shapes_clone(small, 0);
+
+            clone = par_shapes_clone(large, clone);
+            assert_equal(clone->npoints, large->npoints);
+            assert_equal(clone->ntriangles, large->ntriangles);
+            assert_not_null(clone->normals);
+            assert_not_null(clone->tcoords);
+
+            clone = par_shapes_clone(small, clone);
+            assert_equal(clone->npoints, small->npoints);
+            assert_equal(clone->ntriangles, small->ntriangles);
+            assert_not_null(clone->normals);
+            assert_not_null(clone->tcoords);
+
+            par_shapes_free_mesh(small);
+            par_shapes_free_mesh(large);
+            par_shapes_free_mesh(clone);
         }
     }
 
