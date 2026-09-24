@@ -569,6 +569,7 @@ static par_msquares_meshlist* par_msquares__merge(par_msquares_meshlist** lists,
         for (int j = 0; j < meshlist->nmeshes; j++) {
             *pmesh++ = meshlist->meshes[j];
         }
+        free(meshlist->meshes);
         free(meshlist);
     }
     if (!snap) {
